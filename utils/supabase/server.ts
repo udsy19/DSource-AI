@@ -8,8 +8,13 @@ export const createClient = async (cookieStore: any) => {
   const cookies = cookieStore;
   return createServerClient(supabaseUrl!, supabaseKey!, {
     cookies: {
-      getAll() {
-        return cookies.getAll();
+      async getAll() {
+        try {
+          return await cookies.getAll();
+        } catch (error) {
+          // Return empty array if cookies are not available
+          return [];
+        }
       },
       setAll(cookiesToSet) {
         try {

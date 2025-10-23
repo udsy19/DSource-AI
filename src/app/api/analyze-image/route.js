@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "../../../../utils/supabase/server";
+import { cookies } from "next/headers";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -47,7 +48,16 @@ export async function POST(request) {
       ],
     });
 
-    const validationResult = JSON.parse(validationResponse.text);
+    // Extract JSON from validation response text
+    const validationJson = validationResponse.text.match(
+      /```json\n([\s\S]*?)\n```/
+    )?.[1];
+    if (!validationJson) {
+      throw new Error("Failed to parse validation result");
+    }
+    const validationResult = JSON.parse(validationJson);
+
+    console.log(validationResult);
 
     if (!validationResult.isInterior) {
       return NextResponse.json(
@@ -60,33 +70,85 @@ export async function POST(request) {
       );
     }
 
-    // Step 2: Extract materials from the interior image
-    const materialExtractionPrompt = `
-    Analyze this interior image and identify all visible materials and finishes.
-    Look for materials like:
-    - Flooring (wood, tile, carpet, marble, etc.)
-    - Wall finishes (paint, wallpaper, wood paneling, stone, etc.)
-    - Countertops (granite, quartz, wood, etc.)
-    - Cabinetry materials (wood species, finishes, etc.)
-    - Hardware (metal types, finishes, etc.)
-    - Lighting fixtures materials
-    - Furniture materials
-    - Window treatments
-    - Any other visible materials
+    // Step 2: Search Supabase for matching products
+    const cookieStore = await cookies();
+    const supabase = await createClient(cookieStore);
+    const matchingProducts = [];
+
+    // Get unique categories and subcategories from scraped_product_list
+    const { data: uniqueCategories, error: categoryError } = await supabase
+      .from("scraped_product_list")
+      .select("category_name, sub_category, color")
+      .not("category_name", "is", null);
+
+    if (categoryError) {
+      throw new Error("Failed to fetch categories from database");
+    }
+
+    // Create a Set to store unique combinations
+    const uniqueCombinations = new Set();
+
+    uniqueCategories.forEach((item) => {
+      if (item.category_name && item.sub_category && item.color) {
+        // Create a unique key by combining all three values
+        const combinationKey = `${item.category_name}|${item.sub_category[0]}|${item.color}`;
+        uniqueCombinations.add(combinationKey);
+      }
+    });
+
+    // Convert combinations back to objects
+    const uniqueCombinationsList = Array.from(uniqueCombinations).map(
+      (combo) => {
+        const [category, subCategory, color] = combo.split("|");
+        return {
+          category_name: category,
+          sub_category: subCategory,
+          color: color,
+        };
+      }
+    );
+
+    console.log("Unique combinations:", uniqueCombinationsList);
+
+    // Step 2: Get AI product recommendations based on unique combinations
+    const productRecommendationPrompt = `
+    Analyze this interior image and recommend the top 3 most suitable products from the available options below.
+    
+    Available Product Combinations:
+    ${uniqueCombinationsList
+      .map(
+        (item) =>
+          `- ${item.category_name} > ${item.sub_category} (${item.color})`
+      )
+      .join("\n")}
+    
+    For each recommended product, provide:
+    1. Which specific area/part of the interior it would be suitable for
+    2. Why it matches the design style and color scheme
+    3. Confidence score (0-1) for the recommendation
     
     Respond with a JSON array of objects:
     [
       {
-        "material": "string (specific material name)",
-        "category": "string (flooring, wall, countertop, etc.)",
-        "subCategory": "string (wood, tile, metal, etc.)",
-        "location": "string (where in the image)",
-        "confidence": number (0-1)
+        "product": {
+          "category_name": "string",
+          "sub_category": "string", 
+          "color": "string"
+        },
+        "interior_location": "string (specific area like 'kitchen countertop', 'living room floor', etc.)",
+        "reasoning": "string (why this product fits)",
+        "confidence": number (0-1),
+        "position": {
+          "x": number (0-100, percentage from left),
+          "y": number (0-100, percentage from top)
+        }
       }
     ]
+    
+    Only return the top 3 most confident recommendations in descending order.
     `;
 
-    const materialResponse = await ai.models.generateContent({
+    const productResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [
         {
@@ -95,46 +157,78 @@ export async function POST(request) {
             data: base64Image,
           },
         },
-        { text: materialExtractionPrompt },
+        { text: productRecommendationPrompt },
       ],
     });
 
-    const materials = JSON.parse(materialResponse.text);
+    const productJson = productResponse.text.match(
+      /```json\n([\s\S]*?)\n```/
+    )?.[1];
+    if (!productJson) {
+      throw new Error("Failed to parse product recommendation result");
+    }
+    const productRecommendations = JSON.parse(productJson);
 
-    // Step 3: Search Supabase for matching products
-    const supabase = createClient();
-    const matchingProducts = [];
+    // Step 3: Fetch detailed product data from Supabase based on recommendations
+    const detailedProducts = [];
 
-    for (const material of materials) {
+    for (const recommendation of productRecommendations) {
       try {
-        // Search by category and sub-category
-        const { data: products, error } = await supabase
+        const { data: productData, error: productError } = await supabase
           .from("scraped_product_list")
           .select("*")
-          .or(
-            `category.ilike.%${material.category}%,sub_category.ilike.%${material.subCategory}%,category.ilike.%${material.material}%,sub_category.ilike.%${material.material}%`
-          )
-          .limit(10);
+          .eq("category_name", recommendation.product.category_name)
+          .eq("color", recommendation.product.color)
+          .limit(1);
 
-        if (!error && products) {
-          matchingProducts.push({
-            material: material,
-            products: products,
+        if (productError) {
+          console.error("Error fetching product data:", productError);
+          continue;
+        }
+
+        if (productData && productData.length > 0) {
+          detailedProducts.push({
+            ...recommendation,
+            productDetails: productData[0],
           });
+        } else {
+          // If exact match not found, try to find similar products
+          const { data: similarProducts, error: similarError } = await supabase
+            .from("scraped_product_list")
+            .select("*")
+            .eq("category_name", recommendation.product.category_name)
+            .limit(1);
+
+          if (!similarError && similarProducts && similarProducts.length > 0) {
+            detailedProducts.push({
+              ...recommendation,
+              productDetails: similarProducts[0],
+            });
+          } else {
+            // Add recommendation without detailed product data
+            detailedProducts.push({
+              ...recommendation,
+              productDetails: null,
+            });
+          }
         }
       } catch (error) {
-        console.error(
-          `Error searching for material ${material.material}:`,
-          error
-        );
+        console.error("Error processing product recommendation:", error);
+        detailedProducts.push({
+          ...recommendation,
+          productDetails: null,
+        });
       }
     }
 
     return NextResponse.json({
       success: true,
       validation: validationResult,
-      materials: materials,
+      categories: uniqueCombinationsList.map((item) => item.category_name),
+      subCategories: uniqueCombinationsList.map((item) => item.sub_category),
+      productRecommendations: detailedProducts,
       matchingProducts: matchingProducts,
+      materials: [],
     });
   } catch (error) {
     console.error("Error analyzing image:", error);
