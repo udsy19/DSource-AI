@@ -24,6 +24,97 @@ body {
   height: 32rem;
 }
 
+#popular-1 {
+  background-image: url("../../public/popular-1.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#popular-2 {
+  background-image: url("../../public/popular-2.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#popular-3 {
+  background-image: url("../../public/popular-3.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+#popular-4 {
+  background-image: url("../../public/popular-4.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#popular-5 {
+  background-image: url("../../public/popular-5.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+.mask1 {
+  -webkit-mask-image: url("../../public/union.png");
+  mask-image: url("../../public/union.png");
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+#modern-minimalist-view-materials {
+  background-image: url("../../public/modern-minimalist-view-materials.avif");
+  background-size: cover;
+  background-position: center;
+}
+
 #source-image {
   height: 32rem;
+}
+
+#made-with-dsource-1 {
+  background-image: url("../../public/made-1.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-2 {
+  background-image: url("../../public/made-2.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-3 {
+  background-image: url("../../public/made-3.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-4 {
+  background-image: url("../../public/made-4.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-5 {
+  background-image: url("../../public/made-5.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-6 {
+  background-image: url("../../public/made-6.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+#made-with-dsource-7 {
+  background-image: url("../../public/made-7.avif");
+  background-size: cover;
+  background-position: center;
+}
+
+#footer {
+  background-image: url("../../public/footer.jpg");
+  background-size: cover;
+  background-position: center;
 }

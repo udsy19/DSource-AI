@@ -1,15 +1,18 @@
 import React from "react";
-import Image from "next/image";
 
-import logo from "../../public/logo.png";
+import Image from "next/image";
+import Link from "next/link";
+
+import logo from "../../public/logo-dsource.png";
 
 const Header = () => {
   return (
-    <header className="absolute top-0 left-0 w-full p-4">
-      <div className="flex items-center justify-between bg-gray-900 backdrop-blur-md rounded-full shadow-lg px-14 py-4">
-        <div className="w-3/12">
-          <Image src={logo} alt="logo" width={72} height={72} />
-        </div>
+    <div className="fixed top-4 left-4 right-4 z-50">
+      <header className="flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-14 py-4 bg-black/10">
+        <Link href="/" className="w-3/12 flex items-center gap-4">
+          <Image src={logo} alt="logo" width={60} height={60} />
+          <h1 className="text-2xl font-bold text-white">DSource.AI</h1>
+        </Link>
         <div className="w-6/12">
           <nav>
             <ul className="flex items-center text-white gap-8">
@@ -71,8 +74,8 @@ const Header = () => {
             </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </div>
   );
 };
 
