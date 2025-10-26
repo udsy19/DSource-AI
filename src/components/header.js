@@ -1,14 +1,33 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import logo from "../../public/logo-dsource.png";
 
-const Header = () => {
+const Header = ({ currentPath }) => {
+  const [pathName, setPathName] = useState(currentPath);
+
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setPathName(pathname);
+  }, [pathname]);
+
+  console.log(pathName);
+
   return (
     <div className="fixed top-4 left-4 right-4 z-50">
-      <header className="flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-14 py-4 bg-black/10">
+      <header
+        className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-14 py-4 ${
+          pathName?.startsWith("/ai-material-finder")
+            ? "bg-black"
+            : "bg-black/10"
+        }`}
+      >
         <Link href="/" className="w-3/12 flex items-center gap-4">
           <Image src={logo} alt="logo" width={60} height={60} />
           <h1 className="text-2xl font-bold text-white">DSource.AI</h1>

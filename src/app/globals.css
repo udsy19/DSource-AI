@@ -118,3 +118,9 @@ body {
   background-size: cover;
   background-position: center;
 }
+
+#ai-material-finder-image {
+  background-image: url("../../public/ai-material-finder.avif");
+  background-size: cover;
+  background-position: center;
+}
