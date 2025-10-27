@@ -6,9 +6,9 @@ import Link from "next/link";
 import aiMaterialOne from "../../../public/ai-material-finder-1.png";
 import aiMaterialTwo from "../../../public/ai-material-finder-2.png";
 import stepsSubtract from "../../../public/steps-subtract.png";
-import browseIcon from "../../../public/browse-icon.png";
 import uploadIcon from "../../../public/upload-icon.png";
-import searchIcon from "../../../public/identify-icon.png";
+import identifyIcon from "../../../public/identify-icon.png";
+import shopIcon from "../../../public/shop-icon.png";
 
 const AiMaterialFinder = () => {
   const howItWorks = [
@@ -20,14 +20,14 @@ const AiMaterialFinder = () => {
       number: "01",
     },
     {
-      icon: browseIcon,
+      icon: identifyIcon,
       title: "Identify Objects",
       description:
         "Our AI analyses your images and identifies furniture and decor items",
       number: "02",
     },
     {
-      icon: searchIcon,
+      icon: shopIcon,
       title: "Browse Local Options",
       description:
         "Get a curated list of similar products available at local retailers in your area",

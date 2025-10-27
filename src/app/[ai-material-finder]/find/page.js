@@ -3,46 +3,42 @@ import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import uploadIcon from "../../../../public/upload-icon.png";
+import identifyIcon from "../../../../public/identify-icon.png";
+import shopIcon from "../../../../public/shop-icon.png";
+
 const AiMaterialFinder = () => {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState(null);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("visualizer");
-  const [hoveredProduct, setHoveredProduct] = useState(null);
   const fileInputRef = useRef(null);
+  const productsScrollRef = useRef(null);
 
-  // Helper function to fix image URLs
-  const fixImageUrl = (url) => {
-    if (!url) return "/placeholder.jpg";
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [productCategorySelected, setProductCategorySelected] = useState("All");
+  const [isAnalyzing, setIsAnalyzing] = useState({ state: false, message: "" });
 
-    console.log("Original URL:", url);
-
-    // If it's already a full URL, return as is
-    if (url.startsWith("http")) {
-      console.log("Already full URL:", url);
-      return url;
-    }
-
-    // Remove any leading slashes and construct the full URL
-    const cleanPath = url.replace(/^\/+/, "");
-    const finalUrl = `https://pub-132f3882c2074e84999a9ab982950552.r2.dev/${cleanPath}`;
-    console.log("Constructed URL:", finalUrl);
-    return finalUrl;
+  const toggleCategory = (index) => {
+    setCategories((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, selected: !item.selected } : item
+      )
+    );
   };
 
-  // Auto-call findMaterial when switching to AI Material Finder tab
-  useEffect(() => {
-    if (
-      analysisResults === null &&
-      activeTab === "material-finder" &&
-      uploadedImage &&
-      !isAnalyzing
-    ) {
-      findMaterial();
+  const scrollProductsLeft = () => {
+    if (productsScrollRef.current) {
+      productsScrollRef.current.scrollBy({ left: -200, behavior: "smooth" });
     }
-  }, [activeTab]);
+  };
+
+  const scrollProductsRight = () => {
+    if (productsScrollRef.current) {
+      productsScrollRef.current.scrollBy({ left: 200, behavior: "smooth" });
+    }
+  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -115,57 +111,183 @@ const AiMaterialFinder = () => {
   const removeImage = () => {
     setUploadedImage(null);
     setImagePreview(null);
-    setAnalysisResults(null);
     setError(null);
+    setIsAnalyzing({ state: false, message: "" });
+    setCategories([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const findMaterial = async () => {
-    if (!uploadedImage) {
-      setError("Please upload an image first");
-      return;
+  const handleMouseEnter = (category) => {
+    if (products.length > 0) {
+      handleProductCategorySelection(category.label);
     }
 
-    setIsAnalyzing(true);
-    setError(null);
-    setAnalysisResults(null);
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.label === category.label
+          ? { ...c, hovered: true }
+          : { ...c, hovered: false }
+      )
+    );
+  };
 
-    try {
-      const formData = new FormData();
-      formData.append("image", uploadedImage);
+  const handleMouseLeave = () => {
+    setCategories((prev) => prev.map((c) => ({ ...c, hovered: false })));
+  };
 
-      const response = await fetch("/api/analyze-image", {
-        method: "POST",
-        body: formData,
+  const handleGenerateProducts = () => {
+    setIsAnalyzing({
+      state: true,
+      message: "Generating products for selected categories",
+    });
+
+    const timer = setTimeout(() => {
+      fetch("/api/get-products")
+        .then((res) => res.json())
+        .then((data) => {
+          setProducts(data.categories);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+
+      setIsAnalyzing({
+        state: false,
+        message: "Products generated successfully",
       });
+    }, 5000);
 
-      const result = await response.json();
+    return () => clearTimeout(timer);
+  };
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to analyze image");
+  const handleProductCategorySelection = (category) => {
+    setProductCategorySelected(category);
+    if (products.length > 0) {
+      if (category !== "All") {
+        setFilteredProducts(products.filter((c) => c.label === category));
+      } else {
+        setFilteredProducts(products);
       }
-
-      setAnalysisResults(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsAnalyzing(false);
     }
   };
+
+  useEffect(() => {
+    // Create fake analysis loading component
+    // Add fake product categories
+    if (uploadedImage) {
+      setIsAnalyzing({
+        state: true,
+        message: "Analysing uploaded image for possible categories",
+      });
+      const timer = setTimeout(() => {
+        setCategories([
+          {
+            label: "Wall Painting",
+            selected: false,
+            position: { x: 400, y: 80 },
+            hovered: false,
+          },
+          {
+            label: "Pillow",
+            selected: false,
+            position: { x: 600, y: 320 },
+            hovered: false,
+          },
+          {
+            label: "Coffee Table",
+            selected: false,
+            position: { x: 500, y: 400 },
+            hovered: false,
+          },
+          {
+            label: "Sofa",
+            selected: false,
+            position: { x: 350, y: 370 },
+            hovered: false,
+          },
+          {
+            label: "Floor",
+            selected: false,
+            position: { x: 70, y: 470 },
+            hovered: false,
+          },
+          {
+            label: "Carpet",
+            selected: false,
+            position: { x: 700, y: 450 },
+            hovered: false,
+          },
+        ]);
+        setIsAnalyzing({ state: false, message: "" });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [uploadedImage]);
+
+  useEffect(() => {
+    handleProductCategorySelection("All");
+  }, [products]);
+
   return (
     <div className="w-full">
-      <div className="w-full h-[10vh]"></div>
-      <div className="mt-24 px-12">
-        <div>
-          <h1 className="text-2xl font-bold">
-            AI Visualizer & Material Finder
-          </h1>
+      {/* Analysis Loading Modal */}
+      {isAnalyzing.state && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-xl">
+          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 flex flex-col items-center space-y-4 min-w-[400px] border border-white/30 shadow-xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+            <p className="text-lg text-center text-black">
+              {isAnalyzing.message}
+            </p>
+          </div>
         </div>
-        <div className="flex gap-12 mt-4">
+      )}
+      <div className="mt-48 px-12">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center w-1/3">
+            <h1 className="text-4xl font-bold">AI Material Finder</h1>
+            <div className="w-6 ml-4">
+              <Image src={identifyIcon} alt="Identify Icon" />
+            </div>
+          </div>
+          <div className="flex justify-between w-1/3">
+            <div className="flex flex-col items-center">
+              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={uploadIcon} alt="Upload Icon" />
+              </div>
+              <h2 className="text-lg font-bold mt-4">Upload Image</h2>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={identifyIcon} alt="Identify Icon" />
+              </div>
+              <h2 className="text-lg font-bold mt-4">AI Match</h2>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={shopIcon} alt="Shop Icon" />
+              </div>
+              <h2 className="text-lg font-bold mt-4">Shop</h2>
+            </div>
+          </div>
+          <div className="w-1/3 flex items-center justify-end">
+            <Link
+              href="/ai-material-finder/tutorial"
+              className="text-black px-12 py-3 border-2 border-black rounded-full cursor-pointer hover:bg-gray-800 transition-all duration-300 font-bold"
+            >
+              View Tutorial
+            </Link>
+          </div>
+        </div>
+        <div className="grid grid-cols-12 gap-12 mt-24">
           {/* Image Upload */}
-          <div className="w-4/6 flex items-center justify-center border-1 border-gray-700 rounded-lg p-4">
+          <div
+            className={`${
+              categories.length > 0 ? "col-span-8" : "col-span-12"
+            } h-[50rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-4`}
+          >
             {imagePreview ? (
               <div className="relative w-full" style={{ height: "37rem" }}>
                 <div
@@ -178,130 +300,114 @@ const AiMaterialFinder = () => {
                     fill
                     className="object-contain"
                   />
-
-                  {/* Product Hover Indicators */}
-                  {analysisResults?.productRecommendations &&
-                    analysisResults.productRecommendations.length > 0 && (
-                      <>
-                        {analysisResults.productRecommendations.map(
-                          (recommendation, index) => (
-                            <div
-                              key={index}
-                              className="flex-1 rounded-lg flex items-center justify-center shadow-md shadow-black/20 absolute"
-                              style={{
-                                left: `${
-                                  recommendation.position?.x || 20 + index * 20
-                                }%`,
-                                top: `${
-                                  recommendation.position?.y || 20 + index * 15
-                                }%`,
-                              }}
-                              onMouseEnter={() =>
-                                setHoveredProduct(recommendation)
-                              }
-                              onMouseLeave={() => setHoveredProduct(null)}
-                            >
-                              {/* Hover Indicator Dot */}
-                              <div className="w-4 h-4 bg-gray-700 rounded-full border-2 border-white shadow-lg animate-pulse"></div>
-
-                              {/* Product Card */}
-                              {hoveredProduct === recommendation && (
-                                <div className="w-96 absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-                                  <div className="flex bg-white rounded-lg shadow-xl border border-gray-200 p-4">
-                                    <div className="w-1/3">
-                                      <Image
-                                        src={fixImageUrl(
-                                          recommendation.productDetails
-                                            ?.image_url
-                                        )}
-                                        alt={
-                                          recommendation.productDetails
-                                            ?.product_name || "Product"
-                                        }
-                                        width={400}
-                                        height={200}
-                                        className="border-2 border-gray-200 rounded-lg object-cover"
-                                      />
-                                    </div>
-                                    <div className="w-2/3 flex flex-col justify-between pl-4">
-                                      <div>
-                                        <h2 className="text-sm font-bold">
-                                          {recommendation.productDetails?.product_name.substring(
-                                            0,
-                                            25
-                                          ) || "Product Name"}
-                                        </h2>
-                                        <p className="text-xs text-gray-500">
-                                          {recommendation.productDetails
-                                            ?.brand_name || "Brand"}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          {recommendation.productDetails
-                                            ?.category_name || "Category"}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <a
-                                          href={`https://materialdepot.in/${
-                                            recommendation.productDetails
-                                              ?.product_material_depot_variant_handle ||
-                                            ""
-                                          }/product`}
-                                          className="text-xs text-blue-600 hover:text-blue-800"
-                                          target="_blank"
-                                        >
-                                          View Product →
-                                        </a>
-                                      </div>
-                                    </div>
+                  {categories.map(
+                    (category, index) =>
+                      category.position && (
+                        <div
+                          key={index}
+                          className="absolute"
+                          style={{
+                            left: category.position?.x,
+                            top: category.position?.y,
+                          }}
+                        >
+                          {category.hovered &&
+                            (filteredProducts.length > 0 ? (
+                              <div className="absolute -top-10 left-12 w-64 overflow-hidden bg-white/10 backdrop-blur-md border border-2 border-black/80 rounded-lg p-4 z-50">
+                                <div className="flex items-center gap-4 ">
+                                  <div className="w-24 h-16 rounded-lg overflow-hidden">
+                                    <div
+                                      className="w-full h-full bg-gray-100"
+                                      style={{
+                                        backgroundImage: `url(${filteredProducts[0].products[0].image})`,
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                      }}
+                                    ></div>
                                   </div>
-                                  {/* Arrow pointing to dot */}
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-                                    <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"></div>
+                                  <div className="flex flex-col justify-between">
+                                    <div>
+                                      <h3 className="text-sm font-bold">
+                                        {filteredProducts[0].products[0].title}
+                                      </h3>
+                                      <p className="text-xs font-bold">$$$</p>
+                                      <h4 className="text-xs">Brand: Ikea</h4>
+                                    </div>
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          )
-                        )}
-                      </>
-                    )}
+                                <div className="flex items-center gap-2 mt-2">
+                                  <button className="w-1/2 border border-black px-2 py-1 rounded text-xs">
+                                    View
+                                  </button>
+                                  <button className="w-1/2 border border-black px-2 py-1 rounded text-xs">
+                                    Wishlist
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 absolute -top-10 left-0 w-40 overflow-hidden text-ellipsis whitespace-nowrap bg-white/10 backdrop-blur-md border border-2 border-black/80 rounded-md transition-all duration-300 p-2">
+                                <span>
+                                  {category.selected ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      className="w-5 h-5 text-black"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                      className="w-4 h-4 text-black"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 4.5v15m7.5-7.5h-15"
+                                      />
+                                    </svg>
+                                  )}
+                                </span>
+                                {category.label}
+                              </div>
+                            ))}
+                          <div
+                            key={index}
+                            className="cursor-pointer w-8 h-8 bg-white border border-5 border-black/80 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-black/30"
+                            onMouseEnter={() => handleMouseEnter(category)}
+                            onMouseLeave={() => handleMouseLeave()}
+                            onClick={() => {
+                              toggleCategory(index);
+                              if (filteredProducts.length > 0) {
+                                handleProductCategorySelection(category.label);
+                              }
+                            }}
+                          ></div>
+                        </div>
+                      )
+                  )}
                 </div>
-                <button
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
-                >
-                  ×
-                </button>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">
-                    File: {uploadedImage?.name} (
-                    {(uploadedImage?.size / 1024 / 1024).toFixed(2)} MB)
-                  </p>
-                  {analysisResults?.productRecommendations &&
-                    analysisResults.productRecommendations.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Hover over the blue dots to see product recommendations
-                      </p>
-                    )}
-                </div>
-                {/* <div className="mt-2 text-center">
-                  <p className="text-sm text-gray-600">
-                    File: {uploadedImage?.name} (
-                    {(uploadedImage?.size / 1024 / 1024).toFixed(2)} MB)
-                  </p>
+                {categories.length > 0 && (
                   <button
-                    onClick={findMaterial}
-                    disabled={isAnalyzing}
-                    className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
                   >
-                    {isAnalyzing ? "Analyzing..." : "Find Material"}
+                    ×
                   </button>
-                </div> */}
+                )}
               </div>
             ) : (
               <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                className="border-2 border-dashed border-gray-300 rounded-lg p-64 text-center cursor-pointer hover:border-gray-400 transition-colors"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={handleClick}
@@ -338,333 +444,193 @@ const AiMaterialFinder = () => {
               </div>
             )}
           </div>
-          {/* Form */}
-          <div className="w-2/6 border-1 border-gray-700 rounded-lg p-4">
-            {/* Tab Navigation */}
-            <div className="flex mb-4 border-b border-gray-200">
-              <button
-                onClick={() => setActiveTab("visualizer")}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "visualizer"
-                    ? "text-gray-900 bg-white border-b-2 border-black"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                AI Visualizer
-              </button>
-              <button
-                onClick={() => setActiveTab("material-finder")}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "material-finder"
-                    ? "text-gray-900 bg-white border-b-2 border-black"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                AI Material Finder
-              </button>
-            </div>
+          <div
+            className={`col-span-4 h-[50rem] ${
+              categories.length > 0 ? "block" : "hidden"
+            }`}
+          >
+            {products.length > 0 ? (
+              <div className="flex flex-col justify-center">
+                <h2 className="text-2xl font-bold">AI Material Match</h2>
 
-            {/* AI Visualizer Content */}
-            {activeTab === "visualizer" && (
-              <div>
-                {/* Define your space */}
-                <div className="text-sm font-bold">Define your space</div>
-                <div className="flex mt-2 gap-8">
-                  <button className="w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer">
-                    Interior
+                <div className="relative mt-4 border border-black rounded-lg">
+                  <button
+                    onClick={scrollProductsLeft}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                      className="w-6 h-6"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15.75 19.5L8.25 12l7.5-7.5"
+                      />
+                    </svg>
                   </button>
-                  <button className="w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer">
-                    Exterior
+
+                  <button
+                    onClick={scrollProductsRight}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                      className="w-6 h-6"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                      />
+                    </svg>
                   </button>
-                  <button className="w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer">
-                    Floor Plan
-                  </button>
-                </div>
-                {/* Select Space & Style */}
-                <div className="flex mt-4 gap-8">
-                  <div className="w-1/2">
-                    <div className="text-sm font-bold">Select Space</div>
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Select an option</option>
-                        <option value="option1">Living Room</option>
-                        <option value="option2">Kitchen</option>
-                        <option value="option3">Bathroom</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="w-1/2">
-                    <div className="text-sm font-bold">Select Style</div>
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Select an option</option>
-                        <option value="option1">Modern</option>
-                        <option value="option2">Traditional</option>
-                        <option value="option4">Scandinavian</option>
-                        <option value="option5">Mid-Century Modern</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                {/* Prompt */}
-                <div className="mt-4">
-                  <textarea
-                    className="w-full h-32 mt-2 border-1 border-gray-700 rounded-lg px-3 py-3 text-sm resize-none"
-                    placeholder="Prompt..."
-                  ></textarea>
-                </div>
-                {/* Optional */}
-                <div className="text-sm font-bold mt-4">Optional</div>
-                <div className="flex mt-2 gap-8">
-                  <div className="w-1/2">
-                    <div className="text-sm font-bold">Lighting</div>
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Select an option</option>
-                        <option value="option1">Living Room</option>
-                        <option value="option2">Kitchen</option>
-                        <option value="option3">Bathroom</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="w-1/2">
-                    <div className="text-sm font-bold">Color Palette</div>
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Select an option</option>
-                        <option value="option1">Modern</option>
-                        <option value="option2">Traditional</option>
-                        <option value="option4">Scandinavian</option>
-                        <option value="option5">Mid-Century Modern</option>
-                      </select>
+
+                  <div
+                    ref={productsScrollRef}
+                    className="overflow-x-auto hide-scrollbar p-4 rounded-lg ml-4 mr-6"
+                  >
+                    <div className="grid grid-flow-col min-w-max">
+                      <div
+                        className={`cursor-pointer text-center py-2 px-4 rounded-lg font-semibold ${
+                          productCategorySelected === "All"
+                            ? "underline"
+                            : "text-black/40"
+                        }`}
+                        onClick={() => handleProductCategorySelection("All")}
+                      >
+                        All
+                      </div>
+                      {products.map((category, index) => (
+                        <div
+                          key={index}
+                          className={`cursor-pointer text-center py-2 px-4 rounded-lg font-semibold ${
+                            productCategorySelected === category.label
+                              ? "underline"
+                              : "text-black/40"
+                          }`}
+                          onClick={() =>
+                            handleProductCategorySelection(category.label)
+                          }
+                        >
+                          {category.label}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-                <div className="flex mt-4 gap-8">
-                  <div className="w-1/2">
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Different Renders Every Time</option>
-                        <option value="option1">Living Room</option>
-                        <option value="option2">Kitchen</option>
-                        <option value="option3">Bathroom</option>
-                      </select>
+                <div className="py-4 h-[42rem] overflow-y-auto hide-scrollbar">
+                  {filteredProducts.map((category, index) => (
+                    <div key={index} className="my-4">
+                      {category.products.map((product, index) => (
+                        <div
+                          key={index}
+                          className="my-4 flex gap-4 bg-gray-100 rounded-lg p-4"
+                        >
+                          <div
+                            className="w-48 h-32 rounded-lg overflow-hidden"
+                            style={{
+                              backgroundImage: `url(${product.image})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }}
+                          ></div>
+                          <div className="flex flex-col justify-between">
+                            <div>
+                              <h3 className="text-md font-bold pt-1">
+                                {product.title}
+                              </h3>
+                              <p className="text-xs font-bold">$$$</p>
+                              <h4 className="text-sm">Brand: Ikea</h4>
+                              <h4 className="text-xs">Color: Beige</h4>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Link
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer"
+                                href="/marketplace"
+                              >
+                                View Product
+                              </Link>
+                              <Link
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer"
+                                href="/spec-builder"
+                              >
+                                Add to Spec Builder
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <div className="w-1/2">
-                    <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
-                        <option value="">Public Render</option>
-                        <option value="option1">Modern</option>
-                        <option value="option2">Traditional</option>
-                        <option value="option4">Scandinavian</option>
-                        <option value="option5">Mid-Century Modern</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <button className="w-full bg-black text-white rounded-lg p-2 text-sm cursor-pointer">
-                    Generate
-                  </button>
+                  ))}
                 </div>
               </div>
-            )}
-
-            {/* AI Material Finder Content */}
-            {activeTab === "material-finder" && (
-              <div
-                className="text-center overflow-y-auto"
-                style={{ height: "32rem" }}
-              >
-                {/* No Image Message */}
-                {!uploadedImage && !isAnalyzing && (
-                  <div className="flex flex-col items-center justify-center h-64">
-                    <div className="text-gray-500 text-sm">
-                      Please upload an image first to analyze materials
-                    </div>
-                  </div>
-                )}
-
-                {/* Spinner Animation */}
-                {isAnalyzing && (
-                  <div className="flex flex-col items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <p className="mt-4 text-sm text-gray-600">
-                      Analyzing image...
-                    </p>
-                  </div>
-                )}
-
-                {/* Error Display */}
-                {error && !isAnalyzing && (
-                  <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
-                    {error}
-                  </div>
-                )}
-
-                {/* Analysis Results */}
-                {analysisResults && !isAnalyzing && (
-                  <div className="mt-4 text-left">
-                    <h3 className="font-bold text-sm mb-2">
-                      Product Recommendations:
-                    </h3>
-
-                    {/* Product Recommendations */}
-                    {analysisResults.productRecommendations &&
-                      analysisResults.productRecommendations.length > 0 && (
-                        <div className="space-y-4">
-                          {analysisResults.productRecommendations.map(
-                            (recommendation, index) => (
-                              <div
-                                key={index}
-                                className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-                              >
-                                {/* Card Header */}
-                                <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-3 text-white">
-                                  <div className="flex justify-between items-center">
-                                    <h4 className="text-sm font-bold">
-                                      #{index + 1}{" "}
-                                      {recommendation.product.category_name}
-                                    </h4>
-                                    <span className="text-xs bg-white text-blue-600 px-2 py-1 rounded-full font-semibold">
-                                      {(
-                                        recommendation.confidence * 100
-                                      ).toFixed(0)}
-                                      %
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-blue-100 mt-1">
-                                    {recommendation.product.sub_category}
-                                  </p>
-                                </div>
-
-                                {/* Card Content */}
-                                <div className="p-4">
-                                  {/* Product Image and Basic Info */}
-                                  {recommendation.productDetails && (
-                                    <div className="flex gap-3 mb-3">
-                                      <div className="w-20 h-20 flex-shrink-0">
-                                        {recommendation.productDetails
-                                          .image_url ? (
-                                          <img
-                                            src={fixImageUrl(
-                                              recommendation.productDetails
-                                                .image_url
-                                            )}
-                                            alt={
-                                              recommendation.productDetails
-                                                .product_name
-                                            }
-                                            className="w-full h-full object-cover rounded-lg border border-gray-200"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                                            <span className="text-xs text-gray-500">
-                                              No Image
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <h5 className="text-sm font-semibold text-gray-900 truncate">
-                                          {recommendation.productDetails
-                                            .product_name || "Product Name"}
-                                        </h5>
-                                        <p className="text-xs text-gray-600">
-                                          {recommendation.productDetails
-                                            .brand || "Brand"}
-                                        </p>
-                                        <p className="text-sm font-bold text-green-600 mt-1">
-                                          {recommendation.productDetails
-                                            .price || "Price N/A"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Product Details */}
-                                  <div className="space-y-2 mb-3">
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-600">
-                                        Color:
-                                      </span>
-                                      <span className="font-medium">
-                                        {recommendation.product.color}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                      <span className="text-gray-600">
-                                        Location:
-                                      </span>
-                                      <span className="font-medium">
-                                        {recommendation.interior_location}
-                                      </span>
-                                    </div>
-                                    {recommendation.productDetails
-                                      ?.dimensions && (
-                                      <div className="flex justify-between text-xs">
-                                        <span className="text-gray-600">
-                                          Dimensions:
-                                        </span>
-                                        <span className="font-medium">
-                                          {
-                                            recommendation.productDetails
-                                              .dimensions
-                                          }
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* AI Reasoning */}
-                                  <div className="bg-gray-50 rounded-lg p-3">
-                                    <p className="text-xs text-gray-700">
-                                      <strong>Why this fits:</strong>{" "}
-                                      {recommendation.reasoning}
-                                    </p>
-                                  </div>
-
-                                  {/* Product Link */}
-                                  {recommendation.productDetails
-                                    ?.product_material_depot_variant_handle && (
-                                    <div className="mt-3">
-                                      <Link
-                                        href={`https://materialdepot.in/${recommendation.productDetails.product_material_depot_variant_handle}/product`}
-                                        className="w-full bg-gray-700 text-white text-xs py-2 px-3 rounded-lg hover:bg-gray-800 transition-colors text-center block"
-                                        target="_blank"
-                                      >
-                                        View Product →
-                                      </Link>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
+            ) : (
+              <div className="flex flex-col justify-center">
+                <h2 className="text-2xl font-bold">Select Products</h2>
+                <div
+                  className="grid grid-cols-3 gap-4 mt-4 p-8 rounded-lg"
+                  style={{ background: "#E5E7EB" }}
+                >
+                  {categories.map((category, index) => (
+                    <button
+                      key={index}
+                      onClick={() => toggleCategory(index)}
+                      className={`py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/80 shadow-lg shadow-black/10 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)] transition-all duration-300 flex items-center justify-center ${
+                        category.hovered
+                          ? "scale-110 bg-white/20 border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                          : ""
+                      }`}
+                    >
+                      {category.selected ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          className="w-5 h-5 text-black"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          className="w-4 h-4 text-black"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 4.5v15m7.5-7.5h-15"
+                          />
+                        </svg>
                       )}
-
-                    {/* Validation Results */}
-                    {analysisResults.validation && (
-                      <div className="mt-4 p-2 bg-gray-50 rounded-lg">
-                        <p className="text-xs font-semibold">
-                          Space Type: {analysisResults.validation.spaceType}
-                        </p>
-                        <p className="text-xs">
-                          Confidence:{" "}
-                          {(
-                            analysisResults.validation.confidence * 100
-                          ).toFixed(1)}
-                          %
-                        </p>
-                        <p className="text-xs">
-                          Reasoning: {analysisResults.validation.reasoning}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      <span className="ml-1 text-sm font-bold">
+                        {category.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="w-full mt-4 py-4 rounded-full bg-black text-white hover:bg-gray-800 transition-all duration-300"
+                  onClick={handleGenerateProducts}
+                >
+                  Generate Products
+                </button>
               </div>
             )}
           </div>

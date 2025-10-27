@@ -17,13 +17,12 @@ const Header = ({ currentPath }) => {
     setPathName(pathname);
   }, [pathname]);
 
-  console.log(pathName);
-
   return (
     <div className="fixed top-4 left-4 right-4 z-50">
       <header
         className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-14 py-4 ${
-          pathName?.startsWith("/ai-material-finder")
+          pathName?.startsWith("/ai-material-finder") ||
+          pathName?.startsWith("/marketplace")
             ? "bg-black"
             : "bg-black/10"
         }`}
