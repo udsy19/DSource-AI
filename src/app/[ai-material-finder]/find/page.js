@@ -6,8 +6,10 @@ import Link from "next/link";
 import uploadIcon from "../../../../public/upload-icon.png";
 import identifyIcon from "../../../../public/identify-icon.png";
 import shopIcon from "../../../../public/shop-icon.png";
+import { useSpec } from "../../../contexts/SpecContext";
 
 const AiMaterialFinder = () => {
+  const { specCount, setSpecCount } = useSpec();
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState(null);
@@ -244,7 +246,7 @@ const AiMaterialFinder = () => {
           </div>
         </div>
       )}
-      <div className="mt-48 px-12">
+      <div className="mt-40 px-12">
         <div className="flex items-center justify-between">
           <div className="flex items-center w-1/3">
             <h1 className="text-4xl font-bold">AI Material Finder</h1>
@@ -254,19 +256,19 @@ const AiMaterialFinder = () => {
           </div>
           <div className="flex justify-between w-1/3">
             <div className="flex flex-col items-center">
-              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
                 <Image src={uploadIcon} alt="Upload Icon" />
               </div>
               <h2 className="text-lg font-bold mt-4">Upload Image</h2>
             </div>
             <div className="flex flex-col items-center">
-              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
                 <Image src={identifyIcon} alt="Identify Icon" />
               </div>
               <h2 className="text-lg font-bold mt-4">AI Match</h2>
             </div>
             <div className="flex flex-col items-center">
-              <div className="w-20 p-6 bg-gray-100 rounded-full border-2 border-black">
+              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
                 <Image src={shopIcon} alt="Shop Icon" />
               </div>
               <h2 className="text-lg font-bold mt-4">Shop</h2>
@@ -281,7 +283,7 @@ const AiMaterialFinder = () => {
             </Link>
           </div>
         </div>
-        <div className="grid grid-cols-12 gap-12 mt-24">
+        <div className="grid grid-cols-12 gap-12 mt-12">
           {/* Image Upload */}
           <div
             className={`${
@@ -554,17 +556,48 @@ const AiMaterialFinder = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <Link
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer"
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center"
                                 href="/marketplace"
                               >
-                                View Product
+                                <div>View Product</div>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth={3}
+                                  stroke="currentColor"
+                                  className="w-3 h-3 ml-2"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+                                  />
+                                </svg>
                               </Link>
-                              <Link
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer"
+                              <button
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0"
                                 href="/spec-builder"
+                                onClick={() => {
+                                  setSpecCount(specCount + 1);
+                                }}
                               >
-                                Add to Spec Builder
-                              </Link>
+                                <div>Add to Spec</div>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth={3}
+                                  stroke="currentColor"
+                                  className="w-3 h-3 ml-2"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M12 4.5v15m7.5-7.5h-15"
+                                  />
+                                </svg>
+                              </button>
                             </div>
                           </div>
                         </div>

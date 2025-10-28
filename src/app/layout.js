@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "../components/header";
 import Footer from "../components/footer";
 import QuickLinks from "../components/quick-links";
+import { SpecProvider } from "../contexts/SpecContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,10 +27,12 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Header />
-        <main className="relative z-0">{children}</main>
-        <Footer />
-        <QuickLinks />
+        <SpecProvider>
+          <Header />
+          <main className="relative z-0">{children}</main>
+          <Footer />
+          <QuickLinks />
+        </SpecProvider>
       </body>
     </html>
   );

@@ -7,8 +7,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import logo from "../../public/logo-dsource.png";
+import specSheetIcon from "../../public/spec-sheet-icon.png";
+import { useSpec } from "../contexts/SpecContext";
 
-const Header = ({ currentPath }) => {
+const Header = ({ currentPath = "" }) => {
+  const { specCount } = useSpec();
   const [pathName, setPathName] = useState(currentPath);
 
   const pathname = usePathname();
@@ -22,7 +25,9 @@ const Header = ({ currentPath }) => {
       <header
         className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-14 py-4 ${
           pathName?.startsWith("/ai-material-finder") ||
-          pathName?.startsWith("/marketplace")
+          pathName?.startsWith("/marketplace") ||
+          pathName?.startsWith("/spec-builder") ||
+          pathName?.startsWith("/ai-visualizer")
             ? "bg-black"
             : "bg-black/10"
         }`}
@@ -67,11 +72,30 @@ const Header = ({ currentPath }) => {
           </nav>
         </div>
         <div className="w-3/12 flex justify-end items-center gap-8">
-          <div>
-            <button className="cursor-pointer text-base text-white px-4 py-4 text-bold">
-              Login
-            </button>
-          </div>
+          {pathName?.startsWith("/ai-material-finder") ? (
+            <Link
+              href="/spec-builder"
+              className="cursor-pointer flex items-center relative"
+            >
+              <Image
+                src={specSheetIcon}
+                alt="spec sheet icon"
+                width={30}
+                height={30}
+              />
+              <div className="ml-2 flex items-center gap-2">
+                <p className="text-white text-base font-bold">Spec Sheet</p>
+                {specCount > 0 && (
+                  <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                    {specCount}
+                  </span>
+                )}
+              </div>
+            </Link>
+          ) : (
+            <div className="text-white text-md">Login</div>
+          )}
+
           <div>
             <button className="cursor-pointer bg-white text-base text-black rounded-full shadow-lg px-10 py-4 flex items-center gap-2">
               Sign Up

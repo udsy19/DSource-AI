@@ -40,38 +40,37 @@ const Hero = () => {
       <div className="flex justify-between">
         {/* Design Card */}
         <div className="w-1/3">
-          <div className="flex flex-col items-center justify-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-12">Design</h1>
+          <Link href="/ai-visualizer">
+            <div className="flex flex-col items-center justify-center">
+              <div>
+                <h1 className="text-4xl font-bold mb-12">Design</h1>
+              </div>
+              <div className="w-2/3 mb-8 rounded-3xl" id="design-image"></div>
+              <div className="flex flex-col items-center justify-center w-2/3 px-4">
+                <h2 className="text-2xl font-bold mb-2">AI Visualizer</h2>
+                <p className="text-gray-500 text-center">
+                  Instantly turn ideas into 3D previews and design options.
+                </p>
+              </div>
             </div>
-            <div className="w-2/3 mb-8 rounded-3xl" id="design-image"></div>
-            <div className="flex flex-col items-center justify-center w-2/3 px-4">
-              <h2 className="text-2xl font-bold mb-2">AI Visualizer</h2>
-              <p className="text-gray-500 text-center">
-                Instantly turn ideas into 3D previews and design options.
-              </p>
-            </div>
-          </div>
+          </Link>
         </div>
         {/* Discover Card */}
         <div className="w-1/3">
-          <div className="flex flex-col items-center justify-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-12">Discover</h1>
+          <Link href="/ai-material-finder">
+            <div className="flex flex-col items-center justify-center">
+              <div>
+                <h1 className="text-4xl font-bold mb-12">Discover</h1>
+              </div>
+              <div className="w-2/3 mb-8 rounded-3xl" id="discover-image"></div>
+              <div className="flex flex-col items-center justify-center w-2/3 px-4">
+                <h2 className="text-2xl font-bold mb-2">AI Material Finder</h2>
+                <p className="text-gray-500 text-center">
+                  Find products or materials by simply uploading a photo.
+                </p>
+              </div>
             </div>
-            <div className="w-2/3 mb-8 rounded-3xl" id="discover-image"></div>
-            <div className="flex flex-col items-center justify-center w-2/3 px-4">
-              <Link
-                className="text-2xl font-bold mb-2 cursor-pointer"
-                href="/ai-material-finder"
-              >
-                AI Material Finder
-              </Link>
-              <p className="text-gray-500 text-center">
-                Find products or materials by simply uploading a photo.
-              </p>
-            </div>
-          </div>
+          </Link>
         </div>
         {/* Source Card */}
         <div className="w-1/3">
