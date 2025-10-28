@@ -276,7 +276,12 @@ const SpecBuilder = () => {
           <div className="flex items-center justify-between mb-12">
             <h2 className="text-2xl font-bold mv">Project: Peterville Home</h2>
             <div>
-              <button className="bg-black text-white px-8 py-3 rounded-xl flex items-center gap-2">
+              <a
+                href="/specsheet.pdf"
+                download="specsheet.pdf"
+                type="application/pdf"
+                className="bg-black text-white px-8 py-3 rounded-xl flex items-center gap-2"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
@@ -292,7 +297,7 @@ const SpecBuilder = () => {
                   />
                 </svg>
                 <span>Download</span>
-              </button>
+              </a>
             </div>
           </div>
           {/* Totals Header */}
