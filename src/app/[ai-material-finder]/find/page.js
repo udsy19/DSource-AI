@@ -139,6 +139,9 @@ const AiMaterialFinder = () => {
     setCategories((prev) => prev.map((c) => ({ ...c, hovered: false })));
   };
 
+  // TODO: Implement product retrieval from the database
+  // Look for cateogries that are selected and fetch products from the database that match the category
+  // Refine [api/get-products] to fetch products from the database that match the category
   const handleGenerateProducts = () => {
     setIsAnalyzing({
       state: true,
@@ -184,45 +187,69 @@ const AiMaterialFinder = () => {
         message: "Analysing uploaded image for possible categories",
       });
       const timer = setTimeout(() => {
-        setCategories([
-          {
-            label: "Wall Painting",
-            selected: false,
-            position: { x: 400, y: 80 },
-            hovered: false,
-          },
-          {
-            label: "Pillow",
-            selected: false,
-            position: { x: 600, y: 320 },
-            hovered: false,
-          },
-          {
-            label: "Coffee Table",
-            selected: false,
-            position: { x: 500, y: 400 },
-            hovered: false,
-          },
-          {
-            label: "Sofa",
-            selected: false,
-            position: { x: 350, y: 370 },
-            hovered: false,
-          },
-          {
-            label: "Floor",
-            selected: false,
-            position: { x: 70, y: 470 },
-            hovered: false,
-          },
-          {
-            label: "Carpet",
-            selected: false,
-            position: { x: 700, y: 450 },
-            hovered: false,
-          },
-        ]);
-        setIsAnalyzing({ state: false, message: "" });
+        const formData = new FormData();
+        formData.append(
+          "image",
+          uploadedImage,
+          uploadedImage.name || "uploaded-image"
+        );
+
+        fetch("/api/analyze-image", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              console.log(data);
+              const normalizedCategories = Array.isArray(data.categories)
+                ? data.categories.map((category) => {
+                    const x =
+                      typeof category?.position?.x === "number"
+                        ? Math.round(category.position.x * 100)
+                        : null;
+                    const y =
+                      typeof category?.position?.y === "number"
+                        ? Math.round(category.position.y * 100)
+                        : null;
+
+                    return {
+                      label: category?.label ?? "Unknown",
+                      selected: false,
+                      hovered: false,
+                      confidence: category?.confidence ?? null,
+                      reasoning: category?.reasoning ?? "",
+                      position:
+                        x !== null && y !== null
+                          ? {
+                              x: `${x}%`,
+                              y: `${y}%`,
+                            }
+                          : null,
+                    };
+                  })
+                : [];
+
+              setCategories(normalizedCategories);
+              setError(null);
+            } else {
+              setError(
+                data?.error ||
+                  "We couldn't understand this image. Please try another interior photo."
+              );
+              setCategories([]);
+            }
+          })
+          .catch((err) => {
+            console.error(err);
+            setError(
+              "Something went wrong while analyzing the image. Please try again."
+            );
+            setCategories([]);
+          })
+          .finally(() => {
+            setIsAnalyzing({ state: false, message: "" });
+          });
       }, 5000);
 
       return () => clearTimeout(timer);

@@ -7,6 +7,57 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
 
+const clamp = (value, min, max) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  return Math.min(Math.max(value, min), max);
+};
+
+const extractJsonResponse = (rawText) => {
+  if (!rawText || typeof rawText !== "string") {
+    throw new Error("Model response was empty or not a string");
+  }
+
+  const trimmed = rawText.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i);
+    if (fencedMatch) {
+      return JSON.parse(fencedMatch[1]);
+    }
+    throw new Error("Failed to parse JSON from model response");
+  }
+};
+
+const getResponseText = async (response) => {
+  if (!response) {
+    return "";
+  }
+
+  if (typeof response.text === "function") {
+    return await response.text();
+  }
+
+  if (typeof response.text === "string") {
+    return response.text;
+  }
+
+  if (response.response) {
+    const nested = response.response;
+    if (typeof nested.text === "function") {
+      return await nested.text();
+    }
+    if (typeof nested.text === "string") {
+      return nested.text;
+    }
+  }
+
+  return "";
+};
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -49,13 +100,9 @@ export async function POST(request) {
     });
 
     // Extract JSON from validation response text
-    const validationJson = validationResponse.text.match(
-      /```json\n([\s\S]*?)\n```/
-    )?.[1];
-    if (!validationJson) {
-      throw new Error("Failed to parse validation result");
-    }
-    const validationResult = JSON.parse(validationJson);
+    const validationResult = extractJsonResponse(
+      await getResponseText(validationResponse)
+    );
 
     console.log(validationResult);
 
@@ -70,85 +117,32 @@ export async function POST(request) {
       );
     }
 
-    // Step 2: Search Supabase for matching products
-    const cookieStore = await cookies();
-    const supabase = await createClient(cookieStore);
-    const matchingProducts = [];
+    // Step 2: Analyze image for possible categories with approximate positions
+    const categoryAnalysisPrompt = `
+    You are analyzing an interior design photograph. Identify only sofa, lamps, pillow, carpet, floor and wall painting that are clearly visible.
 
-    // Get unique categories and subcategories from scraped_product_list
-    const { data: uniqueCategories, error: categoryError } = await supabase
-      .from("scraped_product_list")
-      .select("category_name, sub_category, color")
-      .not("category_name", "is", null);
-
-    if (categoryError) {
-      throw new Error("Failed to fetch categories from database");
+    Respond with a JSON object that matches this TypeScript type exactly:
+    {
+      "categories": Array<{
+        "label": string;                // concise category name (only one -> should be unique and shouldn't repeat for different items in the image) (e.g. "Sofa", "Pendant Light")
+        "confidence": number;           // 0-1
+        "position": {
+          "x": number;                  // horizontal center as a decimal between 0 and 1 (0 = far left, 1 = far right)
+          "y": number;                  // vertical center as a decimal between 0 and 1 (0 = top, 1 = bottom)
+        } | null;
+        "reasoning": string;            // one-sentence justification referencing visual cues
+      }>;
+      "overallConfidence": number;      // 0-1 summary confidence for the full categorization
+      "summary": string;                // short natural-language overview of what is in the scene
     }
 
-    // Create a Set to store unique combinations
-    const uniqueCombinations = new Set();
-
-    uniqueCategories.forEach((item) => {
-      if (item.category_name && item.sub_category && item.color) {
-        // Create a unique key by combining all three values
-        const combinationKey = `${item.category_name}|${item.sub_category[0]}|${item.color}`;
-        uniqueCombinations.add(combinationKey);
-      }
-    });
-
-    // Convert combinations back to objects
-    const uniqueCombinationsList = Array.from(uniqueCombinations).map(
-      (combo) => {
-        const [category, subCategory, color] = combo.split("|");
-        return {
-          category_name: category,
-          sub_category: subCategory,
-          color: color,
-        };
-      }
-    );
-
-    console.log("Unique combinations:", uniqueCombinationsList);
-
-    // Step 2: Get AI product recommendations based on unique combinations
-    const productRecommendationPrompt = `
-    Analyze this interior image and recommend the top 3 most suitable products from the available options below.
-    
-    Available Product Combinations:
-    ${uniqueCombinationsList
-      .map(
-        (item) =>
-          `- ${item.category_name} > ${item.sub_category} (${item.color})`
-      )
-      .join("\n")}
-    
-    For each recommended product, provide:
-    1. Which specific area/part of the interior it would be suitable for
-    2. Why it matches the design style and color scheme
-    3. Confidence score (0-1) for the recommendation
-    
-    Respond with a JSON array of objects:
-    [
-      {
-        "product": {
-          "category_name": "string",
-          "sub_category": "string", 
-          "color": "string"
-        },
-        "interior_location": "string (specific area like 'kitchen countertop', 'living room floor', etc.)",
-        "reasoning": "string (why this product fits)",
-        "confidence": number (0-1),
-        "position": {
-          "x": number (0-100, percentage from left),
-          "y": number (0-100, percentage from top)
-        }
-      }
-    ]
-    
-    Only return the top 3 most confident recommendations in descending order.
+    Rules:
+    - Only include categories you are at least 0.4 confident about.
+    - If you cannot estimate a position reliably, set "position" to null.
+    - The response must be pure JSON. Do not include backticks, Markdown fencing, or additional commentary.
     `;
 
-    const productResponse = await ai.models.generateContent({
+    const categoryAnalysisResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [
         {
@@ -157,78 +151,44 @@ export async function POST(request) {
             data: base64Image,
           },
         },
-        { text: productRecommendationPrompt },
+        { text: categoryAnalysisPrompt },
       ],
     });
 
-    const productJson = productResponse.text.match(
-      /```json\n([\s\S]*?)\n```/
-    )?.[1];
-    if (!productJson) {
-      throw new Error("Failed to parse product recommendation result");
-    }
-    const productRecommendations = JSON.parse(productJson);
+    const categoryAnalysisResult = extractJsonResponse(
+      await getResponseText(categoryAnalysisResponse)
+    );
 
-    // Step 3: Fetch detailed product data from Supabase based on recommendations
-    const detailedProducts = [];
+    const categories =
+      categoryAnalysisResult?.categories?.map((item) => {
+        const x = clamp(item?.position?.x, 0, 1);
+        const y = clamp(item?.position?.y, 0, 1);
 
-    for (const recommendation of productRecommendations) {
-      try {
-        const { data: productData, error: productError } = await supabase
-          .from("scraped_product_list")
-          .select("*")
-          .eq("category_name", recommendation.product.category_name)
-          .eq("color", recommendation.product.color)
-          .limit(1);
-
-        if (productError) {
-          console.error("Error fetching product data:", productError);
-          continue;
-        }
-
-        if (productData && productData.length > 0) {
-          detailedProducts.push({
-            ...recommendation,
-            productDetails: productData[0],
-          });
-        } else {
-          // If exact match not found, try to find similar products
-          const { data: similarProducts, error: similarError } = await supabase
-            .from("scraped_product_list")
-            .select("*")
-            .eq("category_name", recommendation.product.category_name)
-            .limit(1);
-
-          if (!similarError && similarProducts && similarProducts.length > 0) {
-            detailedProducts.push({
-              ...recommendation,
-              productDetails: similarProducts[0],
-            });
-          } else {
-            // Add recommendation without detailed product data
-            detailedProducts.push({
-              ...recommendation,
-              productDetails: null,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error processing product recommendation:", error);
-        detailedProducts.push({
-          ...recommendation,
-          productDetails: null,
-        });
-      }
-    }
+        return {
+          label: item?.label ?? "Unknown",
+          confidence:
+            typeof item?.confidence === "number" &&
+            !Number.isNaN(item.confidence)
+              ? clamp(item.confidence, 0, 1)
+              : null,
+          position:
+            x !== null && y !== null
+              ? {
+                  x,
+                  y,
+                }
+              : null,
+          reasoning: item?.reasoning ?? "",
+          selected: false,
+          hovered: false,
+        };
+      }) ?? [];
 
     return NextResponse.json({
       success: true,
-      validation: validationResult,
-      categories: uniqueCombinationsList.map((item) => item.category_name),
-      subCategories: uniqueCombinationsList.map((item) => item.sub_category),
-      productRecommendations: detailedProducts,
-      matchingProducts: matchingProducts,
-      materials: [],
+      categories,
+      overallConfidence: clamp(categoryAnalysisResult?.overallConfidence, 0, 1),
+      summary: categoryAnalysisResult?.summary ?? "",
     });
   } catch (error) {
     console.error("Error analyzing image:", error);

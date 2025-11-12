@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+// TODO: Implement product retrieval from the database
+// Connect to MCP server of Supabase and fetch products from the database that match the category
+// You can use the DATABASE_REFERENCE.md instead of connecting to MCP server to get all details of the database if the MCP server connection doesn't work
+// Refine [api/get-products] GET request based on the table structure of the database identified from the MCP server connection
 export async function GET(request) {
   try {
     return NextResponse.json(
