@@ -9,7 +9,7 @@ import shopIcon from "../../../../public/shop-icon.png";
 import { useSpec } from "../../../contexts/SpecContext";
 
 const AiMaterialFinder = () => {
-  const { specCount, setSpecCount } = useSpec();
+  const { addProductToSpec } = useSpec();
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState(null);
@@ -621,9 +621,8 @@ const AiMaterialFinder = () => {
                               </Link>
                               <button
                                 className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0"
-                                href="/spec-builder"
                                 onClick={() => {
-                                  setSpecCount(specCount + 1);
+                                  addProductToSpec(product, category.label);
                                 }}
                               >
                                 <div>Add to Spec</div>
