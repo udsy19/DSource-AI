@@ -148,6 +148,10 @@ const AiMaterialFinder = () => {
       message: "Generating products for selected categories",
     });
 
+    // TODO
+    // use "categories" state to fetch products from the database that match the category
+    //
+
     const timer = setTimeout(() => {
       fetch("/api/get-products")
         .then((res) => res.json())
@@ -259,6 +263,8 @@ const AiMaterialFinder = () => {
   useEffect(() => {
     handleProductCategorySelection("All");
   }, [products]);
+
+  console.log(categories);
 
   return (
     <div className="w-full">
