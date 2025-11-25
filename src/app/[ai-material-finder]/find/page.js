@@ -160,15 +160,14 @@ const AiMaterialFinder = () => {
     // use "categories" state to fetch products from the database that match the category
     //
 
-    const timer = setTimeout(() => {
-      fetch("/api/get-products")
-        .then((res) => res.json())
-        .then((data) => {
-          setProducts(data.categories);
-        })
-        .catch((err) => {
-          console.error(err);
-        });
+    fetch("/api/get-products")
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(data.categories);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
 
     fetch(apiUrl)
       .then((res) => {
@@ -389,7 +388,10 @@ const AiMaterialFinder = () => {
                                         {filteredProducts[0].products[0].title}
                                       </h3>
                                       <p className="text-xs font-bold">$$$</p>
-                                      <h4 className="text-xs">Brand: {filteredProducts[0].products[0].brand}</h4>
+                                      <h4 className="text-xs">
+                                        Brand:{" "}
+                                        {filteredProducts[0].products[0].brand}
+                                      </h4>
                                     </div>
                                   </div>
                                 </div>
@@ -607,8 +609,12 @@ const AiMaterialFinder = () => {
                                 {product.title}
                               </h3>
                               <p className="text-xs font-bold">$$$</p>
-                              <h4 className="text-sm">Brand: {product.brand}</h4>
-                              <h4 className="text-xs">Color: {product.color}</h4>
+                              <h4 className="text-sm">
+                                Brand: {product.brand}
+                              </h4>
+                              <h4 className="text-xs">
+                                Color: {product.color}
+                              </h4>
                             </div>
                             <div className="flex items-center gap-2">
                               <Link
