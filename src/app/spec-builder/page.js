@@ -195,21 +195,21 @@ const SpecBuilder = () => {
   };
 
   return (
-    <div className="w-full mb-24">
-      <div className="mt-40 px-12">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold">Specification Sheet</h1>
+    <div className="w-full mb-12 sm:mb-16 md:mb-24">
+      <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Specification Sheet</h1>
         </div>
 
-        <div className="px-12">
-          <div className="flex items-center justify-between mb-12">
-            <h2 className="text-2xl font-bold mv">Project: Peterville Home</h2>
+        <div className="px-0 sm:px-4 md:px-8 lg:px-12">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8 md:mb-12">
+            <h2 className="text-xl sm:text-2xl font-bold">Project: Peterville Home</h2>
             <div>
               <a
                 href="/specsheet.pdf"
                 download="specsheet.pdf"
                 type="application/pdf"
-                className="bg-black text-white px-8 py-3 rounded-xl flex items-center gap-2"
+                className="bg-black text-white px-6 sm:px-8 py-2 sm:py-3 rounded-xl flex items-center gap-2 text-sm sm:text-base"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -231,41 +231,41 @@ const SpecBuilder = () => {
           </div>
           {/* Totals Header */}
           {categories.length > 0 && (
-            <div className="bg-gray-200 rounded-lg px-8 py-6 mb-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">Totals</h2>
+            <div className="bg-gray-200 rounded-lg px-4 sm:px-6 md:px-8 py-4 sm:py-6 mb-6 sm:mb-8 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-2 md:gap-4 min-w-max sm:min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold">Totals</h2>
               <div className="text-center">
-                <div className="text-lg font-bold">
+                <div className="text-base sm:text-lg font-bold">
                   ${totals.totalClientPrice.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600">TOTAL CLIENT PRICE</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">
+                <div className="text-base sm:text-lg font-bold">
                   ${totals.totalTax.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600">TOTAL TAX</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">
+                <div className="text-base sm:text-lg font-bold">
                   ${totals.totalProfit.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600">TOTAL PROFIT</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">{totalClientSavings}%</div>
+                <div className="text-base sm:text-lg font-bold">{totalClientSavings}%</div>
                 <div className="text-xs text-gray-600">
                   TOTAL CLIENT SAVINGS
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">
+                <div className="text-base sm:text-lg font-bold">
                   ${totalTradePrice.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600">TOTAL TRADE PRICE</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">{totalTradeDiscount}%</div>
+                <div className="text-base sm:text-lg font-bold">{totalTradeDiscount}%</div>
                 <div className="text-xs text-gray-600">
                   TOTAL TRADE DISCOUNT
                 </div>
@@ -346,11 +346,11 @@ const SpecBuilder = () => {
                     {category.products.map((product, productIndex) => (
                       <div
                         key={productIndex}
-                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 flex gap-6"
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 flex flex-col lg:flex-row gap-4 sm:gap-6"
                       >
                         {/* Left Side - Image and Basic Details */}
-                        <div className="w-32 flex-1">
-                          <div className="relative w-full h-32 rounded-lg overflow-hidden mb-4 bg-gray-100">
+                        <div className="w-full lg:w-32 flex-shrink-0 lg:flex-1">
+                          <div className="relative w-full h-48 sm:h-64 lg:h-32 rounded-lg overflow-hidden mb-2 sm:mb-4 bg-gray-100">
                             <Image
                               src={product.image}
                               alt={product.name}
@@ -360,26 +360,26 @@ const SpecBuilder = () => {
                           </div>
                         </div>
 
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div>
-                            <h3 className="text-lg font-bold">
+                            <h3 className="text-base sm:text-lg font-bold">
                               {product.name}
                             </h3>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-xs sm:text-sm text-gray-600">
                               <span className="mr-1">Brand:</span>
                               <span className="font-semibold">
                                 {product.brand}
                               </span>
                             </p>
                           </div>
-                          <div className="mt-4">
-                            <p className="text-sm text-gray-600">
+                          <div className="mt-2 sm:mt-4">
+                            <p className="text-xs sm:text-sm text-gray-600">
                               <span className="mr-1">Material:</span>
                               <span className="font-semibold">
                                 {product.material}
                               </span>
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-xs sm:text-sm text-gray-600">
                               <span className="mr-1">Finish:</span>
                               <span className="font-semibold">
                                 {product.finish}
@@ -388,8 +388,8 @@ const SpecBuilder = () => {
                           </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col gap-2">
-                          <p className="text-sm text-gray-600">
+                        <div className="flex-1 flex flex-col gap-2 min-w-0">
+                          <p className="text-xs sm:text-sm text-gray-600">
                             <span className="mr-1">Dimensions:</span>
                             <span className="font-semibold">
                               {product.dimensions}
@@ -398,10 +398,10 @@ const SpecBuilder = () => {
                           <div>{renderColorSwatch(product.color)}</div>
                         </div>
 
-                        <div className="flex-1 flex flex-col gap-8 items-center">
+                        <div className="flex-1 flex flex-col gap-4 sm:gap-8 items-start sm:items-center">
                           <div>
                             <p className="text-xs text-gray-500">Product ID</p>
-                            <p className="text-sm font-semibold">
+                            <p className="text-xs sm:text-sm font-semibold">
                               {product.id}
                             </p>
                           </div>
@@ -413,29 +413,29 @@ const SpecBuilder = () => {
                           )}
                         </div>
 
-                        <div className="flex-1 flex flex-col gap-3">
+                        <div className="flex-1 flex flex-col gap-2 sm:gap-3">
                           <div className="flex gap-2 items-center">
                             <p className="text-xs text-gray-500">Price</p>
-                            <p className="text-sm font-semibold">
+                            <p className="text-xs sm:text-sm font-semibold">
                               ${product.price.toFixed(2)}
                             </p>
                           </div>
                           <div className="flex gap-2 items-center">
                             <p className="text-xs text-gray-500">Qty</p>
-                            <p className="text-sm font-semibold">
+                            <p className="text-xs sm:text-sm font-semibold">
                               {product.quantity}
                             </p>
                           </div>
                           <div className="flex gap-2 items-center">
                             <p className="text-xs text-gray-500">Timeline</p>
-                            <p className="text-sm font-semibold">
+                            <p className="text-xs sm:text-sm font-semibold">
                               {product.timeline}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 flex-1">
-                          <button className="flex gap-2 justify-center w-full px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-sm font-semibold">
+                        <div className="flex flex-row lg:flex-col gap-2 flex-1">
+                          <button className="flex gap-2 justify-center w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
@@ -450,16 +450,16 @@ const SpecBuilder = () => {
                                 d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
                               />
                             </svg>
-                            Vendor
+                            <span className="hidden sm:inline">Vendor</span>
                           </button>
-                          <button className="w-full px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-sm font-semibold">
+                          <button className="w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
                             Details
                           </button>
-                          <button className="w-full px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-sm font-semibold">
+                          <button className="w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
                             Quote
                           </button>
                         </div>
-                        <div className="flex-1 flex flex-col items-center justify-center">
+                        <div className="flex-1 flex flex-col items-start sm:items-center justify-center">
                           <p className="text-xs text-gray-500 mb-2 text-center">
                             Client
                           </p>
