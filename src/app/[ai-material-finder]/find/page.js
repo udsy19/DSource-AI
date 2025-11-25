@@ -9,7 +9,7 @@ import shopIcon from "../../../../public/shop-icon.png";
 import { useSpec } from "../../../contexts/SpecContext";
 
 const AiMaterialFinder = () => {
-  const { specCount, setSpecCount } = useSpec();
+  const { addProductToSpec } = useSpec();
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState(null);
@@ -139,10 +139,18 @@ const AiMaterialFinder = () => {
     setCategories((prev) => prev.map((c) => ({ ...c, hovered: false })));
   };
 
-  // TODO: Implement product retrieval from the database
-  // Look for cateogries that are selected and fetch products from the database that match the category
-  // Refine [api/get-products] to fetch products from the database that match the category
   const handleGenerateProducts = () => {
+    // Get selected categories
+    const selectedCategories = categories
+      .filter((cat) => cat.selected)
+      .map((cat) => cat.label);
+
+    // If no categories are selected, show an error or return early
+    if (selectedCategories.length === 0) {
+      alert("Please select at least one category to generate products");
+      return;
+    }
+
     setIsAnalyzing({
       state: true,
       message: "Generating products for selected categories",
@@ -162,13 +170,28 @@ const AiMaterialFinder = () => {
           console.error(err);
         });
 
-      setIsAnalyzing({
-        state: false,
-        message: "Products generated successfully",
+    fetch(apiUrl)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setProducts(data.categories || []);
+        setIsAnalyzing({
+          state: false,
+          message: "Products generated successfully",
+        });
+      })
+      .catch((err) => {
+        console.error("Error fetching products:", err);
+        setIsAnalyzing({
+          state: false,
+          message: "Failed to generate products. Please try again.",
+        });
+        alert("Failed to fetch products. Please try again.");
       });
-    }, 5000);
-
-    return () => clearTimeout(timer);
   };
 
   const handleProductCategorySelection = (category) => {
@@ -366,7 +389,7 @@ const AiMaterialFinder = () => {
                                         {filteredProducts[0].products[0].title}
                                       </h3>
                                       <p className="text-xs font-bold">$$$</p>
-                                      <h4 className="text-xs">Brand: Ikea</h4>
+                                      <h4 className="text-xs">Brand: {filteredProducts[0].products[0].brand}</h4>
                                     </div>
                                   </div>
                                 </div>
@@ -584,13 +607,13 @@ const AiMaterialFinder = () => {
                                 {product.title}
                               </h3>
                               <p className="text-xs font-bold">$$$</p>
-                              <h4 className="text-sm">Brand: Ikea</h4>
-                              <h4 className="text-xs">Color: Beige</h4>
+                              <h4 className="text-sm">Brand: {product.brand}</h4>
+                              <h4 className="text-xs">Color: {product.color}</h4>
                             </div>
                             <div className="flex items-center gap-2">
                               <Link
                                 className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center"
-                                href="/marketplace"
+                                href={product.link || "/marketplace"}
                               >
                                 <div>View Product</div>
                                 <svg
@@ -610,9 +633,8 @@ const AiMaterialFinder = () => {
                               </Link>
                               <button
                                 className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0"
-                                href="/spec-builder"
                                 onClick={() => {
-                                  setSpecCount(specCount + 1);
+                                  addProductToSpec(product, category.label);
                                 }}
                               >
                                 <div>Add to Spec</div>

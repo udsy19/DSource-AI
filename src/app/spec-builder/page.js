@@ -1,18 +1,12 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import { useSpec } from "../../contexts/SpecContext";
 
 const SpecBuilder = () => {
-  const [expandedCategories, setExpandedCategories] = useState({
-    "Living Room Accessories": true,
-    "Office Room": true,
-  });
-  const [productStatuses, setProductStatuses] = useState({
-    SB003: "approved",
-    TB005: "rejected",
-    FS001: "draft",
-    QT004: "approved",
-  });
+  const { specProducts } = useSpec();
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const [productStatuses, setProductStatuses] = useState({});
 
   const toggleCategory = (category) => {
     setExpandedCategories((prev) => ({
@@ -33,118 +27,44 @@ const SpecBuilder = () => {
     });
   };
 
-  const categories = [
-    {
-      name: "Living Room Accessories",
-      count: 4,
-      products: [
-        {
-          id: "SB003",
-          name: "Beige plush Texture paint",
-          brand: "Italia",
-          material: "Jute blent",
-          finish: "Natural Low-sheen",
-          dimensions: 'W: 8" H: 10"',
-          color: "Sand",
-          price: 520.0,
-          quantity: 2,
-          timeline: "1-2 weeks",
-          inStock: true,
-          image: "/wall-painting/wall-painting-1.png",
-        },
-        {
-          id: "TB005",
-          name: "Elmora Table",
-          brand: "HavenCraft",
-          material: "Solid ash wood",
-          finish: "Smoked Maple Veneer",
-          dimensions: 'W: 26" H: 42"',
-          color: "Smoked Maple",
-          price: 1249.0,
-          quantity: 3,
-          timeline: "2-4 weeks",
-          inStock: true,
-          image: "/coffee-table/coffee-table-1.webp",
-        },
-        {
-          id: "FS001",
-          name: "Seraphine Couch",
-          brand: "Modhavan",
-          material: "Premium linen fabric",
-          finish: "Upholstered gray",
-          dimensions: 'W: 36" H: 32"',
-          color: "Clay gray",
-          price: 1250.0,
-          quantity: 1,
-          timeline: "2-4 weeks",
-          inStock: true,
-          image: "/sofa/sofa-2.avif",
-        },
-        {
-          id: "QT004",
-          name: "Solterra Plank",
-          brand: "EarhEdge",
-          material: "ok wood plank",
-          finish: "Ash satin finish",
-          dimensions: 'W: 48" H: 0.5"',
-          color: "Drift wood Brown",
-          price: 6.25,
-          quantity: 400,
-          timeline: "3-4 weeks",
-          inStock: true,
-          image: "/floor/floor-2.webp",
-        },
-      ],
-    },
-    {
-      name: "Office Room",
-      count: 3,
-      products: [
-        {
-          id: "FB001",
-          name: "OakLume Flooring",
-          brand: "NatureCore",
-          material: "Oak Hardwood",
-          finish: "Semi Matte",
-          dimensions: 'W: 21" H: 8"',
-          color: "Amber Ash",
-          price: 1249.0,
-          quantity: 100,
-          timeline: "2-4 weeks",
-          inStock: true,
-          image: "/floor/floor-1.webp",
-        },
-        {
-          id: "SG004",
-          name: "Glidden Toasted Almond",
-          brand: "Casa",
-          material: "Mica",
-          finish: "Matte",
-          dimensions: 'W: 26" H: 12"',
-          color: "Light Brown",
-          price: 250.0,
-          quantity: 5,
-          timeline: "2-3 weeks",
-          inStock: true,
-          image: "/wall-painting/wall-painting-2.png",
-        },
-        {
-          id: "TB004",
-          name: "SilkThread Carpet",
-          brand: "Elanora",
-          material: "Jute Fiber",
-          finish: "Flat Weave",
-          dimensions: 'W: 36" H: 42"',
-          color: "Pebble Cloud Brown",
-          price: 1300.0,
-          quantity: 4,
-          timeline: "1-4 weeks",
-          inStock: true,
-          image: "/carpet/carpet-2.avif",
-        },
-      ],
-    },
-  ];
+  // Group products by category
+  const categories = useMemo(() => {
+    if (specProducts.length === 0) {
+      return [];
+    }
+
+    // Group products by category
+    const categoryMap = new Map();
+    specProducts.forEach((product) => {
+      const categoryName = product.category || "Uncategorized";
+      if (!categoryMap.has(categoryName)) {
+        categoryMap.set(categoryName, []);
+      }
+      categoryMap.get(categoryName).push(product);
+    });
+
+    // Convert map to array format
+    return Array.from(categoryMap.entries()).map(([name, products]) => ({
+      name,
+      count: products.length,
+      products,
+    }));
+  }, [specProducts]);
+
+  // Initialize expanded categories when categories change
+  useEffect(() => {
+    if (categories.length > 0) {
+      setExpandedCategories((prev) => {
+        const updated = { ...prev };
+        categories.forEach((cat) => {
+          if (updated[cat.name] === undefined) {
+            updated[cat.name] = true;
+          }
+        });
+        return updated;
+      });
+    }
+  }, [categories]);
 
   // Calculate totals
   const totals = categories.reduce(
@@ -252,15 +172,24 @@ const SpecBuilder = () => {
       "Smoked Maple": "#8B6F47",
       "Clay gray": "#B8B8AA",
       "Drift wood Brown": "#6B5B47",
+      "N/A": "#DDD",
+    };
+
+    // Try to parse color as hex code if it starts with #
+    const getColorValue = (colorName) => {
+      if (colorName?.startsWith("#")) {
+        return colorName;
+      }
+      return colorMap[colorName] || "#DDD";
     };
 
     return (
       <div className="flex items-center gap-2">
         <div
           className="w-4 h-4 rounded-full border border-gray-300"
-          style={{ backgroundColor: colorMap[color] || "#DDD" }}
+          style={{ backgroundColor: getColorValue(color) }}
         ></div>
-        <span className="text-sm text-gray-600">{color}</span>
+        <span className="text-sm text-gray-600">{color || "N/A"}</span>
       </div>
     );
   };
@@ -301,7 +230,8 @@ const SpecBuilder = () => {
             </div>
           </div>
           {/* Totals Header */}
-          <div className="bg-gray-200 rounded-lg px-8 py-6 mb-8">
+          {categories.length > 0 && (
+            <div className="bg-gray-200 rounded-lg px-8 py-6 mb-8">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Totals</h2>
               <div className="text-center">
@@ -341,7 +271,27 @@ const SpecBuilder = () => {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {categories.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-xl text-gray-500 mb-4">
+                No products in your spec yet.
+              </p>
+              <p className="text-gray-400">
+                Go to{" "}
+                <a
+                  href="/ai-material-finder/find"
+                  className="text-black underline font-semibold"
+                >
+                  AI Material Finder
+                </a>{" "}
+                to add products to your spec.
+              </p>
+            </div>
+          )}
 
           {/* Category Sections */}
           {categories.map((category, categoryIndex) => (
