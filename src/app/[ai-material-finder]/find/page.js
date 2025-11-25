@@ -285,64 +285,64 @@ const AiMaterialFinder = () => {
     <div className="w-full">
       {/* Analysis Loading Modal */}
       {isAnalyzing.state && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-xl">
-          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 flex flex-col items-center space-y-4 min-w-[400px] border border-white/30 shadow-xl">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
-            <p className="text-lg text-center text-black">
+        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-xl p-4">
+          <div className="bg-white/20 backdrop-blur-md rounded-lg p-6 sm:p-8 flex flex-col items-center space-y-4 w-full max-w-[400px] border border-white/30 shadow-xl">
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-black"></div>
+            <p className="text-base sm:text-lg text-center text-black">
               {isAnalyzing.message}
             </p>
           </div>
         </div>
       )}
-      <div className="mt-40 px-12">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center w-1/3">
-            <h1 className="text-4xl font-bold">AI Material Finder</h1>
-            <div className="w-6 ml-4">
-              <Image src={identifyIcon} alt="Identify Icon" />
+      <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-center w-full lg:w-1/3">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">AI Material Finder</h1>
+            <div className="w-4 sm:w-5 md:w-6 ml-2 sm:ml-3 md:ml-4">
+              <Image src={identifyIcon} alt="Identify Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
             </div>
           </div>
-          <div className="flex justify-between w-1/3">
+          <div className="flex justify-between w-full lg:w-1/3 gap-2 sm:gap-4">
             <div className="flex flex-col items-center">
-              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={uploadIcon} alt="Upload Icon" />
+              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={uploadIcon} alt="Upload Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
               </div>
-              <h2 className="text-lg font-bold mt-4">Upload Image</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">Upload Image</h2>
             </div>
             <div className="flex flex-col items-center">
-              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={identifyIcon} alt="Identify Icon" />
+              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={identifyIcon} alt="Identify Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
               </div>
-              <h2 className="text-lg font-bold mt-4">AI Match</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">AI Match</h2>
             </div>
             <div className="flex flex-col items-center">
-              <div className="w-12 p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={shopIcon} alt="Shop Icon" />
+              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
+                <Image src={shopIcon} alt="Shop Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
               </div>
-              <h2 className="text-lg font-bold mt-4">Shop</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">Shop</h2>
             </div>
           </div>
-          <div className="w-1/3 flex items-center justify-end">
+          <div className="w-full lg:w-1/3 flex items-center justify-start lg:justify-end">
             <Link
               href="/ai-material-finder/tutorial"
-              className="text-black px-12 py-3 border-2 border-black rounded-full cursor-pointer hover:bg-gray-800 transition-all duration-300 font-bold"
+              className="text-black px-6 sm:px-8 md:px-12 py-2 sm:py-3 border-2 border-black rounded-full cursor-pointer hover:bg-gray-800 transition-all duration-300 font-bold text-sm sm:text-base"
             >
               View Tutorial
             </Link>
           </div>
         </div>
-        <div className="grid grid-cols-12 gap-12 mt-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 md:gap-8 lg:gap-12 mt-6 sm:mt-8 md:mt-12">
           {/* Image Upload */}
           <div
             className={`${
-              categories.length > 0 ? "col-span-8" : "col-span-12"
-            } h-[50rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-4`}
+              categories.length > 0 ? "lg:col-span-8" : "lg:col-span-12"
+            } h-auto min-h-[30rem] sm:min-h-[40rem] md:h-[50rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-3 sm:p-4`}
           >
             {imagePreview ? (
-              <div className="relative w-full" style={{ height: "37rem" }}>
+              <div className="relative w-full" style={{ minHeight: "25rem", height: "auto" }}>
                 <div
                   className="relative w-full rounded-lg overflow-hidden"
-                  style={{ height: "95%" }}
+                  style={{ minHeight: "95%" }}
                 >
                   <Image
                     src={imagePreview}
@@ -460,7 +460,7 @@ const AiMaterialFinder = () => {
               </div>
             ) : (
               <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-64 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-16 md:p-32 lg:p-64 text-center cursor-pointer hover:border-gray-400 transition-colors w-full"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={handleClick}
@@ -498,7 +498,7 @@ const AiMaterialFinder = () => {
             )}
           </div>
           <div
-            className={`col-span-4 h-[50rem] ${
+            className={`lg:col-span-4 h-auto min-h-[30rem] sm:min-h-[40rem] md:h-[50rem] ${
               categories.length > 0 ? "block" : "hidden"
             }`}
           >
@@ -580,7 +580,7 @@ const AiMaterialFinder = () => {
                     </div>
                   </div>
                 </div>
-                <div className="py-4 h-[42rem] overflow-y-auto hide-scrollbar">
+                <div className="py-4 h-auto min-h-[20rem] sm:min-h-[30rem] md:h-[42rem] max-h-[42rem] overflow-y-auto hide-scrollbar">
                   {filteredProducts.map((category, index) => (
                     <div key={index} className="my-4">
                       {category.products.map((product, index) => (
@@ -589,7 +589,7 @@ const AiMaterialFinder = () => {
                           className="my-4 flex gap-4 bg-gray-100 rounded-lg p-4"
                         >
                           <div
-                            className="w-48 h-32 rounded-lg overflow-hidden"
+                            className="w-32 sm:w-40 md:w-48 h-24 sm:h-28 md:h-32 rounded-lg overflow-hidden flex-shrink-0"
                             style={{
                               backgroundImage: `url(${product.image})`,
                               backgroundSize: "cover",
@@ -664,7 +664,7 @@ const AiMaterialFinder = () => {
               <div className="flex flex-col justify-center">
                 <h2 className="text-2xl font-bold">Select Products</h2>
                 <div
-                  className="grid grid-cols-3 gap-4 mt-4 p-8 rounded-lg"
+                  className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 p-4 sm:p-6 md:p-8 rounded-lg"
                   style={{ background: "#E5E7EB" }}
                 >
                   {categories.map((category, index) => (

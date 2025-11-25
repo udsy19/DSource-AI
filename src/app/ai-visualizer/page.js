@@ -131,16 +131,16 @@ const AiMaterialFinder = () => {
           </div>
         </div>
       )}
-      <div className="mt-40 px-12">
+      <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="flex items-center">
-          <h1 className="text-4xl font-bold">AI Visualizer</h1>
-          <div className="w-6 ml-4">
-            <Image src={visualizerIcon} alt="Visualizer Icon" />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">AI Visualizer</h1>
+          <div className="w-4 sm:w-5 md:w-6 ml-2 sm:ml-3 md:ml-4">
+            <Image src={visualizerIcon} alt="Visualizer Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
           </div>
         </div>
-        <div className="flex gap-12 mt-12">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 md:gap-8 lg:gap-12 mt-6 sm:mt-8 md:mt-12">
           {/* Image Upload */}
-          <div className="w-2/6 border-1 border-gray-700 rounded-lg p-4">
+          <div className="w-full lg:w-2/6 border-1 border-gray-700 rounded-lg p-3 sm:p-4">
             {/* Tab Navigation */}
             <div className="flex mb-4 border-b border-gray-200">
               <button
@@ -757,7 +757,7 @@ const AiMaterialFinder = () => {
               </div>
             )}
           </div>
-          <div className="w-4/6 max-h-[40rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-4">
+          <div className="w-full lg:w-4/6 max-h-[40rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-3 sm:p-4">
             {imagePreview ? (
               <div className="relative w-full" style={{ height: "37rem" }}>
                 <div

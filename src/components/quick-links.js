@@ -40,22 +40,22 @@ const QuickLinks = () => {
   ];
 
   return (
-    <div className="w-full h-full py-12 px-24" id="quick-links">
-      <div className="grid grid-cols-5 px-12">
+    <div className="w-full h-full py-6 sm:py-8 md:py-12 px-4 sm:px-8 md:px-16 lg:px-24" id="quick-links">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 px-4 sm:px-8 md:px-12">
         {linkSections.map((links, index) => (
           <LinkSection key={index} links={links} />
         ))}
-        <div></div>
-        <div>
-          <h1 className="text-2xl mb-4">DSource.AI</h1>
-          <p className="text-gray-500">
+        <div className="hidden lg:block"></div>
+        <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-1">
+          <h1 className="text-xl sm:text-2xl mb-2 sm:mb-4">DSource.AI</h1>
+          <p className="text-gray-500 text-sm sm:text-base">
             The ultimate platform for material sourcing and project
             visualization.
           </p>
         </div>
       </div>
-      <div className="mt-24 px-12 mb-8">
-        <h4 className="text-gray-500">
+      <div className="mt-12 sm:mt-16 md:mt-24 px-4 sm:px-8 md:px-12 mb-4 sm:mb-6 md:mb-8">
+        <h4 className="text-gray-500 text-sm sm:text-base">
           © 2025 DSource.AI. All rights reserved.
         </h4>
       </div>

@@ -14,14 +14,50 @@ body {
   background-image: url("../../public/design-image.jpg");
   background-size: cover;
   background-position: center;
-  height: 32rem;
+  min-height: 200px;
+}
+
+@media (min-width: 640px) {
+  #design-image {
+    min-height: 250px;
+  }
+}
+
+@media (min-width: 768px) {
+  #design-image {
+    min-height: 300px;
+  }
+}
+
+@media (min-width: 1024px) {
+  #design-image {
+    height: 32rem;
+  }
 }
 
 #discover-image {
   background-image: url("../../public/discover-image.jpg");
   background-size: cover;
   background-position: center;
-  height: 32rem;
+  min-height: 200px;
+}
+
+@media (min-width: 640px) {
+  #discover-image {
+    min-height: 250px;
+  }
+}
+
+@media (min-width: 768px) {
+  #discover-image {
+    min-height: 300px;
+  }
+}
+
+@media (min-width: 1024px) {
+  #discover-image {
+    height: 32rem;
+  }
 }
 
 #popular-1 {
@@ -68,7 +104,13 @@ body {
 }
 
 #source-image {
-  height: 32rem;
+  min-height: 24rem;
+}
+
+@media (min-width: 1024px) {
+  #source-image {
+    height: 32rem;
+  }
 }
 
 #made-with-dsource-1 {

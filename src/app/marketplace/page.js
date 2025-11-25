@@ -125,53 +125,53 @@ const Marketplace = () => {
   ];
 
   return (
-    <div className="w-full h-full my-32 p-12">
-      <div className="flex flex-col items-center justify-center mb-12">
-        <h1 className="text-4xl font-bold">Marketplace</h1>
+    <div className="w-full h-full my-12 sm:my-20 md:my-32 p-4 sm:p-8 md:p-12">
+      <div className="flex flex-col items-center justify-center mb-6 sm:mb-8 md:mb-12">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Marketplace</h1>
       </div>
       {/* Sample Category */}
-      <h1 className="text-2xl font-bold text-center">Sample Category</h1>
-      <div className="grid grid-cols-6 gap-12 px-12 mb-24 mt-12">
+      <h1 className="text-xl sm:text-2xl font-bold text-center">Sample Category</h1>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 md:gap-8 lg:gap-12 px-4 sm:px-8 md:px-12 mb-12 sm:mb-16 md:mb-24 mt-6 sm:mt-8 md:mt-12">
         {sampleCategory.map((item) => (
           <div
             className="flex flex-col items-center justify-center"
             key={item.id}
           >
             <div
-              className="cursor-pointer col-span-1 w-full aspect-square rounded-lg shadow-md border border-white border-4 shadow-black/40 hover:shadow-lg hover:shadow-black/60 transition-all duration-300"
+              className="cursor-pointer col-span-1 w-full aspect-square rounded-lg shadow-md border border-white border-2 sm:border-4 shadow-black/40 hover:shadow-lg hover:shadow-black/60 transition-all duration-300"
               style={{
                 backgroundImage: `url(${item.image})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }}
             ></div>
-            <h1 className="text-xl font-bold text-center mt-4">{item.label}</h1>
+            <h1 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-center mt-2 sm:mt-4">{item.label}</h1>
           </div>
         ))}
       </div>
       {/* Shop by room */}
-      <h1 className="text-2xl font-bold text-center">Shop by room</h1>
-      <div className="grid grid-cols-4 gap-12 px-24 mb-24 mt-12">
+      <h1 className="text-xl sm:text-2xl font-bold text-center">Shop by room</h1>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8 lg:gap-12 px-4 sm:px-8 md:px-16 lg:px-24 mb-12 sm:mb-16 md:mb-24 mt-6 sm:mt-8 md:mt-12">
         {shopByRoom.map((item) => (
           <div
             className="flex flex-col items-center justify-center"
             key={item.id}
           >
             <div
-              className="cursor-pointer col-span-1 w-full aspect-square rounded-lg shadow-md border border-white border-4 shadow-black/40 hover:shadow-lg hover:shadow-black/60 transition-all duration-300"
+              className="cursor-pointer col-span-1 w-full aspect-square rounded-lg shadow-md border border-white border-2 sm:border-4 shadow-black/40 hover:shadow-lg hover:shadow-black/60 transition-all duration-300"
               style={{
                 backgroundImage: `url(${item.image})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }}
             ></div>
-            <h1 className="text-xl font-bold text-center mt-4">{item.label}</h1>
+            <h1 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-center mt-2 sm:mt-4">{item.label}</h1>
           </div>
         ))}
       </div>
       {/* Shop the look */}
-      <h1 className="text-2xl font-bold text-center">Shop the look</h1>
-      <div className="grid grid-cols-3 gap-12 px-24 mt-12">
+      <h1 className="text-xl sm:text-2xl font-bold text-center">Shop the look</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 lg:gap-12 px-4 sm:px-8 md:px-16 lg:px-24 mt-6 sm:mt-8 md:mt-12">
         {shopTheLook.map((item) => (
           <div
             className="flex flex-col items-center justify-center"
