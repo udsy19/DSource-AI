@@ -156,18 +156,11 @@ const AiMaterialFinder = () => {
       message: "Generating products for selected categories",
     });
 
-    // TODO
-    // use "categories" state to fetch products from the database that match the category
-    //
-
-    fetch("/api/get-products")
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(data.categories);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
+    // Build query string with selected categories
+    const categoriesQuery = selectedCategories.join(",");
+    const apiUrl = `/api/get-products?categories=${encodeURIComponent(
+      categoriesQuery
+    )}`;
 
     fetch(apiUrl)
       .then((res) => {
