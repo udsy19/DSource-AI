@@ -1,0 +1,3 @@
+product_id,product_material_depot_variant_handle,product_name,brand_name,category_name,color,color_code,color_family,sub_category,series_name,description,application,thickness,size,tags,image_url
+900001,vendor-handle-sample-1,Sample Product Name,Sample Brand,Laminates,Beige,#F5F5DC,Beige,"Decorative Laminates|Premium Collection","Signature Series","Explain the key marketing copy for the product","Living Room|Bedroom|Office",1 mm,"8x4 ft","Premium|Indoor|Laminate","https://example.com/image.jpg"
+
