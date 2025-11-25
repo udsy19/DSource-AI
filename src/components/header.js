@@ -23,7 +23,7 @@ const Header = ({ currentPath = "" }) => {
   }, [pathname]);
 
   return (
-    <div className="fixed top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 z-50">
+    <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 w-full px-2 sm:px-4 max-w-[1728px] z-50">
       <header
         className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-4 py-2 sm:px-8 md:px-14 sm:py-4 ${
           pathName?.startsWith("/ai-material-finder") ||

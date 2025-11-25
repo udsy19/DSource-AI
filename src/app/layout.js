@@ -28,10 +28,12 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SpecProvider>
-          <Header />
-          <main className="relative z-0">{children}</main>
-          <Footer />
-          <QuickLinks />
+          <div className="max-w-[1728px] mx-auto px-2 sm:px-4">
+            <Header />
+            <main className="relative z-0">{children}</main>
+            <Footer />
+            <QuickLinks />
+          </div>
         </SpecProvider>
       </body>
     </html>
