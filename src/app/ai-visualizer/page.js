@@ -19,6 +19,14 @@ const AiMaterialFinder = () => {
   const [isStyleExpanded, setIsStyleExpanded] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Form state for AI Visualizer
+  const [prompt, setPrompt] = useState("");
+  const [selectedSpace, setSelectedSpace] = useState("");
+  const [selectedStyle, setSelectedStyle] = useState("");
+  const [selectedLighting, setSelectedLighting] = useState("");
+  const [selectedColorPalette, setSelectedColorPalette] = useState("");
+  const [validationError, setValidationError] = useState(null);
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -97,26 +105,101 @@ const AiMaterialFinder = () => {
     }
   };
 
-  const handleGenerate = (type) => {
-    setIsAnalyzing({
-      state: true,
-      message: "Generating image",
-    });
-
-    const timer = setTimeout(() => {
-      if (type === "visualizer") {
-        setImagePreview("/api/images/Gemini_Generated_Image.png");
-      } else if (type === "cad") {
-        setImagePreview("/api/images/cad-drawing.jpeg");
+  const handleGenerate = async (type) => {
+    if (type === "visualizer") {
+      // Validate prompt
+      if (!prompt || prompt.trim().length === 0) {
+        setValidationError("Please enter a prompt to generate an image.");
+        return;
       }
 
-      setIsAnalyzing({
-        state: false,
-        message: "Image generated successfully",
-      });
-    }, 5000);
+      // Clear previous errors
+      setValidationError(null);
+      setError(null);
 
-    return () => clearTimeout(timer);
+      setIsAnalyzing({
+        state: true,
+        message: "Validating prompt and generating image...",
+      });
+
+      try {
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: prompt.trim(),
+            spaceType: visualizerSpace || selectedSpace,
+            style: selectedStyle,
+            lighting: selectedLighting,
+            colorPalette: selectedColorPalette,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          // Handle validation errors or API errors
+          if (data.error) {
+            if (data.suggestion) {
+              // Show detailed error with suggestion
+              setValidationError(
+                `${data.error}\n\n${data.suggestion}`
+              );
+            } else {
+              setValidationError(data.error);
+            }
+          } else {
+            setError("Failed to generate image. Please try again.");
+          }
+          setIsAnalyzing({ state: false, message: "" });
+          return;
+        }
+
+        if (data.success && data.images && data.images.length > 0) {
+          // Display the first generated image
+          const generatedImage = data.images[0];
+
+          // Convert base64 to data URL if needed
+          if (generatedImage.image) {
+            const imageDataUrl = generatedImage.image.startsWith('data:')
+              ? generatedImage.image
+              : `data:${generatedImage.mimeType || 'image/png'};base64,${generatedImage.image}`;
+
+            setImagePreview(imageDataUrl);
+          }
+
+          setIsAnalyzing({
+            state: false,
+            message: "Image generated successfully",
+          });
+        } else {
+          setError("No images were generated. Please try a different prompt.");
+          setIsAnalyzing({ state: false, message: "" });
+        }
+      } catch (err) {
+        console.error("Error generating image:", err);
+        setError("An error occurred while generating the image. Please try again.");
+        setIsAnalyzing({ state: false, message: "" });
+      }
+    } else if (type === "cad") {
+      // Keep the mock behavior for CAD converter
+      setIsAnalyzing({
+        state: true,
+        message: "Generating CAD drawing",
+      });
+
+      const timer = setTimeout(() => {
+        setImagePreview("/api/images/cad-drawing.jpeg");
+        setIsAnalyzing({
+          state: false,
+          message: "CAD drawing generated successfully",
+        });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
   };
 
   return (
@@ -150,11 +233,10 @@ const AiMaterialFinder = () => {
                   setAnalysisResults(null);
                   setError(null);
                 }}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "visualizer"
-                    ? "text-gray-900 bg-white border-b-2 border-black"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-4 py-2 text-sm font-medium ${activeTab === "visualizer"
+                  ? "text-gray-900 bg-white border-b-2 border-black"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 AI Visualizer
               </button>
@@ -165,11 +247,10 @@ const AiMaterialFinder = () => {
                   setAnalysisResults(null);
                   setError(null);
                 }}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "cad-converter"
-                    ? "text-gray-900 bg-white border-b-2 border-black"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-4 py-2 text-sm font-medium ${activeTab === "cad-converter"
+                  ? "text-gray-900 bg-white border-b-2 border-black"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 Image to CAD Converter
               </button>
@@ -182,31 +263,28 @@ const AiMaterialFinder = () => {
                 <div className="text-sm font-bold">Define your space</div>
                 <div className="flex mt-2 gap-8">
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
-                      visualizerSpace === "interior"
-                        ? "bg-black text-white"
-                        : "bg-white text-black"
-                    }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "interior"
+                      ? "bg-black text-white"
+                      : "bg-white text-black"
+                      }`}
                     onClick={() => setVisualizerSpace("interior")}
                   >
                     Interior
                   </button>
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
-                      visualizerSpace === "exterior"
-                        ? "bg-black text-white"
-                        : "bg-white text-black"
-                    }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "exterior"
+                      ? "bg-black text-white"
+                      : "bg-white text-black"
+                      }`}
                     onClick={() => setVisualizerSpace("exterior")}
                   >
                     Exterior
                   </button>
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
-                      visualizerSpace === "floor-plan"
-                        ? "bg-black text-white"
-                        : "bg-white text-black"
-                    }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "floor-plan"
+                      ? "bg-black text-white"
+                      : "bg-white text-black"
+                      }`}
                     onClick={() => setVisualizerSpace("floor-plan")}
                   >
                     Floor Plan
@@ -217,33 +295,59 @@ const AiMaterialFinder = () => {
                   <div className="w-1/2">
                     <div className="text-sm font-bold">Select Space</div>
                     <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
+                      <select
+                        className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
+                        value={selectedSpace}
+                        onChange={(e) => setSelectedSpace(e.target.value)}
+                      >
                         <option value="">Select an option</option>
-                        <option value="option1">Living Room</option>
-                        <option value="option2">Kitchen</option>
-                        <option value="option3">Bathroom</option>
+                        <option value="Living Room">Living Room</option>
+                        <option value="Kitchen">Kitchen</option>
+                        <option value="Bathroom">Bathroom</option>
+                        <option value="Bedroom">Bedroom</option>
+                        <option value="Dining Room">Dining Room</option>
+                        <option value="Office">Office</option>
                       </select>
                     </div>
                   </div>
                   <div className="w-1/2">
                     <div className="text-sm font-bold">Select Style</div>
                     <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
+                      <select
+                        className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
+                        value={selectedStyle}
+                        onChange={(e) => setSelectedStyle(e.target.value)}
+                      >
                         <option value="">Select an option</option>
-                        <option value="option1">Modern</option>
-                        <option value="option2">Traditional</option>
-                        <option value="option4">Scandinavian</option>
-                        <option value="option5">Mid-Century Modern</option>
+                        <option value="Modern">Modern</option>
+                        <option value="Traditional">Traditional</option>
+                        <option value="Scandinavian">Scandinavian</option>
+                        <option value="Mid-Century Modern">Mid-Century Modern</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Minimalist">Minimalist</option>
                       </select>
                     </div>
                   </div>
                 </div>
                 {/* Prompt */}
                 <div className="mt-4">
+                  <div className="text-sm font-bold">Prompt</div>
                   <textarea
                     className="w-full h-32 mt-2 border-1 border-gray-700 rounded-lg px-3 py-3 text-sm resize-none"
-                    placeholder="Prompt..."
+                    placeholder="Describe your interior design vision... (e.g., 'A cozy living room with warm lighting and comfortable seating')"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
                   ></textarea>
+                  {validationError && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-600">{validationError}</p>
+                    </div>
+                  )}
+                  {error && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-600">{error}</p>
+                    </div>
+                  )}
                 </div>
                 {/* Optional */}
                 <div className="text-sm font-bold mt-4">Optional</div>
@@ -251,23 +355,34 @@ const AiMaterialFinder = () => {
                   <div className="w-1/2">
                     <div className="text-sm font-bold">Lighting</div>
                     <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
+                      <select
+                        className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
+                        value={selectedLighting}
+                        onChange={(e) => setSelectedLighting(e.target.value)}
+                      >
                         <option value="">Select an option</option>
-                        <option value="option1">Living Room</option>
-                        <option value="option2">Kitchen</option>
-                        <option value="option3">Bathroom</option>
+                        <option value="Natural">Natural</option>
+                        <option value="Warm">Warm</option>
+                        <option value="Cool">Cool</option>
+                        <option value="Ambient">Ambient</option>
+                        <option value="Dramatic">Dramatic</option>
                       </select>
                     </div>
                   </div>
                   <div className="w-1/2">
                     <div className="text-sm font-bold">Color Palette</div>
                     <div>
-                      <select className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm">
+                      <select
+                        className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
+                        value={selectedColorPalette}
+                        onChange={(e) => setSelectedColorPalette(e.target.value)}
+                      >
                         <option value="">Select an option</option>
-                        <option value="option1">Modern</option>
-                        <option value="option2">Traditional</option>
-                        <option value="option4">Scandinavian</option>
-                        <option value="option5">Mid-Century Modern</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Warm Tones">Warm Tones</option>
+                        <option value="Cool Tones">Cool Tones</option>
+                        <option value="Monochrome">Monochrome</option>
+                        <option value="Bold & Vibrant">Bold & Vibrant</option>
                       </select>
                     </div>
                   </div>
@@ -327,9 +442,8 @@ const AiMaterialFinder = () => {
                   >
                     <span className="text-sm font-semibold">Position</span>
                     <svg
-                      className={`w-4 h-4 text-gray-500 transform transition-transform ${
-                        isPositionExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 text-gray-500 transform transition-transform ${isPositionExpanded ? "rotate-180" : ""
+                        }`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -597,9 +711,8 @@ const AiMaterialFinder = () => {
                   >
                     <span className="text-sm font-semibold">Style</span>
                     <svg
-                      className={`w-4 h-4 text-gray-500 transform transition-transform ${
-                        isStyleExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 text-gray-500 transform transition-transform ${isStyleExpanded ? "rotate-180" : ""
+                        }`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
