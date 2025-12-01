@@ -123,18 +123,26 @@ const AiMaterialFinder = () => {
       });
 
       try {
+        // Prepare request body with optional image
+        const requestBody = {
+          prompt: prompt.trim(),
+          spaceType: visualizerSpace || selectedSpace,
+          style: selectedStyle,
+          lighting: selectedLighting,
+          colorPalette: selectedColorPalette,
+        };
+
+        // Include image if available (for image editing)
+        if (imagePreview) {
+          requestBody.image = imagePreview;
+        }
+
         const response = await fetch("/api/generate-image", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            prompt: prompt.trim(),
-            spaceType: visualizerSpace || selectedSpace,
-            style: selectedStyle,
-            lighting: selectedLighting,
-            colorPalette: selectedColorPalette,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const data = await response.json();
@@ -144,9 +152,7 @@ const AiMaterialFinder = () => {
           if (data.error) {
             if (data.suggestion) {
               // Show detailed error with suggestion
-              setValidationError(
-                `${data.error}\n\n${data.suggestion}`
-              );
+              setValidationError(`${data.error}\n\n${data.suggestion}`);
             } else {
               setValidationError(data.error);
             }
@@ -163,9 +169,11 @@ const AiMaterialFinder = () => {
 
           // Convert base64 to data URL if needed
           if (generatedImage.image) {
-            const imageDataUrl = generatedImage.image.startsWith('data:')
+            const imageDataUrl = generatedImage.image.startsWith("data:")
               ? generatedImage.image
-              : `data:${generatedImage.mimeType || 'image/png'};base64,${generatedImage.image}`;
+              : `data:${generatedImage.mimeType || "image/png"};base64,${
+                  generatedImage.image
+                }`;
 
             setImagePreview(imageDataUrl);
           }
@@ -180,7 +188,9 @@ const AiMaterialFinder = () => {
         }
       } catch (err) {
         console.error("Error generating image:", err);
-        setError("An error occurred while generating the image. Please try again.");
+        setError(
+          "An error occurred while generating the image. Please try again."
+        );
         setIsAnalyzing({ state: false, message: "" });
       }
     } else if (type === "cad") {
@@ -216,9 +226,17 @@ const AiMaterialFinder = () => {
       )}
       <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="flex items-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">AI Visualizer</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+            AI Visualizer
+          </h1>
           <div className="w-4 sm:w-5 md:w-6 ml-2 sm:ml-3 md:ml-4">
-            <Image src={visualizerIcon} alt="Visualizer Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
+            <Image
+              src={visualizerIcon}
+              alt="Visualizer Icon"
+              width={24}
+              height={24}
+              className="sm:w-6 sm:h-6"
+            />
           </div>
         </div>
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 md:gap-8 lg:gap-12 mt-6 sm:mt-8 md:mt-12">
@@ -233,10 +251,11 @@ const AiMaterialFinder = () => {
                   setAnalysisResults(null);
                   setError(null);
                 }}
-                className={`px-4 py-2 text-sm font-medium ${activeTab === "visualizer"
-                  ? "text-gray-900 bg-white border-b-2 border-black"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === "visualizer"
+                    ? "text-gray-900 bg-white border-b-2 border-black"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 AI Visualizer
               </button>
@@ -247,10 +266,11 @@ const AiMaterialFinder = () => {
                   setAnalysisResults(null);
                   setError(null);
                 }}
-                className={`px-4 py-2 text-sm font-medium ${activeTab === "cad-converter"
-                  ? "text-gray-900 bg-white border-b-2 border-black"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium ${
+                  activeTab === "cad-converter"
+                    ? "text-gray-900 bg-white border-b-2 border-black"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 Image to CAD Converter
               </button>
@@ -263,28 +283,31 @@ const AiMaterialFinder = () => {
                 <div className="text-sm font-bold">Define your space</div>
                 <div className="flex mt-2 gap-8">
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "interior"
-                      ? "bg-black text-white"
-                      : "bg-white text-black"
-                      }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
+                      visualizerSpace === "interior"
+                        ? "bg-black text-white"
+                        : "bg-white text-black"
+                    }`}
                     onClick={() => setVisualizerSpace("interior")}
                   >
                     Interior
                   </button>
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "exterior"
-                      ? "bg-black text-white"
-                      : "bg-white text-black"
-                      }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
+                      visualizerSpace === "exterior"
+                        ? "bg-black text-white"
+                        : "bg-white text-black"
+                    }`}
                     onClick={() => setVisualizerSpace("exterior")}
                   >
                     Exterior
                   </button>
                   <button
-                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${visualizerSpace === "floor-plan"
-                      ? "bg-black text-white"
-                      : "bg-white text-black"
-                      }`}
+                    className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
+                      visualizerSpace === "floor-plan"
+                        ? "bg-black text-white"
+                        : "bg-white text-black"
+                    }`}
                     onClick={() => setVisualizerSpace("floor-plan")}
                   >
                     Floor Plan
@@ -322,7 +345,9 @@ const AiMaterialFinder = () => {
                         <option value="Modern">Modern</option>
                         <option value="Traditional">Traditional</option>
                         <option value="Scandinavian">Scandinavian</option>
-                        <option value="Mid-Century Modern">Mid-Century Modern</option>
+                        <option value="Mid-Century Modern">
+                          Mid-Century Modern
+                        </option>
                         <option value="Industrial">Industrial</option>
                         <option value="Minimalist">Minimalist</option>
                       </select>
@@ -375,7 +400,9 @@ const AiMaterialFinder = () => {
                       <select
                         className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
                         value={selectedColorPalette}
-                        onChange={(e) => setSelectedColorPalette(e.target.value)}
+                        onChange={(e) =>
+                          setSelectedColorPalette(e.target.value)
+                        }
                       >
                         <option value="">Select an option</option>
                         <option value="Neutral">Neutral</option>
@@ -442,8 +469,9 @@ const AiMaterialFinder = () => {
                   >
                     <span className="text-sm font-semibold">Position</span>
                     <svg
-                      className={`w-4 h-4 text-gray-500 transform transition-transform ${isPositionExpanded ? "rotate-180" : ""
-                        }`}
+                      className={`w-4 h-4 text-gray-500 transform transition-transform ${
+                        isPositionExpanded ? "rotate-180" : ""
+                      }`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -711,8 +739,9 @@ const AiMaterialFinder = () => {
                   >
                     <span className="text-sm font-semibold">Style</span>
                     <svg
-                      className={`w-4 h-4 text-gray-500 transform transition-transform ${isStyleExpanded ? "rotate-180" : ""
-                        }`}
+                      className={`w-4 h-4 text-gray-500 transform transition-transform ${
+                        isStyleExpanded ? "rotate-180" : ""
+                      }`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
