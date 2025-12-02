@@ -21,6 +21,34 @@ const AiMaterialFinder = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [productCategorySelected, setProductCategorySelected] = useState("All");
   const [isAnalyzing, setIsAnalyzing] = useState({ state: false, message: "" });
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  // Check which categories are available in the database
+  const checkCategoryAvailability = async (categoryLabels) => {
+    if (!categoryLabels || categoryLabels.length === 0) return [];
+
+    try {
+      const categoriesQuery = categoryLabels.join(",");
+      const apiUrl = `/api/get-products?categories=${encodeURIComponent(
+        categoriesQuery
+      )}`;
+
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const availableCategories = (data.categories || []).map(
+        (cat) => cat.label
+      );
+
+      return availableCategories;
+    } catch (error) {
+      console.error("Error checking category availability:", error);
+      return [];
+    }
+  };
 
   const toggleCategory = (index) => {
     setCategories((prev) =>
@@ -140,14 +168,16 @@ const AiMaterialFinder = () => {
   };
 
   const handleGenerateProducts = () => {
-    // Get selected categories
+    // Get selected categories (only available ones can be selected)
     const selectedCategories = categories
-      .filter((cat) => cat.selected)
+      .filter((cat) => cat.selected && cat.available)
       .map((cat) => cat.label);
 
     // If no categories are selected, show an error or return early
     if (selectedCategories.length === 0) {
-      alert("Please select at least one category to generate products");
+      alert(
+        "Please select at least one available category to generate products"
+      );
       return;
     }
 
@@ -218,7 +248,7 @@ const AiMaterialFinder = () => {
           body: formData,
         })
           .then((res) => res.json())
-          .then((data) => {
+          .then(async (data) => {
             if (data.success) {
               console.log(data);
               const normalizedCategories = Array.isArray(data.categories)
@@ -245,18 +275,38 @@ const AiMaterialFinder = () => {
                               y: `${y}%`,
                             }
                           : null,
+                      available: false, // Will be updated after checking
                     };
                   })
                 : [];
 
-              setCategories(normalizedCategories);
+              // Check which categories are available in the database
+              setCheckingAvailability(true);
+              const categoryLabels = normalizedCategories.map(
+                (cat) => cat.label
+              );
+              const availableCategories = await checkCategoryAvailability(
+                categoryLabels
+              );
+
+              // Update categories with availability status
+              const categoriesWithAvailability = normalizedCategories.map(
+                (category) => ({
+                  ...category,
+                  available: availableCategories.includes(category.label),
+                })
+              );
+
+              setCategories(categoriesWithAvailability);
               setError(null);
+              setCheckingAvailability(false);
             } else {
               setError(
                 data?.error ||
                   "We couldn't understand this image. Please try another interior photo."
               );
               setCategories([]);
+              setCheckingAvailability(false);
             }
           })
           .catch((err) => {
@@ -265,6 +315,7 @@ const AiMaterialFinder = () => {
               "Something went wrong while analyzing the image. Please try again."
             );
             setCategories([]);
+            setCheckingAvailability(false);
           })
           .finally(() => {
             setIsAnalyzing({ state: false, message: "" });
@@ -279,7 +330,8 @@ const AiMaterialFinder = () => {
     handleProductCategorySelection("All");
   }, [products]);
 
-  console.log(categories);
+  console.log(imagePreview);
+  console.log(uploadedImage);
 
   return (
     <div className="w-full">
@@ -297,29 +349,61 @@ const AiMaterialFinder = () => {
       <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
           <div className="flex items-center w-full lg:w-1/3">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">AI Material Finder</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+              AI Material Finder
+            </h1>
             <div className="w-4 sm:w-5 md:w-6 ml-2 sm:ml-3 md:ml-4">
-              <Image src={identifyIcon} alt="Identify Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
+              <Image
+                src={identifyIcon}
+                alt="Identify Icon"
+                width={24}
+                height={24}
+                className="sm:w-6 sm:h-6"
+              />
             </div>
           </div>
           <div className="flex justify-between w-full lg:w-1/3 gap-2 sm:gap-4">
             <div className="flex flex-col items-center">
               <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={uploadIcon} alt="Upload Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
+                <Image
+                  src={uploadIcon}
+                  alt="Upload Icon"
+                  width={24}
+                  height={24}
+                  className="sm:w-6 sm:h-6"
+                />
               </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">Upload Image</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
+                Upload Image
+              </h2>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={identifyIcon} alt="Identify Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
+                <Image
+                  src={identifyIcon}
+                  alt="Identify Icon"
+                  width={24}
+                  height={24}
+                  className="sm:w-6 sm:h-6"
+                />
               </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">AI Match</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
+                AI Match
+              </h2>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image src={shopIcon} alt="Shop Icon" width={24} height={24} className="sm:w-6 sm:h-6" />
+                <Image
+                  src={shopIcon}
+                  alt="Shop Icon"
+                  width={24}
+                  height={24}
+                  className="sm:w-6 sm:h-6"
+                />
               </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">Shop</h2>
+              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
+                Shop
+              </h2>
             </div>
           </div>
           <div className="w-full lg:w-1/3 flex items-center justify-start lg:justify-end">
@@ -339,18 +423,21 @@ const AiMaterialFinder = () => {
             } h-auto min-h-[30rem] sm:min-h-[40rem] md:h-[50rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-3 sm:p-4`}
           >
             {imagePreview ? (
-              <div className="relative w-full" style={{ minHeight: "25rem", height: "auto" }}>
+              <div
+                className="relative w-full flex items-center justify-center"
+                style={{ minHeight: "25rem" }}
+              >
                 <div
-                  className="relative w-full rounded-lg overflow-hidden"
-                  style={{ minHeight: "95%" }}
+                  className="relative w-full rounded-lg overflow-hidden flex items-center justify-center"
+                  style={{ minHeight: "25rem" }}
                 >
-                  <Image
+                  <img
                     src={imagePreview}
                     alt="Uploaded image"
-                    fill
-                    className="object-contain"
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                    style={{ maxHeight: "40rem" }}
                   />
-                  {categories.map(
+                  {/* {categories.map(
                     (category, index) =>
                       category.position && (
                         <div
@@ -447,7 +534,7 @@ const AiMaterialFinder = () => {
                           ></div>
                         </div>
                       )
-                  )}
+                  )} */}
                 </div>
                 {categories.length > 0 && (
                   <button
@@ -670,26 +757,50 @@ const AiMaterialFinder = () => {
                   {categories.map((category, index) => (
                     <button
                       key={index}
-                      onClick={() => toggleCategory(index)}
-                      className={`py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/80 shadow-lg shadow-black/10 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)] transition-all duration-300 flex items-center justify-center ${
-                        category.hovered
-                          ? "scale-110 bg-white/20 border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)]"
-                          : ""
+                      onClick={() => {
+                        if (category.available) {
+                          toggleCategory(index);
+                        }
+                      }}
+                      disabled={!category.available}
+                      className={`py-2 rounded-lg backdrop-blur-md border shadow-lg shadow-black/10 transition-all duration-300 flex items-center justify-center ${
+                        category.available
+                          ? category.hovered
+                            ? "scale-110 bg-white/20 border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)] bg-white/10 border-white/80 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                            : "bg-white/10 border-white/80 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                          : "bg-gray-300/50 border-gray-400/50 opacity-50 cursor-not-allowed"
                       }`}
                     >
-                      {category.selected ? (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          className="w-5 h-5 text-black"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                      {category.available ? (
+                        category.selected ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="w-5 h-5 text-black"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            className="w-4 h-4 text-black"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 4.5v15m7.5-7.5h-15"
+                            />
+                          </svg>
+                        )
                       ) : (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -697,16 +808,20 @@ const AiMaterialFinder = () => {
                           fill="none"
                           stroke="currentColor"
                           strokeWidth={2}
-                          className="w-4 h-4 text-black"
+                          className="w-4 h-4 text-gray-500"
                         >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            d="M12 4.5v15m7.5-7.5h-15"
+                            d="M18 12H6"
                           />
                         </svg>
                       )}
-                      <span className="ml-1 text-sm font-bold">
+                      <span
+                        className={`ml-1 text-sm font-bold ${
+                          category.available ? "text-black" : "text-gray-500"
+                        }`}
+                      >
                         {category.label}
                       </span>
                     </button>

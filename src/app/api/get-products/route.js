@@ -6,12 +6,12 @@ import { cookies } from "next/headers";
 // This maps the AI-detected categories to database category names
 const categoryMapping = {
   "Wall Painting": ["Laminates", "Paint", "Wall Covering"],
-  "Pillow": ["Pillow", "Cushion", "Throw Pillow"],
-  "Sofa": ["Sofa", "Couch", "Sectional"],
+  Pillow: ["Pillow", "Cushion", "Throw Pillow"],
+  Sofa: ["Sofa", "Couch", "Sectional"],
   "Coffee Table": ["Coffee Table", "Table", "Side Table"],
-  "Floor": ["Laminates", "Flooring", "Floor"],
-  "Carpet": ["Carpet", "Rug", "Mat"],
-  "Lamps": ["Lamp", "Lighting", "Pendant Light"],
+  Floor: ["Laminates", "Flooring", "Floor"],
+  Carpet: ["Carpet", "Rug", "Mat"],
+  Lamps: ["Lamp", "Lighting", "Pendant Light"],
 };
 
 // Helper function to normalize category names for matching
@@ -22,19 +22,19 @@ function normalizeCategoryName(name) {
 // Helper function to find matching database categories
 function getMatchingDatabaseCategories(uiCategory) {
   const normalized = normalizeCategoryName(uiCategory);
-  
+
   // Direct match
   if (categoryMapping[uiCategory]) {
     return categoryMapping[uiCategory];
   }
-  
+
   // Try to find partial matches
   for (const [key, values] of Object.entries(categoryMapping)) {
     if (normalizeCategoryName(key) === normalized) {
       return values;
     }
   }
-  
+
   // If no mapping found, try the category name as-is
   return [uiCategory];
 }
@@ -43,10 +43,13 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const categoriesParam = searchParams.get("categories");
-    
+
     // Parse categories from query parameter (comma-separated)
     const selectedCategories = categoriesParam
-      ? categoriesParam.split(",").map((c) => c.trim()).filter(Boolean)
+      ? categoriesParam
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
       : [];
 
     // Create Supabase client
@@ -71,10 +74,10 @@ export async function GET(request) {
       const dbCategories = selectedCategories.flatMap((cat) =>
         getMatchingDatabaseCategories(cat)
       );
-      
+
       // Remove duplicates
       const uniqueDbCategories = [...new Set(dbCategories)];
-      
+
       // Filter by category_name using case-insensitive matching
       // Build OR conditions for Supabase using PostgREST syntax
       if (uniqueDbCategories.length > 0) {
@@ -103,7 +106,7 @@ export async function GET(request) {
 
     selectedCategories.forEach((uiCategory, index) => {
       const dbCategories = getMatchingDatabaseCategories(uiCategory);
-      
+
       // Find products that match this UI category
       const categoryProducts = (products || []).filter((product) => {
         const productCategory = normalizeCategoryName(
@@ -124,7 +127,7 @@ export async function GET(request) {
             brand: product.brand_name || "Unknown Brand",
             color: product.color || "N/A",
             image: product.image_url || "/api/images/placeholder.png",
-            link: `/marketplace?product=${product.product_id || product.id}`,
+            link: `/marketplace/products/${product.product_id || product.id}`,
           })),
         });
       }
