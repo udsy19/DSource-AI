@@ -122,48 +122,44 @@ const Header = ({ currentPath = "" }) => {
 
         {/* Desktop Actions */}
         <div className="hidden lg:flex lg:w-3/12 lg:justify-end lg:items-center lg:gap-4 xl:gap-8">
-          {pathName?.startsWith("/ai-material-finder") ? (
-            <Link
-              href="/spec-builder"
-              className="cursor-pointer flex items-center relative"
-            >
-              <Image
-                src={specSheetIcon}
-                alt="spec sheet icon"
-                width={30}
-                height={30}
-              />
-              <div className="ml-2 flex items-center gap-2">
-                <p className="text-white text-sm xl:text-base font-bold hidden xl:block">
-                  Spec Sheet
-                </p>
-                {specCount > 0 && (
-                  <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                    {specCount}
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/spec-builder"
+                className="cursor-pointer flex items-center relative"
+              >
+                <Image
+                  src={specSheetIcon}
+                  alt="spec sheet icon"
+                  width={30}
+                  height={30}
+                />
+                <div className="ml-2 flex items-center gap-2">
+                  <p className="text-white text-sm xl:text-base font-bold hidden xl:block">
+                    Spec Sheet
+                  </p>
+                  <span className="bg-red-500 text-white rounded-full min-w-6 w-6 h-6 flex items-center justify-center text-xs font-bold">
+                    {specCount ?? 0}
                   </span>
+                </div>
+              </Link>
+              <div className="flex items-center gap-4">
+                {isVendor && (
+                  <Link
+                    href="/vendor"
+                    className="text-white text-sm xl:text-base hover:underline"
+                  >
+                    Dashboard
+                  </Link>
                 )}
-              </div>
-            </Link>
-          ) : isAuthenticated ? (
-            <div className="flex items-center gap-4">
-              <div className="text-white text-sm xl:text-base">
-                {isVendor ? "Vendor" : "User"}: {user?.email?.split("@")[0]}
-              </div>
-              {isVendor && (
-                <Link
-                  href="/vendor"
+                <button
+                  onClick={signOut}
                   className="text-white text-sm xl:text-base hover:underline"
                 >
-                  Dashboard
-                </Link>
-              )}
-              <button
-                onClick={signOut}
-                className="text-white text-sm xl:text-base hover:underline"
-              >
-                Logout
-              </button>
-            </div>
+                  Logout
+                </button>
+              </div>
+            </>
           ) : (
             <div className="flex items-center gap-4">
               <Link
@@ -242,51 +238,54 @@ const Header = ({ currentPath = "" }) => {
               </button>
             </div>
             <div className="flex flex-col gap-4 mt-4">
-              {pathName?.startsWith("/ai-material-finder") ? (
-                <Link
-                  href="/spec-builder"
-                  className="cursor-pointer flex items-center"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Image
-                    src={specSheetIcon}
-                    alt="spec sheet icon"
-                    width={30}
-                    height={30}
-                  />
-                  <div className="ml-2 flex items-center gap-2">
-                    <p className="text-white text-base font-bold">Spec Sheet</p>
-                    {specCount > 0 && (
-                      <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                        {specCount}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ) : isAuthenticated ? (
-                <div className="flex flex-col gap-2">
-                  <div className="text-white text-base">
-                    {isVendor ? "Vendor" : "User"}: {user?.email?.split("@")[0]}
-                  </div>
-                  {isVendor && (
-                    <Link
-                      href="/vendor"
-                      className="text-white text-base hover:underline"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Vendor Dashboard
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => {
-                      signOut();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="text-white text-base hover:underline text-left"
+              {isAuthenticated ? (
+                <>
+                  {" "}
+                  <Link
+                    href="/spec-builder"
+                    className="cursor-pointer flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Logout
-                  </button>
-                </div>
+                    <Image
+                      src={specSheetIcon}
+                      alt="spec sheet icon"
+                      width={30}
+                      height={30}
+                    />
+                    <div className="ml-2 flex items-center gap-2">
+                      <p className="text-white text-base font-bold">
+                        Spec Sheet
+                      </p>
+                      <span className="bg-red-500 text-white rounded-full min-w-6 w-6 h-6 flex items-center justify-center text-xs font-bold">
+                        {specCount ?? 0}
+                      </span>
+                    </div>
+                  </Link>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-white text-base">
+                      {isVendor ? "Vendor" : "User"}:{" "}
+                      {user?.email?.split("@")[0]}
+                    </div>
+                    {isVendor && (
+                      <Link
+                        href="/vendor"
+                        className="text-white text-base hover:underline"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Vendor Dashboard
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        signOut();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="text-white text-base hover:underline text-left"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </>
               ) : (
                 <div className="flex flex-col gap-2">
                   <Link

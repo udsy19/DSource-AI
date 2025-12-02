@@ -30,10 +30,10 @@ const PopularProducts = () => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Auto-rotate carousel every 3 seconds
@@ -52,23 +52,35 @@ const PopularProducts = () => {
   }, [autoRotateEnabled]);
 
   const getCardStyle = (index) => {
-    // Determine layer based on position from center
-    const distanceFromCenter = Math.abs(index - 2);
+    const centerIndex = Math.floor(products.length / 2);
+    const distanceFromCenter = Math.abs(index - centerIndex);
 
-    // Scale factors based on distance from center - responsive
-    const baseScale = isMobile ? 0.8 : 1.3;
+    const baseScale = isMobile ? 0.85 : 1.2;
     const centerScale = isMobile ? 1 : 1.35;
-    const scale = index === 2 ? centerScale : baseScale - distanceFromCenter * 0.1;
+    const scale =
+      index === centerIndex
+        ? centerScale
+        : baseScale - distanceFromCenter * 0.1;
 
-    // Adjust x-translation to create overlapping effect - responsive
-    const xOffset = isMobile ? (index - 2) * 100 : (index - 2) * 200;
+    const xOffset = isMobile
+      ? (index - centerIndex) * 100
+      : (index - centerIndex) * 200;
 
-    // Z-index decreases as distance from center increases
     const zIndex = 10 - distanceFromCenter;
 
+    if (isMobile) {
+      return {
+        transform: `translateX(${xOffset}px) scale(${scale})`,
+        zIndex,
+        transition: "all 0.3s ease-in-out",
+      };
+    }
+
     return {
-      transform: `scale(${scale}) translateX(${xOffset}px)`,
-      zIndex: zIndex,
+      left: "50%",
+      top: "50%",
+      transform: `translate(-50%, -50%) translateX(${xOffset}px) scale(${scale})`,
+      zIndex,
       transition: "all 0.3s ease-in-out",
     };
   };
@@ -76,9 +88,11 @@ const PopularProducts = () => {
   return (
     <div className="w-full h-full p-4 sm:p-8 md:p-12 lg:p-14">
       <div className="flex flex-col items-center justify-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 sm:mb-8 md:mb-12">Popular Products</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 sm:mb-8 md:mb-12">
+          Popular Products
+        </h1>
         <div className="flex items-center justify-center h-64 sm:h-80 md:h-96 w-full overflow-x-auto md:overflow-visible relative my-12 sm:my-24 md:my-32 lg:my-48 px-4 md:px-0">
-          <div className="flex md:relative items-center gap-4 md:gap-0">
+          <div className="relative flex items-center justify-center w-full gap-4 md:gap-0">
             {products.map((product, index) => (
               <div
                 key={`${product.id}-${index}`}
