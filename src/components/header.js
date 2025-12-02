@@ -4,16 +4,19 @@ import React, { useState, useEffect } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import logo from "../../public/logo-dsource.png";
 import specSheetIcon from "../../public/spec-sheet-icon.png";
 import { useSpec } from "../contexts/SpecContext";
+import { useAuth } from "../contexts/AuthContext";
 
 const Header = ({ currentPath = "" }) => {
   const { specCount } = useSpec();
+  const { user, role, isAuthenticated, isVendor, signOut } = useAuth();
   const [pathName, setPathName] = useState(currentPath);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
   const pathname = usePathname();
 
@@ -141,29 +144,67 @@ const Header = ({ currentPath = "" }) => {
                 )}
               </div>
             </Link>
+          ) : isAuthenticated ? (
+            <div className="flex items-center gap-4">
+              <div className="text-white text-sm xl:text-base">
+                {isVendor ? "Vendor" : "User"}: {user?.email?.split("@")[0]}
+              </div>
+              {isVendor && (
+                <Link
+                  href="/vendor"
+                  className="text-white text-sm xl:text-base hover:underline"
+                >
+                  Dashboard
+                </Link>
+              )}
+              <button
+                onClick={signOut}
+                className="text-white text-sm xl:text-base hover:underline"
+              >
+                Logout
+              </button>
+            </div>
           ) : (
-            <div className="text-white text-sm xl:text-md">Login</div>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/vendor"
+                className="text-white text-sm xl:text-base hover:underline"
+              >
+                Vendor Login
+              </Link>
+              <Link
+                href="/login"
+                className="text-white text-sm xl:text-base hover:underline"
+              >
+                Login
+              </Link>
+            </div>
           )}
 
-          <div>
-            <button className="cursor-pointer bg-white text-sm xl:text-base text-black rounded-full shadow-lg px-6 xl:px-10 py-2 xl:py-4 flex items-center gap-2">
-              Sign Up
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 xl:h-5 xl:w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+          {!isAuthenticated && (
+            <div>
+              <Link
+                href="/signup"
+                className="cursor-pointer bg-white text-sm xl:text-base text-black rounded-full shadow-lg px-6 xl:px-10 py-2 xl:py-4 flex items-center gap-2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 12h14m0 0l-7-7m7 7l-7 7"
-                />
-              </svg>
-            </button>
-          </div>
+                Sign Up
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 xl:h-5 xl:w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 12h14m0 0l-7-7m7 7l-7 7"
+                  />
+                </svg>
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
@@ -222,26 +263,71 @@ const Header = ({ currentPath = "" }) => {
                     )}
                   </div>
                 </Link>
+              ) : isAuthenticated ? (
+                <div className="flex flex-col gap-2">
+                  <div className="text-white text-base">
+                    {isVendor ? "Vendor" : "User"}: {user?.email?.split("@")[0]}
+                  </div>
+                  {isVendor && (
+                    <Link
+                      href="/vendor"
+                      className="text-white text-base hover:underline"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Vendor Dashboard
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="text-white text-base hover:underline text-left"
+                  >
+                    Logout
+                  </button>
+                </div>
               ) : (
-                <div className="text-white text-md">Login</div>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href="/vendor"
+                    className="text-white text-base hover:underline"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Vendor Login
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="text-white text-base hover:underline"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                </div>
               )}
-              <button className="cursor-pointer bg-white text-base text-black rounded-full shadow-lg px-6 py-3 flex items-center justify-center gap-2">
-                Sign Up
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              {!isAuthenticated && (
+                <Link
+                  href="/signup"
+                  className="cursor-pointer bg-white text-base text-black rounded-full shadow-lg px-6 py-3 flex items-center justify-center gap-2"
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 12h14m0 0l-7-7m7 7l-7 7"
-                  />
-                </svg>
-              </button>
+                  Sign Up
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 12h14m0 0l-7-7m7 7l-7 7"
+                    />
+                  </svg>
+                </Link>
+              )}
             </div>
           </nav>
         </div>

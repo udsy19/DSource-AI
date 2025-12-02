@@ -46,7 +46,12 @@ export default function VendorAuthPanel() {
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
-          options: { emailRedirectTo: emailRedirect },
+          options: {
+            emailRedirectTo: emailRedirect,
+            data: {
+              user_type: "vendor",
+            },
+          },
         });
       } else {
         response = await supabase.auth.signInWithPassword({
@@ -66,6 +71,13 @@ export default function VendorAuthPanel() {
             "Check your inbox to confirm the email address before logging in.",
         });
       } else {
+        // After sign in, refresh the session to get updated user data
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log("Session after login:", session.user);
+          console.log("User metadata:", session.user.user_metadata);
+          console.log("App metadata:", session.user.app_metadata);
+        }
         router.refresh();
       }
     } catch (error) {

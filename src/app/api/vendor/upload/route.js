@@ -2,6 +2,7 @@ import { parse } from "csv-parse/sync";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "../../../../../utils/supabase/server";
+import { requireVendor } from "../../../../utils/api-auth";
 
 const REQUIRED_COLUMNS = [
   "product_id",
@@ -74,16 +75,27 @@ const transformRow = (row) => {
 };
 
 export async function POST(request) {
+  try {
+    // Require vendor role
+    await requireVendor();
+  } catch (error) {
+    if (error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message.includes("Forbidden") || error.message.includes("Vendor")) {
+      return NextResponse.json(
+        { error: "Forbidden: Vendor access required" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Authentication error" },
+      { status: 500 }
+    );
+  }
+
   const cookieStore = cookies();
   const supabase = await createClient(cookieStore);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const formData = await request.formData();
   const file = formData.get("file");

@@ -2,16 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "../../../utils/supabase/client";
 
 const formatTimestamp = (value) =>
   new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(value);
-
-const actionButtonStyles =
-  "rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium transition hover:border-gray-900 hover:bg-gray-50";
 
 const templateUrl = "/templates/vendor-product-template.csv";
 const generateId = () =>
@@ -21,7 +17,6 @@ const generateId = () =>
 
 export default function VendorDashboard({ user, productStats }) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -34,17 +29,15 @@ export default function VendorDashboard({ user, productStats }) {
 
   const totalImports = useMemo(
     () => uploadLog.filter((entry) => entry.status === "success").length,
-    [uploadLog],
+    [uploadLog]
   );
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
-  };
 
   const handleUpload = async () => {
     if (!file) {
-      setToast({ type: "error", message: "Select a CSV template before upload." });
+      setToast({
+        type: "error",
+        message: "Select a CSV template before upload.",
+      });
       return;
     }
 
@@ -93,7 +86,7 @@ export default function VendorDashboard({ user, productStats }) {
 
   return (
     <div className="space-y-8 rounded-2xl border border-gray-200 bg-white/70 p-8 shadow-sm backdrop-blur">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header>
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-gray-500">
             Vendor dashboard
@@ -106,9 +99,6 @@ export default function VendorDashboard({ user, productStats }) {
             marketplace fresh.
           </p>
         </div>
-        <button onClick={handleSignOut} className={actionButtonStyles}>
-          Sign out
-        </button>
       </header>
 
       <section className="grid gap-4 rounded-2xl bg-gray-50 p-4 sm:grid-cols-2">
@@ -249,4 +239,3 @@ export default function VendorDashboard({ user, productStats }) {
     </div>
   );
 }
-
