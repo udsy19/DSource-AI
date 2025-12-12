@@ -585,7 +585,7 @@ const AiMaterialFinder = () => {
             )}
           </div>
           <div
-            className={`lg:col-span-4 h-auto min-h-[30rem] sm:min-h-[40rem] md:h-[50rem] ${
+            className={`lg:col-span-4 h-auto min-h-[10rem] sm:min-h-[40rem] md:h-[50rem] ${
               categories.length > 0 ? "block" : "hidden"
             }`}
           >
@@ -696,9 +696,9 @@ const AiMaterialFinder = () => {
                                 Color: {product.color}
                               </h4>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col lg:flex-row items-center gap-2">
                               <Link
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center"
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center w-full lg:w-auto"
                                 href={product.link || "/marketplace"}
                               >
                                 <div>View Product</div>
@@ -718,7 +718,7 @@ const AiMaterialFinder = () => {
                                 </svg>
                               </Link>
                               <button
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0"
+                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0 w-full lg:w-auto"
                                 onClick={() => {
                                   addProductToSpec(product, category.label);
                                 }}
