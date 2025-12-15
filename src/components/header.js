@@ -57,10 +57,18 @@ const Header = ({ currentPath = "" }) => {
         <div className="hidden lg:flex lg:w-6/12">
           <nav>
             <ul className="flex items-center text-white gap-4 xl:gap-8">
-              <li className="font-bold text-sm xl:text-base">Home</li>
-              <li className="font-bold text-sm xl:text-base">Features</li>
-              <li className="font-bold text-sm xl:text-base">Shop Sample</li>
-              <li className="font-bold text-sm xl:text-base">Get Inspired</li>
+              <Link href="/">
+                <li className="font-bold text-sm xl:text-base">Home</li>
+              </Link>
+              <Link href="/ai-material-finder">
+                <li className="font-bold text-sm xl:text-base">Features</li>
+              </Link>
+              <Link href="/marketplace/products">
+                <li className="font-bold text-sm xl:text-base">Shop Sample</li>
+              </Link>
+              <Link href="/ai-visualizer">
+                <li className="font-bold text-sm xl:text-base">Get Inspired</li>
+              </Link>
               <li className="flex-1">
                 <div className="relative">
                   <input
@@ -209,10 +217,18 @@ const Header = ({ currentPath = "" }) => {
         <div className="lg:hidden fixed top-20 left-2 right-2 z-40 backdrop-blur-md rounded-2xl shadow-lg bg-black/90 p-6">
           <nav className="flex flex-col gap-4">
             <ul className="flex flex-col text-white gap-4">
-              <li className="font-bold">Home</li>
-              <li className="font-bold">Features</li>
-              <li className="font-bold">Shop Sample</li>
-              <li className="font-bold">Get Inspired</li>
+              <Link href="/">
+                <li className="font-bold">Home</li>
+              </Link>
+              <Link href="/ai-material-finder">
+                <li className="font-bold">Features</li>
+              </Link>
+              <Link href="/marketplace/products">
+                <li className="font-bold">Shop Sample</li>
+              </Link>
+              <Link href="/ai-visualizer">
+                <li className="font-bold">Get Inspired</li>
+              </Link>
             </ul>
             <div className="relative mt-4">
               <input
