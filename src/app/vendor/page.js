@@ -45,17 +45,19 @@ export default async function VendorPage() {
   console.log("isVendor", isVendor);
 
   return (
-    <div className="relative isolate py-16 sm:py-24">
-      <div className="pointer-events-none absolute inset-0 -z-10 opacity-70">
-        <div className="mx-auto h-full max-w-4xl bg-gradient-to-b from-gray-100 via-white to-white blur-3xl" />
-      </div>
-      <div className="mx-auto max-w-4xl px-4">
-        {user && isVendor ? (
-          <VendorDashboard user={user} productStats={{ totalProducts }} />
-        ) : (
-          <VendorAuthPanel />
-        )}
-      </div>
-    </div>
+    <>
+      {user && isVendor ? (
+        <VendorDashboard user={user} productStats={{ totalProducts }} />
+      ) : (
+        <div className="relative isolate py-16 sm:py-24">
+          <div className="pointer-events-none absolute inset-0 -z-10 opacity-70">
+            <div className="mx-auto h-full max-w-4xl bg-gradient-to-b from-gray-100 via-white to-white blur-3xl" />
+          </div>
+          <div className="mx-auto max-w-4xl px-4">
+            <VendorAuthPanel />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

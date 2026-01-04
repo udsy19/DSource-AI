@@ -2,10 +2,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import Header from "../components/header";
-import Footer from "../components/footer";
-import QuickLinks from "../components/quick-links";
+import ConditionalFooter from "../components/ConditionalFooter";
 import { SpecProvider } from "../contexts/SpecContext";
 import { AuthProvider } from "../contexts/AuthContext";
+import { PathnameProvider } from "../contexts/PathnameContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,16 +28,17 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <SpecProvider>
-            <div className="max-w-[1728px] mx-auto px-2 sm:px-4">
-              <Header />
-              <main className="relative z-0">{children}</main>
-              <Footer />
-              <QuickLinks />
-            </div>
-          </SpecProvider>
-        </AuthProvider>
+        <PathnameProvider>
+          <AuthProvider>
+            <SpecProvider>
+              <div className="max-w-[1728px] mx-auto px-2 sm:px-4">
+                <Header />
+                <main className="relative z-0">{children}</main>
+                <ConditionalFooter />
+              </div>
+            </SpecProvider>
+          </AuthProvider>
+        </PathnameProvider>
       </body>
     </html>
   );

@@ -197,45 +197,6 @@ export default function VendorDashboard({ user, productStats }) {
           {toast.message}
         </div>
       )}
-
-      <section className="rounded-2xl border border-gray-200 bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Recent uploads
-          </h2>
-          <span className="text-xs uppercase tracking-[0.2em] text-gray-500">
-            last 5
-          </span>
-        </div>
-        {uploadLog.length === 0 ? (
-          <p className="mt-4 text-sm text-gray-600">
-            No uploads yet. The last five imports will appear here once you get
-            started.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {uploadLog.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {entry.status === "success" ? "Import complete" : "Failed"}
-                  </p>
-                  <p className="text-xs text-gray-600">{entry.message}</p>
-                </div>
-                <div className="text-right text-xs text-gray-500">
-                  <p>
-                    {entry.inserted}/{entry.totalRows} rows
-                  </p>
-                  <p>{formatTimestamp(entry.timestamp)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

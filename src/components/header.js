@@ -26,49 +26,74 @@ const Header = ({ currentPath = "" }) => {
   }, [pathname]);
 
   return (
-    <div className="fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 w-full px-2 sm:px-4 max-w-[1728px] z-50">
+    <div
+      className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 max-w-[1728px] z-50 px-2 sm:px-4 ${
+        pathName?.startsWith("/vendor") && user && isVendor
+          ? "w-[calc(100%-272px)] ml-34"
+          : "w-full"
+      }`}
+    >
       <header
         className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-4 py-2 sm:px-8 md:px-14 sm:py-4 ${
           pathName?.startsWith("/ai-material-finder") ||
           pathName?.startsWith("/marketplace") ||
           pathName?.startsWith("/spec-builder") ||
-          pathName?.startsWith("/ai-visualizer")
+          pathName?.startsWith("/ai-visualizer") ||
+          pathName?.startsWith("/vendor")
             ? "bg-black"
             : "bg-black/10"
         }`}
       >
-        <Link
-          href="/"
-          className="flex items-center gap-2 sm:gap-4 flex-shrink-0"
-        >
-          <Image
-            src={logo}
-            alt="logo"
-            width={40}
-            height={40}
-            className="sm:w-[60px] sm:h-[60px]"
-          />
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-            DSource.AI
+        {!pathName?.startsWith("/vendor") ? (
+          <Link
+            href="/"
+            className="flex items-center gap-2 sm:gap-4 flex-shrink-0"
+          >
+            <Image
+              src={logo}
+              alt="logo"
+              width={40}
+              height={40}
+              className="sm:w-[60px] sm:h-[60px]"
+            />
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+              DSource.AI
+            </h1>
+          </Link>
+        ) : (
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white mr-12">
+            {pathName?.split("/")[2]
+              ? pathName?.split("/")[2]?.charAt(0).toUpperCase() +
+                pathName?.split("/")[2].slice(1)
+              : "Vendor Dashboard"}
           </h1>
-        </Link>
+        )}
 
         {/* Desktop Navigation */}
+
         <div className="hidden lg:flex lg:w-6/12">
-          <nav>
+          <nav className="w-full">
             <ul className="flex items-center text-white gap-4 xl:gap-8">
-              <Link href="/">
-                <li className="font-bold text-sm xl:text-base">Home</li>
-              </Link>
-              <Link href="/ai-material-finder">
-                <li className="font-bold text-sm xl:text-base">Features</li>
-              </Link>
-              <Link href="/marketplace/products">
-                <li className="font-bold text-sm xl:text-base">Shop Sample</li>
-              </Link>
-              <Link href="/ai-visualizer">
-                <li className="font-bold text-sm xl:text-base">Get Inspired</li>
-              </Link>
+              {!pathName?.startsWith("/vendor") && (
+                <>
+                  <Link href="/">
+                    <li className="font-bold text-sm xl:text-base">Home</li>
+                  </Link>
+                  <Link href="/ai-material-finder">
+                    <li className="font-bold text-sm xl:text-base">Features</li>
+                  </Link>
+                  <Link href="/marketplace/products">
+                    <li className="font-bold text-sm xl:text-base">
+                      Shop Sample
+                    </li>
+                  </Link>
+                  <Link href="/ai-visualizer">
+                    <li className="font-bold text-sm xl:text-base">
+                      Get Inspired
+                    </li>
+                  </Link>
+                </>
+              )}
               <li className="flex-1">
                 <div className="relative">
                   <input
@@ -132,25 +157,27 @@ const Header = ({ currentPath = "" }) => {
         <div className="hidden lg:flex lg:w-3/12 lg:justify-end lg:items-center lg:gap-4 xl:gap-8">
           {isAuthenticated ? (
             <>
-              <Link
-                href="/spec-builder"
-                className="cursor-pointer flex items-center relative"
-              >
-                <Image
-                  src={specSheetIcon}
-                  alt="spec sheet icon"
-                  width={30}
-                  height={30}
-                />
-                <div className="ml-2 flex items-center gap-2">
-                  <p className="text-white text-sm xl:text-base font-bold hidden xl:block">
-                    Spec Sheet
-                  </p>
-                  <span className="bg-red-500 text-white rounded-full min-w-6 w-6 h-6 flex items-center justify-center text-xs font-bold">
-                    {specCount ?? 0}
-                  </span>
-                </div>
-              </Link>
+              {!pathName?.startsWith("/vendor") && (
+                <Link
+                  href="/spec-builder"
+                  className="cursor-pointer flex items-center relative"
+                >
+                  <Image
+                    src={specSheetIcon}
+                    alt="spec sheet icon"
+                    width={30}
+                    height={30}
+                  />
+                  <div className="ml-2 flex items-center gap-2">
+                    <p className="text-white text-sm xl:text-base font-bold hidden xl:block">
+                      Spec Sheet
+                    </p>
+                    <span className="bg-red-500 text-white rounded-full min-w-6 w-6 h-6 flex items-center justify-center text-xs font-bold">
+                      {specCount ?? 0}
+                    </span>
+                  </div>
+                </Link>
+              )}
               <div className="flex items-center gap-4">
                 {isVendor && (
                   <Link
@@ -217,18 +244,22 @@ const Header = ({ currentPath = "" }) => {
         <div className="lg:hidden fixed top-20 left-2 right-2 z-40 backdrop-blur-md rounded-2xl shadow-lg bg-black/90 p-6">
           <nav className="flex flex-col gap-4">
             <ul className="flex flex-col text-white gap-4">
-              <Link href="/">
-                <li className="font-bold">Home</li>
-              </Link>
-              <Link href="/ai-material-finder">
-                <li className="font-bold">Features</li>
-              </Link>
-              <Link href="/marketplace/products">
-                <li className="font-bold">Shop Sample</li>
-              </Link>
-              <Link href="/ai-visualizer">
-                <li className="font-bold">Get Inspired</li>
-              </Link>
+              {!pathName?.startsWith("/vendor") && (
+                <>
+                  <Link href="/">
+                    <li className="font-bold">Home</li>
+                  </Link>
+                  <Link href="/ai-material-finder">
+                    <li className="font-bold">Features</li>
+                  </Link>
+                  <Link href="/marketplace/products">
+                    <li className="font-bold">Shop Sample</li>
+                  </Link>
+                  <Link href="/ai-visualizer">
+                    <li className="font-bold">Get Inspired</li>
+                  </Link>
+                </>
+              )}
             </ul>
             <div className="relative mt-4">
               <input
