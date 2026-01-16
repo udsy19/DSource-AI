@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ITEMS_PER_PAGE = 7;
+const ITEMS_PER_PAGE = 10;
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -235,7 +235,8 @@ export default function ProductsPage() {
 
           <button
             onClick={() => router.push("/vendor")}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
+            style={{ backgroundColor: '#E8703A' }}
           >
             <svg
               className="w-5 h-5"
@@ -432,11 +433,10 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            status === "Available"
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === "Available"
                               ? "bg-green-100 text-green-800"
                               : "bg-red-100 text-red-800"
-                          }`}
+                            }`}
                         >
                           {status}
                         </span>

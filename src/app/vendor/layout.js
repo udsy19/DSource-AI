@@ -3,6 +3,7 @@ import { createClient } from "../../../utils/supabase/server";
 import { getUserRoleFromUser } from "../../utils/api-auth";
 import { ROLES } from "../../utils/roles";
 import VendorSidebar from "@/components/vendor/VendorSidebar";
+import VendorHeader from "@/components/vendor/VendorHeader";
 import VendorRouteGuard from "@/components/vendor/VendorRouteGuard";
 import { redirect } from "next/navigation";
 
@@ -24,15 +25,25 @@ export default async function VendorLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       {user && isVendor ? (
-        <div className="flex">
-          {/* Sidebar */}
-          <aside className="fixed left-4 top-4 bottom-4 z-40 hidden lg:block">
-            <VendorSidebar />
-          </aside>
-          {/* Main Content */}
-          <main className="flex-1 lg:ml-72 px-4 lg:px-8 py-32">{children}</main>
+        // Break out of root layout container for full-width vendor dashboard
+        <div className="fixed inset-0 overflow-auto" style={{ backgroundColor: '#E8E4E0' }}>
+          <div className="flex min-h-screen">
+            {/* Sidebar */}
+            <aside className="fixed left-4 top-4 bottom-4 z-40 hidden lg:block">
+              <VendorSidebar />
+            </aside>
+            {/* Main Content Area */}
+            <div className="flex-1 lg:ml-72 min-h-screen flex flex-col">
+              {/* Header with background */}
+              <div className="px-4 lg:px-8 pt-4 pb-2" style={{ backgroundColor: '#E8E4E0' }}>
+                <VendorHeader user={user} />
+              </div>
+              {/* Page Content */}
+              <main className="px-4 lg:px-8 py-4 flex-1">{children}</main>
+            </div>
+          </div>
         </div>
       ) : (
         // For non-authenticated users, show content without sidebar
@@ -41,6 +52,6 @@ export default async function VendorLayout({ children }) {
           <div className="py-8">{children}</div>
         </VendorRouteGuard>
       )}
-    </div>
+    </>
   );
 }

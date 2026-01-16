@@ -25,24 +25,25 @@ const Header = ({ currentPath = "" }) => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  // Hide global header on vendor routes when user is authenticated as vendor
+  // The vendor layout has its own header component
+  if (pathName?.startsWith("/vendor") && user && isVendor) {
+    return null;
+  }
+
   return (
     <div
-      className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 max-w-[1728px] z-50 px-2 sm:px-4 ${
-        pathName?.startsWith("/vendor") && user && isVendor
-          ? "w-[calc(100%-272px)] ml-34"
-          : "w-full"
-      }`}
+      className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 max-w-[1728px] z-50 px-2 sm:px-4 w-full`}
     >
       <header
-        className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-4 py-2 sm:px-8 md:px-14 sm:py-4 ${
-          pathName?.startsWith("/ai-material-finder") ||
-          pathName?.startsWith("/marketplace") ||
-          pathName?.startsWith("/spec-builder") ||
-          pathName?.startsWith("/ai-visualizer") ||
-          pathName?.startsWith("/vendor")
+        className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-4 py-2 sm:px-8 md:px-14 sm:py-4 ${pathName?.startsWith("/ai-material-finder") ||
+            pathName?.startsWith("/marketplace") ||
+            pathName?.startsWith("/spec-builder") ||
+            pathName?.startsWith("/ai-visualizer") ||
+            pathName?.startsWith("/vendor")
             ? "bg-black"
             : "bg-black/10"
-        }`}
+          }`}
       >
         {!pathName?.startsWith("/vendor") ? (
           <Link
@@ -64,7 +65,7 @@ const Header = ({ currentPath = "" }) => {
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white mr-12">
             {pathName?.split("/")[2]
               ? pathName?.split("/")[2]?.charAt(0).toUpperCase() +
-                pathName?.split("/")[2].slice(1)
+              pathName?.split("/")[2].slice(1)
               : "Vendor Dashboard"}
           </h1>
         )}
