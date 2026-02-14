@@ -68,26 +68,6 @@ const navigationItems = [
     ),
   },
   {
-    name: "Product Management",
-    href: "/vendor/product-management",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-        />
-      </svg>
-    ),
-  },
-  {
     name: "AI Visualizer",
     href: "/vendor/ai-visualizer",
     icon: (
@@ -127,9 +107,9 @@ export default function VendorSidebar() {
   };
 
   return (
-    <div className="h-full w-64 bg-gray-800 rounded-lg border-2 border-blue-500 flex flex-col shadow-lg">
+    <div className="h-full w-64 rounded-2xl flex flex-col shadow-xl" style={{ backgroundColor: '#2D2A2A' }}>
       {/* Logo Section */}
-      <div className="p-6 border-b border-gray-700">
+      <div className="p-6 border-b border-gray-600/30">
         <Link href="/vendor" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white rounded flex items-center justify-center p-1">
             <Image
@@ -152,11 +132,10 @@ export default function VendorSidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${
-                active
-                  ? "bg-gray-700/70"
-                  : "hover:bg-gray-700/40"
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${active
+                ? "bg-gray-700/70"
+                : "hover:bg-gray-700/40"
+                }`}
             >
               {item.icon}
               <span className="font-medium">{item.name}</span>
@@ -166,14 +145,13 @@ export default function VendorSidebar() {
       </nav>
 
       {/* Bottom Section */}
-      <div className="px-4 py-6 border-t border-gray-700 space-y-2">
+      <div className="px-4 py-6 border-t border-gray-600/30 space-y-2">
         <Link
           href="/vendor/settings"
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${
-            pathname === "/vendor/settings"
-              ? "bg-gray-700/70"
-              : "hover:bg-gray-700/40"
-          }`}
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${pathname === "/vendor/settings"
+            ? "bg-gray-700/70"
+            : "hover:bg-gray-700/40"
+            }`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

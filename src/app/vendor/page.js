@@ -21,33 +21,42 @@ export default async function VendorPage() {
       error: userError,
     },
     { data: sessionData },
-    { count, error: productsError },
+    { count: totalProducts, error: productsError },
   ] = await Promise.all([
-    supabase.auth.getUser(), // Use getUser() to get full user object with metadata
+    supabase.auth.getUser(),
     supabase.auth.getSession(),
     supabase
       .from("scraped_product_list")
       .select("*", { count: "exact", head: true }),
   ]);
 
-  const totalProducts = productsError ? 0 : count ?? 0;
+  // Fetch products for the products table (limit to 10 most recent)
+  const { data: recentProducts, error: recentError } = await supabase
+    .from("scraped_product_list")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(10);
 
-  // Debug logging
-  console.log("User from getUser():", user);
-  console.log("User metadata:", user?.user_metadata);
-  console.log("App metadata:", user?.app_metadata);
-  console.log("User error:", userError);
+  console.log("Recent products fetched:", recentProducts?.length, "Error:", recentError);
 
   const userRole = user ? getUserRoleFromUser(user) : null;
   const isVendor = userRole === ROLES.VENDOR;
 
-  console.log("userRole", userRole);
-  console.log("isVendor", isVendor);
+  // Prepare dashboard stats
+  const dashboardStats = {
+    totalProducts: productsError ? 0 : totalProducts ?? 0,
+    // These would ideally come from a sales/orders table - using placeholder for now
+    totalSales: 1000, // Would be fetched from orders table
+    totalOrders: 300, // Would be fetched from orders table
+    productsSold: 5, // Would be calculated from orders
+    newCustomers: 8, // Would be fetched from users table
+    recentProducts: recentProducts || [],
+  };
 
   return (
     <>
       {user && isVendor ? (
-        <VendorDashboard user={user} productStats={{ totalProducts }} />
+        <VendorDashboard user={user} dashboardStats={dashboardStats} />
       ) : (
         <div className="relative isolate py-16 sm:py-24">
           <div className="pointer-events-none absolute inset-0 -z-10 opacity-70">
