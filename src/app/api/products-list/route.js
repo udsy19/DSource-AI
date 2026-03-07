@@ -4,14 +4,18 @@ import { cookies } from "next/headers";
 
 export async function GET(request) {
   try {
-    // Create Supabase client
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
 
-    // Fetch all products from the database
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data: products, error } = await supabase
       .from("scraped_product_list")
       .select("*")
+      .eq("created_by", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {

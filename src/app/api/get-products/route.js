@@ -52,21 +52,24 @@ export async function GET(request) {
           .filter(Boolean)
       : [];
 
-    // Create Supabase client
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
 
-    // If no categories selected, return empty array
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (selectedCategories.length === 0) {
       return NextResponse.json({ categories: [] }, { status: 200 });
     }
 
-    // Build query to fetch products for all selected categories
     let query = supabase
       .from("scraped_product_list")
       .select(
         "id, product_name, brand_name, category_name, color, image_url, product_id"
-      );
+      )
+      .eq("created_by", user.id);
 
     // If we have specific categories, filter by them
     if (selectedCategories.length > 0) {

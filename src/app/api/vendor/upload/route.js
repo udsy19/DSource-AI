@@ -94,8 +94,13 @@ export async function POST(request) {
     );
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -146,7 +151,8 @@ export async function POST(request) {
 
   const transformedRows = rows
     .map((row) => transformRow(row))
-    .filter((row) => row.product_id && row.product_name);
+    .filter((row) => row.product_id && row.product_name)
+    .map((row) => ({ ...row, created_by: user.id }));
 
   if (!transformedRows.length) {
     return NextResponse.json(

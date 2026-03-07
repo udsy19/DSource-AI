@@ -12,32 +12,40 @@ export const metadata = {
 };
 
 export default async function VendorPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
 
   const [
-    {
-      data: { user },
-      error: userError,
-    },
+    { data: { user }, error: userError },
     { data: sessionData },
-    { count: totalProducts, error: productsError },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase.auth.getSession(),
-    supabase
-      .from("scraped_product_list")
-      .select("*", { count: "exact", head: true }),
   ]);
 
-  // Fetch products for the products table (limit to 10 most recent)
-  const { data: recentProducts, error: recentError } = await supabase
-    .from("scraped_product_list")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  let totalProducts = 0;
+  let recentProducts = [];
+  let productsError = null;
+  let recentError = null;
 
-  console.log("Recent products fetched:", recentProducts?.length, "Error:", recentError);
+  if (user) {
+    const [countResult, recentResult] = await Promise.all([
+      supabase
+        .from("scraped_product_list")
+        .select("*", { count: "exact", head: true })
+        .eq("created_by", user.id),
+      supabase
+        .from("scraped_product_list")
+        .select("*")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+    totalProducts = countResult.count ?? 0;
+    productsError = countResult.error;
+    recentProducts = recentResult.data ?? [];
+    recentError = recentResult.error;
+  }
 
   const userRole = user ? getUserRoleFromUser(user) : null;
   const isVendor = userRole === ROLES.VENDOR;

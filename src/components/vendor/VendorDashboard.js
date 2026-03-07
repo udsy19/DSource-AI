@@ -234,7 +234,7 @@ export default function VendorDashboard({ user, dashboardStats }) {
 
       {/* Products Table */}
       <section className="bg-white rounded-2xl p-6 shadow-sm border-2 border-blue-100">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Products</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Your uploaded products</h3>
         <div className="overflow-x-auto">
           {displayProducts.length > 0 ? (
             <table className="w-full">
@@ -304,7 +304,7 @@ export default function VendorDashboard({ user, dashboardStats }) {
             </table>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              No products found. Upload products to see them here.
+              No products yet. Upload products to see your catalog here.
             </div>
           )}
         </div>
