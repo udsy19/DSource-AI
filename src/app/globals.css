@@ -5,13 +5,13 @@ body {
 }
 
 #banner-image {
-  background-image: url("../../public/banner-image.jpg");
+  background-image: url("../../public/material-finder-images/Serene Modernist Haven.png");
   background-size: cover;
   background-position: center;
 }
 
 #design-image {
-  background-image: url("../../public/design-image.jpg");
+  background-image: url("../../public/material-finder-images/Minimalist Interior Design.png");
   background-size: cover;
   background-position: center;
   min-height: 200px;
@@ -36,7 +36,7 @@ body {
 }
 
 #discover-image {
-  background-image: url("../../public/discover-image.jpg");
+  background-image: url("../../public/material-finder-images/Minimalist Bedroom.png");
   background-size: cover;
   background-position: center;
   min-height: 200px;
@@ -73,7 +73,7 @@ body {
 }
 
 #popular-3 {
-  background-image: url("../../public/popular-3.avif");
+  background-image: url("../../public/material-finder-images/Frame 86.png");
   background-size: cover;
   background-position: center;
 }
@@ -85,7 +85,7 @@ body {
 }
 
 #popular-5 {
-  background-image: url("../../public/popular-5.avif");
+  background-image: url("../../public/material-finder-images/Frame 90.png");
   background-size: cover;
   background-position: center;
 }
@@ -98,7 +98,7 @@ body {
 }
 
 #modern-minimalist-view-materials {
-  background-image: url("../../public/modern-minimalist-view-materials.avif");
+  background-image: url("../../public/material-finder-images/Frame 41022.png");
   background-size: cover;
   background-position: center;
 }
@@ -114,25 +114,25 @@ body {
 }
 
 #made-with-dsource-1 {
-  background-image: url("../../public/made-1.jpg");
+  background-image: url("../../public/material-finder-images/DS 001.png");
   background-size: cover;
   background-position: center;
 }
 
 #made-with-dsource-2 {
-  background-image: url("../../public/made-2.avif");
+  background-image: url("../../public/material-finder-images/DS 006.png");
   background-size: cover;
   background-position: center;
 }
 
 #made-with-dsource-3 {
-  background-image: url("../../public/made-3.avif");
+  background-image: url("../../public/material-finder-images/Frame 99.png");
   background-size: cover;
   background-position: center;
 }
 
 #made-with-dsource-4 {
-  background-image: url("../../public/made-4.jpg");
+  background-image: url("../../public/material-finder-images/Frame 96.png");
   background-size: cover;
   background-position: center;
 }
@@ -156,7 +156,7 @@ body {
 }
 
 #footer {
-  background-image: url("../../public/footer.jpg");
+  background-image: url("../../public/material-finder-images/section.png");
   background-size: cover;
   background-position: center;
 }

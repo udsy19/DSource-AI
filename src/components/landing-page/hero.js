@@ -3,7 +3,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-import sourceImage from "../../../public/source-image-1.jpg";
+import sourceImage from "../../../public/material-finder-images/Frame 33 copy.png";
 import sourceImage2 from "../../../public/source-image-2.jpg";
 import sourceImage3 from "../../../public/source-image-3.jpg";
 
