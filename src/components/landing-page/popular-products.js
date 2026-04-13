@@ -56,7 +56,7 @@ const PopularProducts = () => {
     const distanceFromCenter = Math.abs(index - centerIndex);
 
     const baseScale = isMobile ? 0.85 : 1.2;
-    const centerScale = isMobile ? 1 : 1.35;
+    const centerScale = isMobile ? 1 : 1.45;
     const scale =
       index === centerIndex
         ? centerScale
@@ -64,7 +64,7 @@ const PopularProducts = () => {
 
     const xOffset = isMobile
       ? (index - centerIndex) * 100
-      : (index - centerIndex) * 200;
+      : (index - centerIndex) * 260;
 
     const zIndex = 10 - distanceFromCenter;
 

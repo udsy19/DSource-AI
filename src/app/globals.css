@@ -10,55 +10,6 @@ body {
   background-position: center;
 }
 
-#design-image {
-  background-image: url("../../public/material-finder-images/Minimalist Interior Design.png");
-  background-size: cover;
-  background-position: center;
-  min-height: 200px;
-}
-
-@media (min-width: 640px) {
-  #design-image {
-    min-height: 250px;
-  }
-}
-
-@media (min-width: 768px) {
-  #design-image {
-    min-height: 300px;
-  }
-}
-
-@media (min-width: 1024px) {
-  #design-image {
-    height: 32rem;
-  }
-}
-
-#discover-image {
-  background-image: url("../../public/material-finder-images/Minimalist Bedroom.png");
-  background-size: cover;
-  background-position: center;
-  min-height: 200px;
-}
-
-@media (min-width: 640px) {
-  #discover-image {
-    min-height: 250px;
-  }
-}
-
-@media (min-width: 768px) {
-  #discover-image {
-    min-height: 300px;
-  }
-}
-
-@media (min-width: 1024px) {
-  #discover-image {
-    height: 32rem;
-  }
-}
 
 #popular-1 {
   background-image: url("../../public/popular-1.jpg");
@@ -103,15 +54,6 @@ body {
   background-position: center;
 }
 
-#source-image {
-  min-height: 24rem;
-}
-
-@media (min-width: 1024px) {
-  #source-image {
-    height: 32rem;
-  }
-}
 
 #made-with-dsource-1 {
   background-image: url("../../public/material-finder-images/DS 001.png");

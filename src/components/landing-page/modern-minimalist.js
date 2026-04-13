@@ -27,7 +27,7 @@ const ModernMinimalist = () => {
           </div>
         </div>
         <div className="w-full lg:w-1/3 overflow-hidden flex flex-col gap-6 sm:gap-8 md:gap-10">
-          <div className="p-4 sm:p-6 md:p-8 rounded-3xl" style={{ background: "#854D0E" }}>
+          <div className="p-4 sm:p-6 md:p-8 rounded-3xl" style={{ background: "#3E3535" }}>
             <button className="border-2 bg-white border-black rounded-full text-sm sm:text-base md:text-lg font-bold px-8 sm:px-12 md:px-16 py-3 sm:py-4 md:py-6 w-full sm:w-auto hover:bg-gray-100 transition-colors">
               Get Inspired
             </button>
