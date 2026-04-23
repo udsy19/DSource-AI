@@ -20,22 +20,22 @@ const LinkSection = ({ links }) => {
 const QuickLinks = () => {
   const linkSections = [
     [
-      { label: "SnapFind", href: "/" },
-      { label: "RenderRoom", href: "/" },
-      { label: "QuoteBoard", href: "/" },
-      { label: "Vendor Directory", href: "/" },
+      { label: "SnapFind", href: "/ai-material-finder/find" },
+      { label: "RenderRoom", href: "/ai-visualizer" },
+      { label: "QuoteBoard", href: "/spec-builder" },
+      { label: "Vendor Directory", href: "/marketplace" },
     ],
     [
-      { label: "How it Works", href: "/" },
-      { label: "FAQ", href: "/" },
-      { label: "Help Center", href: "/" },
-      { label: "Contact Us", href: "/" },
+      { label: "How it Works", href: "/ai-material-finder" },
+      { label: "FAQ", href: "/faq" },
+      { label: "Help Center", href: "/help-center" },
+      { label: "Contact Us", href: "/help-center#contact" },
     ],
     [
-      { label: "About Us", href: "/" },
-      { label: "Careers", href: "/" },
-      { label: "Privacy Policy", href: "/" },
-      { label: "Terms of Service", href: "/" },
+      { label: "About Us", href: "/about" },
+      { label: "Careers", href: "/about" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
     ],
   ];
 
@@ -47,16 +47,18 @@ const QuickLinks = () => {
         ))}
         <div className="hidden lg:block"></div>
         <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-1">
-          <h1 className="text-xl sm:text-2xl mb-2 sm:mb-4">DSource.AI</h1>
-          <p className="text-gray-500 text-sm sm:text-base">
-            The ultimate platform for material sourcing and project
-            visualization.
-          </p>
+          <Link href="/" className="block">
+            <h1 className="text-xl sm:text-2xl mb-2 sm:mb-4">DSource.AI</h1>
+            <p className="text-gray-500 text-sm sm:text-base">
+              The ultimate platform for material sourcing and project
+              visualization.
+            </p>
+          </Link>
         </div>
       </div>
       <div className="mt-12 sm:mt-16 md:mt-24 px-4 sm:px-8 md:px-12 mb-4 sm:mb-6 md:mb-8">
         <h4 className="text-gray-500 text-sm sm:text-base">
-          © 2025 DSource.AI. All rights reserved.
+          © 2026 DSource.AI. All rights reserved.
         </h4>
       </div>
     </div>

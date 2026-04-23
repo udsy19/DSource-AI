@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 const Footer = () => {
   return (
@@ -13,9 +14,12 @@ const Footer = () => {
             placeholder="Enter your email"
             className="w-full sm:w-2/3 bg-white/10 backdrop-blur-md shadow-sm shadow-white/50 rounded-lg pl-4 pr-4 sm:pr-16 py-2 sm:py-2 border-2 border-white/20 focus:outline-none text-white placeholder:text-white/70"
           />
-          <button className="bg-orange-500 text-white rounded-full px-6 sm:px-4 py-2 sm:-ml-10 sm:z-10 border-2 border-white/20 hover:bg-orange-600 transition-colors">
+          <Link
+            href="/signup"
+            className="inline-flex items-center justify-center bg-orange-500 text-white rounded-full px-6 sm:px-4 py-2 sm:-ml-10 sm:z-10 border-2 border-white/20 hover:bg-orange-600 transition-colors"
+          >
             Get Started
-          </button>
+          </Link>
         </div>
       </div>
     </div>

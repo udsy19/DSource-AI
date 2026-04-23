@@ -137,7 +137,11 @@ const HelpCenterPage = () => {
                     </div>
 
                     {/* Contact Form */}
-                    <div ref={formRef} className="bg-white rounded-2xl p-6 sm:p-8">
+                    <div
+                        id="contact"
+                        ref={formRef}
+                        className="bg-white rounded-2xl p-6 sm:p-8"
+                    >
                         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>

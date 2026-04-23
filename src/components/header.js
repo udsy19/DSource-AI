@@ -33,10 +33,10 @@ const Header = ({ currentPath = "" }) => {
 
   return (
     <div
-      className={`fixed top-2 sm:top-4 left-1/2 -translate-x-1/2 max-w-[1728px] z-50 px-2 sm:px-4 w-full`}
+      className={`fixed top-1.5 sm:top-2 left-1/2 -translate-x-1/2 max-w-[1728px] z-50 px-2 sm:px-4 w-full`}
     >
       <header
-        className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-4 py-2 sm:px-8 md:px-14 sm:py-4 ${pathName?.startsWith("/ai-material-finder") ||
+        className={`flex items-center justify-between backdrop-blur-md rounded-full shadow-lg px-3 py-1.5 sm:px-5 md:px-10 sm:py-2.5 ${pathName?.startsWith("/ai-material-finder") ||
             pathName?.startsWith("/marketplace") ||
             pathName?.startsWith("/spec-builder") ||
             pathName?.startsWith("/ai-visualizer") ||
@@ -48,21 +48,21 @@ const Header = ({ currentPath = "" }) => {
         {!pathName?.startsWith("/vendor") ? (
           <Link
             href="/"
-            className="flex items-center gap-2 sm:gap-4 flex-shrink-0"
+            className="flex items-center gap-2 sm:gap-3 flex-shrink-0"
           >
             <Image
               src={logo}
               alt="logo"
-              width={40}
-              height={40}
-              className="sm:w-[60px] sm:h-[60px]"
+              width={32}
+              height={32}
+              className="w-8 h-8 sm:w-11 sm:h-11"
             />
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+            <h1 className="text-base sm:text-lg md:text-xl font-bold text-white">
               DSource.AI
             </h1>
           </Link>
         ) : (
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white mr-12">
+          <h1 className="text-base sm:text-lg md:text-xl font-bold text-white mr-12">
             {pathName?.split("/")[2]
               ? pathName?.split("/")[2]?.charAt(0).toUpperCase() +
               pathName?.split("/")[2].slice(1)
@@ -74,38 +74,58 @@ const Header = ({ currentPath = "" }) => {
 
         <div className="hidden lg:flex lg:w-6/12">
           <nav className="w-full">
-            <ul className="flex items-center text-white gap-4 xl:gap-8">
+            <ul className="flex items-center text-white gap-3 xl:gap-6">
               {!pathName?.startsWith("/vendor") && (
                 <>
-                  <Link href="/">
-                    <li className="font-bold text-sm xl:text-base">Home</li>
-                  </Link>
-                  <Link href="/ai-material-finder">
-                    <li className="font-bold text-sm xl:text-base">Features</li>
-                  </Link>
-                  <Link href="/marketplace/products">
-                    <li className="font-bold text-sm xl:text-base">
+                  <li>
+                    <Link
+                      href="/"
+                      className="font-bold text-sm xl:text-base hover:opacity-80"
+                    >
+                      Home
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/ai-material-finder"
+                      className="font-bold text-sm xl:text-base hover:opacity-80"
+                    >
+                      Features
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/marketplace/products"
+                      className="font-bold text-sm xl:text-base hover:opacity-80"
+                    >
                       Shop Sample
-                    </li>
-                  </Link>
-                  <Link href="/ai-visualizer">
-                    <li className="font-bold text-sm xl:text-base">
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/ai-visualizer"
+                      className="font-bold text-sm xl:text-base hover:opacity-80"
+                    >
                       Get Inspired
-                    </li>
-                  </Link>
+                    </Link>
+                  </li>
                 </>
               )}
-              <li className="flex-1">
+              <li className="flex-1 min-w-0">
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search materials..."
-                    className="w-full bg-white text-black backdrop-blur-md rounded-xl shadow-lg pl-4 pr-12 py-2 text-sm focus:outline-none"
+                    className="w-full bg-white text-black backdrop-blur-md rounded-lg shadow-lg pl-3 pr-11 py-1.5 text-sm focus:outline-none"
                   />
-                  <button className="absolute right-0 top-1/2 -translate-y-1/2 bg-black/80 p-2 rounded-xl cursor-pointer">
+                  <Link
+                    href="/marketplace/products"
+                    className="absolute right-0.5 top-1/2 -translate-y-1/2 bg-black/80 p-1.5 rounded-lg"
+                    aria-label="Browse marketplace"
+                  >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-white"
+                      className="h-4 w-4 text-white"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -117,7 +137,7 @@ const Header = ({ currentPath = "" }) => {
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                  </button>
+                  </Link>
                 </div>
               </li>
             </ul>
@@ -217,7 +237,7 @@ const Header = ({ currentPath = "" }) => {
             <div>
               <Link
                 href="/signup"
-                className="cursor-pointer bg-white text-sm xl:text-base text-black rounded-full shadow-lg px-6 xl:px-10 py-2 xl:py-4 flex items-center gap-2"
+                className="cursor-pointer bg-white text-sm xl:text-base text-black rounded-full shadow-lg px-5 xl:px-8 py-1.5 xl:py-2.5 flex items-center gap-2"
               >
                 Sign Up
                 <svg
@@ -242,36 +262,48 @@ const Header = ({ currentPath = "" }) => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed top-20 left-2 right-2 z-40 backdrop-blur-md rounded-2xl shadow-lg bg-black/90 p-6">
+        <div className="lg:hidden fixed top-16 left-2 right-2 z-40 backdrop-blur-md rounded-2xl shadow-lg bg-black/90 p-5">
           <nav className="flex flex-col gap-4">
-            <ul className="flex flex-col text-white gap-4">
+            <ul className="flex flex-col text-white gap-3">
               {!pathName?.startsWith("/vendor") && (
                 <>
-                  <Link href="/">
-                    <li className="font-bold">Home</li>
-                  </Link>
-                  <Link href="/ai-material-finder">
-                    <li className="font-bold">Features</li>
-                  </Link>
-                  <Link href="/marketplace/products">
-                    <li className="font-bold">Shop Sample</li>
-                  </Link>
-                  <Link href="/ai-visualizer">
-                    <li className="font-bold">Get Inspired</li>
-                  </Link>
+                  <li>
+                    <Link href="/" className="font-bold block py-0.5">
+                      Home
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/ai-material-finder" className="font-bold block py-0.5">
+                      Features
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/marketplace/products" className="font-bold block py-0.5">
+                      Shop Sample
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/ai-visualizer" className="font-bold block py-0.5">
+                      Get Inspired
+                    </Link>
+                  </li>
                 </>
               )}
             </ul>
-            <div className="relative mt-4">
+            <div className="relative mt-2">
               <input
                 type="text"
                 placeholder="Search materials..."
-                className="w-full bg-white text-black backdrop-blur-md rounded-xl shadow-lg pl-4 pr-12 py-2 text-sm focus:outline-none"
+                className="w-full bg-white text-black backdrop-blur-md rounded-lg shadow-lg pl-3 pr-11 py-1.5 text-sm focus:outline-none"
               />
-              <button className="absolute right-0 top-1/2 -translate-y-1/2 bg-black/80 p-2 rounded-xl cursor-pointer">
+              <Link
+                href="/marketplace/products"
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 bg-black/80 p-1.5 rounded-lg"
+                aria-label="Browse marketplace"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-white"
+                  className="h-4 w-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -283,7 +315,7 @@ const Header = ({ currentPath = "" }) => {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-              </button>
+              </Link>
             </div>
             <div className="flex flex-col gap-4 mt-4">
               {isAuthenticated ? (
@@ -355,7 +387,7 @@ const Header = ({ currentPath = "" }) => {
               {!isAuthenticated && (
                 <Link
                   href="/signup"
-                  className="cursor-pointer bg-white text-base text-black rounded-full shadow-lg px-6 py-3 flex items-center justify-center gap-2"
+                  className="cursor-pointer bg-white text-base text-black rounded-full shadow-lg px-6 py-2 flex items-center justify-center gap-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Sign Up
