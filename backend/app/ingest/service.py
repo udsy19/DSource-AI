@@ -39,6 +39,7 @@ def resolve_manufacturer(db: Session, code: str, name_hint: str = "") -> str:
     m = db.get(Manufacturer, code)
     if m is None:
         db.add(Manufacturer(code=code, name=(name_hint or code).strip()[:120]))
+        db.flush()  # persist now so the next get() finds it (sessions run autoflush=False)
     return code
 
 

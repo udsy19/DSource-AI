@@ -12,7 +12,9 @@ from app.models import Product
 def db():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
-    s = sessionmaker(bind=engine)()
+    # Mirror the app's SessionLocal (autoflush=False) so tests catch flush-visibility bugs
+    # like many products sharing one manufacturer_code.
+    s = sessionmaker(bind=engine, autoflush=False)()
     try:
         yield s
     finally:
@@ -52,6 +54,20 @@ def test_zero_price_row_persists_none_not_zero(db):
     arm = db.query(Product).filter_by(sku="pro-arm").one()  # sku fell back to handle
     assert arm.price_inr is None
     assert "price_inr" in arm.provenance["flagged_fields"]
+
+
+def test_many_products_share_one_manufacturer(db):
+    # A real Shopify page is hundreds of products under ONE manufacturer code; the manufacturer
+    # row must resolve once, not be re-inserted per product (UNIQUE constraint regression).
+    payload = {"products": [
+        {"title": f"Chair {i}", "handle": f"chair-{i}", "product_type": "Office Chair",
+         "vendor": "Nilkamal", "tags": [], "images": [{"src": f"https://cdn/c{i}.jpg"}],
+         "variants": [{"sku": f"NK-{i}", "price": "4999.00", "available": True}]}
+        for i in range(30)
+    ]}
+    products = parse_products_json(payload, "NK", base_url="https://shop.test")
+    result = upsert_harvest(db, products)
+    assert result.created == 30
 
 
 def test_reharvest_updates_not_duplicates(db):
