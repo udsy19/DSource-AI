@@ -46,7 +46,8 @@ _Last updated: 2026-06-22._
 - ✅ **Phase 1.5 enrichment done:** `app/enrichment/` — one Pydantic `MaterialEnrichment` (value/confidence/source per attr, 'missing' explicit) drives both providers via SDKs (anthropic 0.111, google-genai 2.9). `decide_provider` novelty-gates (near-dup of an enriched product → Gemini; novel → Claude); content-hash cache; resilient provider fallback. **Live-verified on real products via Gemini** (e.g. plastic/engineered-wood with honest image/title/inferred source). 8 unit tests (fakes). CLI: `scripts/enrich_seed.py`.
 - ⚠️ **ANTHROPIC_API_KEY is truncated** (confirmed: live Claude calls 401 → fall back to Gemini). Re-paste full key in `.env` to enable the novel-item Claude path; Gemini path works now.
 - **GST:** no canonical HSN table → `derive_gst(category)` (furniture 18% etc.), always flagged estimated.
-- **Next options:** Phase 3 Specify material-swap (wire 3D palettes → real SKUs + enriched attrs → priced BOM) · Phase 2 material→maintenance derivation · re-paste Claude key + bulk-enrich the catalog.
+- ✅ **Phase 3 Specify material-swap done (frontend):** `CadViewer.tsx` palettes now (a) drive the 3D floor/wall/furniture finishes in real time and (b) resolve each finish to a real SKU via `/api/match` — furniture → real Nilkamal products (Recardo Table ₹17.6k, Compass chair ₹12.5k…), floor/wall → honest "no real match" (no flooring in seed). Live materials BOM sums matched SKUs + GST. `MatchResult` type + `matchProduct` api added. tsc + vite build clean (no frontend test framework in repo).
+- **Next options:** Phase 2 material→maintenance derivation (dust/cleanability/durability, static table) · re-paste Claude key + bulk-enrich catalog · broaden catalog (flooring/wall brands so those swatches resolve) · surface enriched material attrs in the swap panel.
 
 ## Real vs synthetic (honesty ledger)
 
