@@ -70,6 +70,16 @@ def match(req: MatchRequest, db: Session = Depends(get_db)) -> dict:
     return {"results": _results(db, hits, _bands(by_image))}
 
 
+def _primary_material(enrichment: dict | None, material_attrs: dict | None) -> str | None:
+    if enrichment:
+        value = (enrichment.get("primary_material") or {}).get("value")
+        if value:
+            return value
+    if material_attrs:
+        return material_attrs.get("primary_material")
+    return None
+
+
 def _results(db: Session, hits: list[tuple[int, float]], bands: MatchBands) -> list[dict]:
     out = []
     for product_id, score in hits:
@@ -77,6 +87,7 @@ def _results(db: Session, hits: list[tuple[int, float]], bands: MatchBands) -> l
         if p is None:
             continue
         prov = p.provenance or {}
+        enrichment = prov.get("enrichment") or None
         out.append({
             "product_id": p.id, "sku": p.sku, "name": p.name, "category": p.category,
             "vendor": prov.get("vendor") or p.manufacturer_code,
@@ -84,6 +95,8 @@ def _results(db: Session, hits: list[tuple[int, float]], bands: MatchBands) -> l
             "image_url": p.image_url, "url": prov.get("url"),
             "score": round(score, 4), "label": band(score, bands),
             "flagged_fields": prov.get("flagged_fields", []),
+            "material": _primary_material(enrichment, prov.get("material_attrs")),
+            "enrichment": enrichment,
         })
     return out
 
