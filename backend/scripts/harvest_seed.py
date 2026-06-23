@@ -22,7 +22,7 @@ SEED_BRANDS = [
 ]
 
 
-def main(per_brand_pages: int = 2, index_limit: int | None = 120) -> None:
+def main(per_brand_pages: int = 1, index_limit: int | None = 120) -> None:
     Base.metadata.create_all(bind=engine)
     ensure_catalog_columns(engine)
     db = SessionLocal()
@@ -33,7 +33,7 @@ def main(per_brand_pages: int = 2, index_limit: int | None = 120) -> None:
             print(f"[harvest] {domain}: {len(products)} products -> "
                   f"+{res.created} new, {res.updated} updated, {res.no_price} no-price")
         print("[index]", index_catalog(db, limit=index_limit))
-        print("[calibrate]", calibrate_bands(db))
+        print("[calibrate]", calibrate_bands(db, limit=index_limit))
     finally:
         db.close()
 

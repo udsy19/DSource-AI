@@ -71,13 +71,15 @@ def index_catalog(
 
 def calibrate_bands(
     db: Session, embedder: EcommerceClipEmbedder | None = None,
-    index: SqliteVecIndex | None = None, source: str = "harvest",
+    index: SqliteVecIndex | None = None, source: str = "harvest", limit: int | None = None,
 ) -> dict:
     embedder = embedder or get_embedder()
     index = index or get_index()
     positives: list[float] = []  # same product, different photo
     negatives: list[float] = []  # best cross-category score (should be low)
-    for p in db.query(Product).filter(Product.source == source).all():
+    # Same query+order as index_catalog so we only calibrate over the slice that was indexed.
+    query = db.query(Product).filter(Product.source == source, Product.image_url.isnot(None))
+    for p in (query.limit(limit).all() if limit else query.all()):
         images = (p.provenance or {}).get("image_urls", [])
         if len(images) < 2:
             continue
