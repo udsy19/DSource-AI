@@ -19,9 +19,13 @@ _CATEGORY_KEYWORDS: list[tuple[str, str]] = [
     ("seating", r"chair|stool|seat|sofa|lounge"),
     ("desking", r"desk|workstation|benching|sit-?stand|height.?adjust"),
     ("tables", r"table|conference|huddle|cafe"),
-    ("storage", r"storage|cabinet|pedestal|locker|credenza|shelv|tower"),
+    ("storage", r"storage|cabinet|pedestal|locker|credenza|shelv|tower|rack"),
     ("pods", r"pod|booth|phone room|focus room|framery"),
     ("flooring", r"carpet|tile|floor|rug"),
+    # India catalog (residential/decor) — appended so existing office categories win first.
+    ("lighting", r"lamp|chandelier|sconce|luminaire|pendant light|\bled light"),
+    ("planters", r"planter|\bpot\b|\bplant\b|sapling|bonsai|succulent|grow bag|garden"),
+    ("decor", r"decor|vase|showpiece|wall art|figurine|photo frame|cushion"),
 ]
 
 

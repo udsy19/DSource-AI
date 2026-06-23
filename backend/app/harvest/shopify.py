@@ -7,9 +7,13 @@ pages over the network goes through HarvestClient.
 
 from __future__ import annotations
 
+import re
+
 from ..ingest.service import infer_category
 from .client import HarvestClient
 from .schema import NormalizedProduct, derive_gst
+
+_TAG_RE = re.compile(r"<[^>]+>")
 
 # office/work cues -> workplace; everything else defaults to residential (a soft hint only)
 _WORKPLACE_HINTS = ("office", "desk", "workstation", "task chair", "conference", "ergonomic")
@@ -57,6 +61,7 @@ def _parse_product(
         image_urls=[img["src"] for img in p.get("images", []) if img.get("src")],
         color=_tag_value(tags, ("color_", "colour_")),
         finish=_tag_value(tags, ("finish_",)),
+        description=_strip_html(p.get("body_html")),
         raw_blob=p,
     )
 
@@ -112,3 +117,10 @@ def _tag_value(tags: list[str], prefixes: tuple[str, ...]) -> str | None:
 def _looks_workplace(text: str) -> bool:
     low = text.lower()
     return any(h in low for h in _WORKPLACE_HINTS)
+
+
+def _strip_html(html: str | None) -> str | None:
+    if not html:
+        return None
+    text = " ".join(_TAG_RE.sub(" ", html).split())
+    return text[:2000] or None

@@ -26,14 +26,21 @@ class Settings(BaseSettings):
     embed_dim: int = 768
 
     # Match-confidence bands per query modality (cosine). text<->image cosines sit far lower
-    # than image<->image (the CLIP/SigLIP modality gap), so they are calibrated SEPARATELY on
-    # the seed catalog. Below the close band => "no real match" (never returns the nearest).
-    # text bands derived from the seed (true-match median 0.124 vs wrong-match p90 0.103);
-    # image bands are conservative pending cleaner (less category-noisy) calibration.
-    match_text_exact: float = 0.16
-    match_text_close: float = 0.10
-    match_image_exact: float = 0.85
-    match_image_close: float = 0.72
+    # than image<->image (the CLIP/SigLIP modality gap), so they are calibrated SEPARATELY by
+    # best balanced-accuracy separation on the seed catalog (scripts/harvest_seed.py).
+    # Below the close band => "no real match" (never returns the nearest).
+    # Achieved on seed: text BA 0.81 (TPR .83/TNR .79), image BA 0.83 (TPR .74/TNR .92).
+    match_text_exact: float = 0.13
+    match_text_close: float = 0.08
+    match_image_exact: float = 0.80
+    match_image_close: float = 0.68
+
+    # Phase 1.5 material enrichment — novelty-gated router. Near-duplicate of an already-enriched
+    # product (image cosine >= novelty threshold + same category) -> cheap Gemini; novel -> Claude.
+    anthropic_api_key: str = ""
+    enrich_gemini_model: str = "gemini-2.5-flash"
+    enrich_claude_model: str = "claude-haiku-4-5"
+    enrich_novelty_threshold: float = 0.85
 
     @property
     def cors_origins_list(self) -> list[str]:

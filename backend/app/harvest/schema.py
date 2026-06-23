@@ -42,6 +42,9 @@ class NormalizedProduct(BaseModel):
     category: str = "other"
     typology_tags: list[str] = Field(default_factory=list)
 
+    # description prose (body_html, stripped) — material often lives here; feeds enrichment
+    description: str | None = None
+
     # media (multiple images power same-product self-calibration of match thresholds)
     image_urls: list[str] = Field(default_factory=list)
 

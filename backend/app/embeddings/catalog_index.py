@@ -10,7 +10,6 @@ hits give negatives. Thresholds come from those distributions, never from litera
 from __future__ import annotations
 
 import io
-import statistics
 
 from curl_cffi import requests
 from PIL import Image
@@ -73,38 +72,40 @@ def calibrate_bands(
     db: Session, embedder: EcommerceClipEmbedder | None = None,
     index: SqliteVecIndex | None = None, source: str = "harvest", limit: int | None = None,
 ) -> dict:
+    """Self-labelled, modality-aware band calibration over the indexed slice.
+
+    Positives = the same product retrieved by another of its signals (its title for text,
+    its 2nd photo for image); negatives = the best cross-category hit. Text and image are
+    calibrated separately because of the CLIP modality gap.
+    """
     embedder = embedder or get_embedder()
     index = index or get_index()
-    positives: list[float] = []  # same product, different photo
-    negatives: list[float] = []  # best cross-category score (should be low)
-    # Same query+order as index_catalog so we only calibrate over the slice that was indexed.
     query = db.query(Product).filter(Product.source == source, Product.image_url.isnot(None))
-    for p in (query.limit(limit).all() if limit else query.all()):
-        images = (p.provenance or {}).get("image_urls", [])
-        if len(images) < 2:
-            continue
-        second = _fetch_image(images[1])
-        if second is None:
-            continue
-        hits = index.query(embedder.embed_images([second])[0], k=10)
-        self_score = next((s for pid, s in hits if pid == p.id), None)
-        if self_score is not None:
-            positives.append(self_score)
-        cross = [s for pid, s in hits if pid != p.id and _category(db, pid) != p.category]
-        if cross:
-            negatives.append(max(cross))
+    products = query.limit(limit).all() if limit else query.all()
 
-    recommended: dict[str, float] = {}
-    if positives:
-        recommended["exact"] = round(_low_percentile(positives), 4)
-    if negatives:
-        recommended["close"] = round(_high_percentile(negatives), 4)
-    return {
-        "positives": len(positives), "negatives": len(negatives),
-        "pos_min": round(min(positives), 4) if positives else None,
-        "neg_max": round(max(negatives), 4) if negatives else None,
-        "recommended": recommended,
-    }
+    text_pos: list[float] = []
+    text_neg: list[float] = []
+    img_pos: list[float] = []
+    img_neg: list[float] = []
+    for p in products:
+        _collect(db, p, index.query(embedder.embed_text(p.name), k=10), text_pos, text_neg)
+        images = (p.provenance or {}).get("image_urls", [])
+        if len(images) >= 2:
+            second = _fetch_image(images[1])
+            if second is not None:
+                _collect(db, p, index.query(embedder.embed_images([second])[0], k=10), img_pos, img_neg)
+
+    return {"text": _separation(text_pos, text_neg), "image": _separation(img_pos, img_neg)}
+
+
+def _collect(db: Session, p: Product, hits: list[tuple[int, float]],
+             positives: list[float], negatives: list[float]) -> None:
+    self_score = next((s for pid, s in hits if pid == p.id), None)
+    if self_score is not None:
+        positives.append(self_score)
+    cross = [s for pid, s in hits if pid != p.id and _category(db, pid) != p.category]
+    if cross:
+        negatives.append(max(cross))
 
 
 def _category(db: Session, product_id: int) -> str:
@@ -112,15 +113,22 @@ def _category(db: Session, product_id: int) -> str:
     return p.category if p else ""
 
 
-def _low_percentile(values: list[float]) -> float:
-    """~10th percentile (exact floor): most true matches score above this."""
-    if len(values) < 10:
-        return min(values)
-    return statistics.quantiles(sorted(values), n=10)[0]
-
-
-def _high_percentile(values: list[float]) -> float:
-    """~90th percentile (no-match ceiling): most wrong matches score below this."""
-    if len(values) < 10:
-        return max(values)
-    return statistics.quantiles(sorted(values), n=10)[8]
+def _separation(positives: list[float], negatives: list[float]) -> dict:
+    """Threshold that maximizes balanced accuracy between true matches and wrong matches,
+    with the achieved TPR/TNR so the bands are honest, not assumed."""
+    if not positives or not negatives:
+        return {"n_pos": len(positives), "n_neg": len(negatives)}
+    best_close, best_ba, best_rates = 0.0, -1.0, (0.0, 0.0)
+    for t in sorted(set(positives) | set(negatives)):
+        tpr = sum(x >= t for x in positives) / len(positives)
+        tnr = sum(x < t for x in negatives) / len(negatives)
+        ba = (tpr + tnr) / 2
+        if ba > best_ba:
+            best_ba, best_close, best_rates = ba, t, (tpr, tnr)
+    exact_floor = sorted(positives)[int(len(positives) * 0.6)]  # 60th pct of true matches
+    return {
+        "n_pos": len(positives), "n_neg": len(negatives),
+        "close": round(best_close, 4), "exact": round(max(best_close, exact_floor), 4),
+        "balanced_accuracy": round(best_ba, 3),
+        "tpr_at_close": round(best_rates[0], 3), "tnr_at_close": round(best_rates[1], 3),
+    }

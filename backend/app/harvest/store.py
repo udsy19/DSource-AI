@@ -33,6 +33,7 @@ def _provenance(mp: NormalizedProduct) -> dict:
         "url": mp.url,
         "color": mp.color,
         "finish": mp.finish,
+        "description": mp.description,
     }
 
 
