@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     render_api_url: str = ""          # only for provider="generic"
     replicate_api_token: str = ""     # for provider="replicate" (ControlNet, layout-faithful)
 
+    # Catalog image/text embeddings (Phase 1). Product-tuned, text+image in one shared space.
+    # Swappable like render_model (e.g. SigLIP2 / marqo-ecommerce-L) without touching callers.
+    embed_model: str = "hf-hub:Marqo/marqo-ecommerce-embeddings-B"
+    embed_dim: int = 768
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
