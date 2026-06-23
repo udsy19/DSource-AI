@@ -6,7 +6,7 @@ are canonical on (manufacturer_code, sku=part number); SIF/pCon imports upsert o
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, inspect, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -14,6 +14,28 @@ from .database import Base
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# India-catalog columns added after the US-dealer schema shipped. create_all() creates missing
+# TABLES but never adds COLUMNS to an existing one, so upgrade a pre-existing dsource.db in
+# place. Idempotent and additive (nullable) — no data loss, US-dealer rows leave them NULL.
+_CATALOG_COLUMNS = (
+    ("image_url", "VARCHAR(500)"),
+    ("price_inr", "FLOAT"),
+    ("gst_rate", "FLOAT"),
+    ("provenance", "JSON"),
+)
+
+
+def ensure_catalog_columns(engine) -> None:
+    insp = inspect(engine)
+    if "products" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("products")}
+    for col, ddl in _CATALOG_COLUMNS:
+        if col not in existing:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE products ADD COLUMN {col} {ddl}"))
 
 
 class Manufacturer(Base):
@@ -33,8 +55,15 @@ class Product(Base):
     category: Mapped[str] = mapped_column(String(60), default="other", index=True)
     list_price: Mapped[float] = mapped_column(Float, default=0.0)
     price_uom: Mapped[str] = mapped_column(String(20), default="each")
-    source: Mapped[str] = mapped_column(String(20), default="seed")  # seed | sif | pcon
+    source: Mapped[str] = mapped_column(String(20), default="seed")  # seed | sif | pcon | harvest
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    # India catalog (source="harvest"): INR pricing + primary image + harvest provenance
+    # (flagged_fields, all image_urls, material_attrs, typology_tags, url). NULL on US-dealer rows.
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    price_inr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    gst_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Discount(Base):

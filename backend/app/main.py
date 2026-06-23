@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, SessionLocal, engine
 from .ingest import service
+from .models import ensure_catalog_columns
 from .ingest.sif import parse_sif
 from .procurement.models import seed_vendors
 from .realdata import apply_coop_hmi_band, ingest_hm_pricebooks
@@ -22,6 +23,7 @@ SYNTHETIC = Path(__file__).resolve().parent.parent / "data" / "synthetic"
 
 def bootstrap() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_catalog_columns(engine)  # in-place add of India-catalog columns to an existing db
     db = SessionLocal()
     try:
         seed(db)
