@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     embed_model: str = "hf-hub:Marqo/marqo-ecommerce-embeddings-B"
     embed_dim: int = 768
 
+    # Match-confidence bands (cosine). PROVISIONAL — recalibrate on real India data via
+    # scripts/harvest_seed.py. Below match_close => "no real match" (never returns the nearest).
+    match_exact: float = 0.9
+    match_close: float = 0.78
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
