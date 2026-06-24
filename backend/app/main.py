@@ -13,7 +13,7 @@ from .procurement.models import seed_vendors
 from .realdata import apply_coop_hmi_band, ingest_hm_pricebooks
 from .routers import (
     brief, cad, catalog, coop, floorplan, gsa, ingest, match, procurement, projects, quote,
-    render, testfit, wellcatalog,
+    render, source, testfit, wellcatalog,
 )
 from .seed import seed
 from .wellcatalog.seed import seed_certs
@@ -93,6 +93,7 @@ app.include_router(wellcatalog.router) # Studio: WELL-ranked catalog
 app.include_router(procurement.router) # Studio: smart procurement (RFQ → PO)
 app.include_router(cad.router)         # CAD viewer: faithful 2D SVG + 3D geometry of the drawing
 app.include_router(match.router)       # DSource AI: catalog match (text/image -> real products)
+app.include_router(source.router)      # DSource AI: test-fit -> real India SKUs (INR sourcing)
 
 
 @app.get("/api/health")

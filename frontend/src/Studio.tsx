@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { cadGeometry, cadSvg, generateTestFit, num, usd } from "./api";
+import { cadGeometry, cadSvg, generateTestFit, inr, num, sourceIndia } from "./api";
 import { Cad3D, CadSvg } from "./components/CadViewer";
 import Dropzone from "./components/Dropzone";
 import PlanCanvas from "./components/PlanCanvas";
-import Procurement from "./components/Procurement";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented, Stat } from "./design/ui";
-import type { CadGeometry, TestFitResponse } from "./types";
+import type { CadGeometry, IndiaSource, TestFitResponse } from "./types";
 
 const LEGEND = [
   { k: "Workstation", c: "rgba(184,85,47,0.5)", f: "rgba(184,85,47,0.11)" },
@@ -18,6 +17,7 @@ const LEGEND = [
 export default function Studio() {
   const [res, setRes] = useState<TestFitResponse | null>(null);
   const [cad, setCad] = useState<{ svg: string; geometry: CadGeometry } | null>(null);
+  const [source, setSource] = useState<IndiaSource | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [mode, setMode] = useState<"plan" | "space">("plan");
@@ -26,6 +26,7 @@ export default function Studio() {
     setBusy(true);
     setErr(null);
     setCad(null);
+    setSource(null);
     try {
       // Render the user's ACTUAL drawing (CAD svg + geometry) AND run the analysis (test-fit).
       const [tf, svg, geo] = await Promise.all([
@@ -35,6 +36,15 @@ export default function Studio() {
       ]);
       setRes(tf);
       if (svg && geo) setCad({ svg: svg.svg, geometry: geo });
+      // Source the test-fit's furniture to REAL India catalog SKUs (INR). Runs after; the
+      // first call warms the embedder so it may take a moment.
+      const c = tf.testfit;
+      sourceIndia({
+        workstation: c.workstation_count,
+        private_office: c.office_count ?? 0,
+        meeting_room: c.meeting_count ?? 0,
+        collaboration: c.collab_count ?? 0,
+      }).then(setSource).catch(() => setSource(null));
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e));
       setRes(null);
@@ -44,7 +54,6 @@ export default function Studio() {
   }
 
   const tf = res?.testfit;
-  const q = res?.quote;
 
   return (
     <main className="studio">
@@ -152,66 +161,45 @@ export default function Studio() {
               </>
             )}
 
-            {q && (
+            {source && (
               <>
                 <hr className="ds-rule" />
                 <div className="quote">
                   <div className="total">
-                    <small>Source · budgetary total</small>
-                    {usd(q.total)}
+                    <small>Source · budgetary total (India)</small>
+                    {inr(source.total)}
                   </div>
-                  {res.bom && (() => {
-                    const all = res.bom.reduce((s, b) => s + b.qty * b.unit_list, 0);
-                    const real = res.bom.filter((b) => b.real).reduce((s, b) => s + b.qty * b.unit_list, 0);
-                    const pct = all ? Math.round((real / all) * 100) : 0;
-                    return <div className="realbar"><span className="fill" style={{ width: `${pct}%` }} />
-                      <em>{pct}% from real published prices</em></div>;
-                  })()}
-                  <div className="rows">
-                    <Row k="List" n={usd(q.subtotal_list)} />
-                    <Row k="Net (after discount)" n={usd(q.net_merchandise)} />
-                    <Row k="Install" n={usd(q.install)} />
-                    <Row k="Freight" n={usd(q.freight)} />
-                    <Row k="Tax" n={usd(q.tax)} />
-                  </div>
-                  <Callout>
-                    Budgetary — list minus the dealer’s standard discount, plus install, freight and
-                    tax. A dealer confirms the firm number.
-                  </Callout>
-                </div>
-              </>
-            )}
-
-            {res.bom && res.bom.length > 0 && (
-              <>
-                <hr className="ds-rule" />
-                <div>
-                  <Eyebrow style={{ display: "block", marginBottom: 14 }}>Source · bill of materials</Eyebrow>
                   <div className="bom">
-                    {res.bom.map((b, i) => (
+                    {source.lines.map((l, i) => (
                       <div className="item" key={i}>
-                        <div className="q">{num(b.qty)}</div>
+                        <div className="q">{num(l.qty)}</div>
                         <div className="nm">
-                          {b.name}
+                          {l.name}
                           <span className="sku">
-                            {b.sku}
-                            <em className={`prov ${b.real ? "real" : "est"}`}>
-                              {b.real ? "real" : "est."}
-                            </em>
+                            {l.vendor}
+                            <em className={`prov ${l.label === "exact" ? "real" : "est"}`}>{l.label}</em>
                           </span>
                         </div>
-                        <div className="pr">{usd(b.unit_list)}</div>
+                        <div className="pr">{inr(l.unit_inr)}</div>
                       </div>
                     ))}
                   </div>
+                  <div className="rows">
+                    <Row k="Subtotal" n={inr(source.subtotal)} />
+                    <Row k="GST" n={inr(source.gst)} />
+                    <Row k="Total" n={inr(source.total)} />
+                  </div>
+                  {source.unmatched.length > 0 && (
+                    <Callout>
+                      {source.unmatched.length} item type(s) have no real catalog match yet — left
+                      unpriced rather than estimated.
+                    </Callout>
+                  )}
+                  <Callout>
+                    Priced from real India catalog SKUs (INR + GST). Multi-vendor sourcing &amp;
+                    comparison arrive with the vendor layer (Phase 5).
+                  </Callout>
                 </div>
-              </>
-            )}
-
-            {res.bom && res.bom.length > 0 && (
-              <>
-                <hr className="ds-rule" />
-                <Procurement bom={res.bom} />
               </>
             )}
           </>

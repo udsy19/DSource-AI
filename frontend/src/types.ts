@@ -43,39 +43,6 @@ export interface BomLine {
   source?: string;
 }
 
-export interface VendorBid {
-  vendor_id: number;
-  vendor_name: string;
-  city: string;
-  state: string;
-  lead_time_days: number;
-  coverage_pct: number;
-  net_total: number;
-  rank: number;
-  can_fulfill_all: boolean;
-  uncovered_skus: string[];
-}
-
-export interface RfqResponse {
-  currency: string;
-  vendor_count: number;
-  vendors: VendorBid[];
-  is_synthetic: boolean;
-  note: string;
-}
-
-export interface Po {
-  po_number: string;
-  currency: string;
-  issued_date: string;
-  vendor: { id: number; name: string; city: string; state: string };
-  subtotal: number;
-  tax: number;
-  total: number;
-  lead_time_days: number;
-  delivery_window: { from: string; to: string };
-}
-
 export interface Quote {
   subtotal_list: number;
   net_merchandise: number;
@@ -131,6 +98,29 @@ export interface MaintenanceAxis {
   basis: "measured_standard" | "derived_proxy" | "estimated";
   standard_ref: string;
   rationale: string;
+}
+
+export interface SourceLine {
+  need: string;
+  for_type: string;
+  qty: number;
+  sku: string;
+  name: string;
+  vendor: string;
+  unit_inr: number;
+  gst_rate: number;
+  line_inr: number;
+  label: MatchLabel;
+  material: string | null;
+}
+
+export interface IndiaSource {
+  currency: string;
+  lines: SourceLine[];
+  unmatched: { need: string; for_type: string; qty: number }[];
+  subtotal: number;
+  gst: number;
+  total: number;
 }
 
 export interface MatchResult {
