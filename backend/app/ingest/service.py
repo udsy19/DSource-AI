@@ -24,6 +24,7 @@ _CATEGORY_KEYWORDS: list[tuple[str, str]] = [
     ("flooring", r"carpet|tile|floor|rug"),
     # India catalog (residential/decor) — appended so existing office categories win first.
     ("lighting", r"lamp|chandelier|sconce|luminaire|pendant light|\bled light"),
+    ("wallcovering", r"wallpaper|wall mural|wall panel|wall decal|wallcover"),
     ("planters", r"planter|\bpot\b|\bplant\b|sapling|bonsai|succulent|grow bag|garden"),
     ("decor", r"decor|vase|showpiece|wall art|figurine|photo frame|cushion"),
 ]

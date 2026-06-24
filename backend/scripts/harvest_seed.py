@@ -14,26 +14,35 @@ from app.harvest.shopify import fetch_shopify
 from app.harvest.store import upsert_harvest
 from app.models import ensure_catalog_columns
 
-# (manufacturer_code, domain) — priced Shopify-JSON India brands from data/india/manufacturers.csv
+# (manufacturer_code, domain) — verified priced Shopify-JSON India brands across categories so
+# the Floor/Wall/Furniture material swatches all resolve to real SKUs (see data/india).
 SEED_BRANDS = [
-    ("NK", "www.nilkamalfurniture.com"),
-    ("TB", "trustbasket.com"),
-    ("UG", "www.ugaoo.com"),
+    ("NK", "www.nilkamalfurniture.com"),  # furniture
+    ("TB", "trustbasket.com"),            # planters
+    ("UG", "www.ugaoo.com"),              # plants
+    ("IK", "www.imperialknots.com"),      # rugs / carpets -> Floor
+    ("OBT", "obeetee.in"),                # rugs / carpets -> Floor
+    ("GW", "www.giffywalls.in"),          # wallpaper -> Walls
+    ("OOR", "www.oorjaa.in"),             # decorative lighting
 ]
 
 
-def main(per_brand_pages: int = 1, index_limit: int | None = 120) -> None:
+def main(per_brand_pages: int = 1, per_brand_index: int = 45, recalibrate: bool = False) -> None:
     Base.metadata.create_all(bind=engine)
     ensure_catalog_columns(engine)
     db = SessionLocal()
     try:
         for code, domain in SEED_BRANDS:
-            products = fetch_shopify(domain, code, max_pages=per_brand_pages)
-            res = upsert_harvest(db, products)
-            print(f"[harvest] {domain}: {len(products)} products -> "
-                  f"+{res.created} new, {res.updated} updated, {res.no_price} no-price")
-        print("[index]", index_catalog(db, limit=index_limit))
-        print("[calibrate]", calibrate_bands(db, limit=index_limit))
+            try:  # one flaky brand (DNS/WAF/rate-limit) must not abort the whole seed
+                products = fetch_shopify(domain, code, max_pages=per_brand_pages)
+                res = upsert_harvest(db, products)
+                idx = index_catalog(db, manufacturer_code=code, limit=per_brand_index)
+                print(f"[seed] {domain}: +{res.created} new / {res.updated} updated "
+                      f"({res.no_price} no-price) -> indexed {idx['indexed']}")
+            except Exception as exc:
+                print(f"[seed] {domain}: FAILED ({type(exc).__name__}: {exc}) — skipped")
+        if recalibrate:
+            print("[calibrate]", calibrate_bands(db, limit=200))
     finally:
         db.close()
 

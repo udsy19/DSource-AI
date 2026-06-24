@@ -51,10 +51,13 @@ def _fetch_image(url: str) -> Image.Image | None:
 def index_catalog(
     db: Session, embedder: EcommerceClipEmbedder | None = None,
     index: SqliteVecIndex | None = None, source: str = "harvest", limit: int | None = None,
+    manufacturer_code: str | None = None,
 ) -> dict:
     embedder = embedder or get_embedder()
     index = index or get_index()
     query = db.query(Product).filter(Product.source == source, Product.image_url.isnot(None))
+    if manufacturer_code:
+        query = query.filter(Product.manufacturer_code == manufacturer_code)
     products = query.limit(limit).all() if limit else query.all()
     indexed = skipped = 0
     for p in products:
