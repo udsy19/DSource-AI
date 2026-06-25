@@ -65,9 +65,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="DSource — Dealer-facing Commercial Interiors Quoting (Phase 0)",
-    version="0.2.0",
-    description="SIF/pCon ingest → normalized catalog → budgetary quote. Single-tenant pilot spine.",
+    title="DSource Studio — Workplace design intelligence (India)",
+    version="0.3.0",
+    description="CAD ingest → 3D + material swap → real India catalog match/enrich → INR sourcing.",
     lifespan=lifespan,
 )
 
@@ -92,8 +92,8 @@ app.include_router(brief.router)       # Studio: HQ brief → program spec trans
 app.include_router(wellcatalog.router) # Studio: WELL-ranked catalog
 app.include_router(procurement.router) # Studio: smart procurement (RFQ → PO)
 app.include_router(cad.router)         # CAD viewer: faithful 2D SVG + 3D geometry of the drawing
-app.include_router(match.router)       # DSource AI: catalog match (text/image -> real products)
-app.include_router(source.router)      # DSource AI: test-fit -> real India SKUs (INR sourcing)
+app.include_router(match.router)       # DSource Studio: catalog match (text/image -> real products)
+app.include_router(source.router)      # DSource Studio: test-fit -> real India SKUs (INR sourcing)
 
 
 @app.get("/api/health")

@@ -1,4 +1,4 @@
-# DSource AI — Memory (living state)
+# DSource Studio — Memory (living state)
 
 The single source of truth for *current* state: locked decisions, status, what's real vs synthetic, open questions. Updated as work lands. Companion to `CLAUDE.md` (rules) and `ROADMAP.md` (plan).
 
@@ -6,7 +6,7 @@ _Last updated: 2026-06-22._
 
 ## Locked decisions
 
-- **Product:** DSource AI — single-user (pro AND end-client), multi-typology (residential/hospitality/retail/small-workplace), India-first, inspiration → real priced sourceable design. Repoints the existing Studio engine. Not enterprise, not multi-seat.
+- **Product:** **DSource Studio** ("workplace design intelligence") — single-user (pro AND end-client), India-first, inspiration → real priced sourceable design. Office/workplace-first; architected to extend to residential/hospitality/retail. (Name reverted from the interim "DSource AI" on 2026-06-25 — UI + GCC deck both say DSource Studio. GitHub remote URL stays `DSource-AI`.)
 - **Architecture principle:** catalog-backed scene = source of truth; AI = inspiration/beauty layer. Two modes (Explore creative-first / Specify catalog-first) share one engine; back-match (CLIP) bridges them; both need the same prerequisite — a real catalog with image embeddings.
 - **Infra posture:** free / local-first, swappable behind interfaces. Only paid calls are the vision LLMs.
 - **Catalog seed:** demand-first from a **real project** (user to provide — see open questions).

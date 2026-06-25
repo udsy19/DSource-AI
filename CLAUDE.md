@@ -1,10 +1,12 @@
-# DSource AI
+# DSource Studio
 
 Project brief and standing direction for Claude Code. Loaded every session. Read this first, then `ROADMAP.md` (the plan) and `memory.md` (current state + open questions). The rules in `.claude/rules/` apply on top of this and outrank style preferences when they conflict.
 
+(The product is **DSource Studio**. The GitHub remote is still `DSource-AI` — the URL only; do not rename it in code.)
+
 ## What we're building
 
-**DSource AI** is a **single-user** platform — used by *both* design professionals and end-clients — that takes any interior (residential, hospitality, retail, or small workplace) from **inspiration → a real, priced, sourceable design**. India-first, architected to expand later.
+**DSource Studio** — *workplace design intelligence* — is a **single-user** platform used by *both* design professionals and end-clients that takes an interior (office/workplace first, architected to extend to residential/hospitality/retail) from **inspiration → a real, priced, sourceable design**. India-first.
 
 It repoints the existing *DSource Studio* engine (CAD ingest, 2D/3D viewer, test-fit, wellbeing scoring, pricing connectors, procurement, ControlNet render) away from enterprise/GCC-only toward multi-typology single-user. **Not** enterprise, **not** multi-seat, **not** freemium. (Enterprise "Studio" is a separate, later track on the same engine.)
 

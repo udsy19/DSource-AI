@@ -9,7 +9,7 @@ import time
 from curl_cffi import requests
 
 # Honest, identifying UA — we harvest only public product data and want to be reachable.
-_USER_AGENT = "DSourceAI-catalog-harvester/0.1 (+https://github.com/udsy19/DSource-AI)"
+_USER_AGENT = "DSourceStudio-catalog-harvester/0.1 (+https://github.com/udsy19/DSource-AI)"
 
 
 class HarvestClient:

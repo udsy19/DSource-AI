@@ -1,4 +1,4 @@
-# DSource AI — Build Roadmap
+# DSource Studio — Build Roadmap
 
 Phased plan, sharpened by the foundation research (2026-06-22). Companion to `CLAUDE.md` (rules/orientation) and `memory.md` (live state). Across every phase: keep tests green (add tests for new code), follow the design system, preserve the never-fake-data ethos.
 
@@ -7,7 +7,7 @@ Phased plan, sharpened by the foundation research (2026-06-22). Companion to `CL
 ---
 
 ## Phase 0 — Repoint the foundation (Studio → AI)
-Decouple the engine from office-only assumptions; reframe the shell as DSource AI.
+Decouple the engine from office-only assumptions; reframe the shell as DSource Studio.
 - First-class `typology` concept (`residential | hospitality | retail | workplace`) threaded through brief → scene → catalog filter.
 - Gate office-specific logic (workstation grids, WELL-8 scoring) behind `typology == workplace` so it stops being the universal default.
 - Keep all existing engine modules as the reusable core; reframe the app shell.
