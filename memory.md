@@ -1,83 +1,50 @@
-# DSource Studio — Memory (living state)
+# Quarry — Memory (living state)
 
-The single source of truth for *current* state: locked decisions, status, what's real vs synthetic, open questions. Updated as work lands. Companion to `CLAUDE.md` (rules) and `ROADMAP.md` (plan).
+Single source of truth for *current* state. Companion to `CLAUDE.md` (the frozen contract) and `ROADMAP.md` (the plan).
 
-_Last updated: 2026-06-22._
+_Last updated: 2026-06-25._
+
+## Pivot
+
+**2026-06-25: full pivot DSource Studio → Quarry.** The user replaced `CLAUDE.md` with the Quarry spec and chose: **full replace** (Quarry is the product now, DSource Studio shelved), **adopt Quarry's stack**, **keep all existing `.claude/rules`**. The prior DSource Studio app (CAD→3D→material-swap→INR sourcing, ~8k LoC) lives only in git history now.
+
+## What Quarry is
+
+A **digital product library / resolver** — `match(BOQLine) -> ranked real products` — stage 4 of an interior fit-out pipeline (test-fit → CAD → BOQ → **Quarry** → render → procurement). API-first, not a search site. V1 = two taxonomy leaves deep (`finishes/acoustic/wall-panel`, `ffe/seating/task-chair`). Hard SQL filter **then** deterministic soft rank; every match returns an auditable breakdown; LLM/embeddings only turn fuzzy intent into a query vector, never invent products/prices/scores.
 
 ## Locked decisions
 
-- **Product:** **DSource Studio** ("workplace design intelligence") — single-user (pro AND end-client), India-first, inspiration → real priced sourceable design. Office/workplace-first; architected to extend to residential/hospitality/retail. (Name reverted from the interim "DSource AI" on 2026-06-25 — UI + GCC deck both say DSource Studio. GitHub remote URL stays `DSource-AI`.)
-- **Architecture principle:** catalog-backed scene = source of truth; AI = inspiration/beauty layer. Two modes (Explore creative-first / Specify catalog-first) share one engine; back-match (CLIP) bridges them; both need the same prerequisite — a real catalog with image embeddings.
-- **Infra posture:** free / local-first, swappable behind interfaces. Only paid calls are the vision LLMs.
-- **Catalog seed:** demand-first from a **real project** (user to provide — see open questions).
-- **Enrichment:** novelty-gated router — Gemini for near-duplicates (≥~75% match to already-enriched), Claude for novel/first-seen items.
-- **Never fake data:** flagged in the schema (`{value, confidence, source/basis}`); "no real match" surfaced explicitly.
-- **Git:** repo `https://github.com/udsy19/DSource-AI.git`, branch `main`. Commit after every change; **no Claude/AI attribution** (`.claude/rules/git-workflow.md`).
+- **Stack:** Python 3.12 + `uv`; FastAPI; **Postgres 16 + pgvector**; SQLAlchemy 2 + Alembic; Pydantic v2; docker-compose. Embeddings pluggable (open_clip + sentence-transformer default).
+- **Rules:** all `.claude/rules/` apply (no-bloat, code-style, testing, **git-workflow incl. NO AI attribution**, frontend-style). Quarry §11 conventions add on top.
+- **File ownership** (post-Phase-0): A=ingestion, B=enrichment, C=matching+api, D=eval. Agents edit only their dir; `schema/`+`db/`+`taxonomy.yaml` are frozen.
 
-## Recommended stack (from 2026-06-22 research; full synthesis in workflow output)
+## Status — Phase 0 ✅ DONE
 
-| Slot | Pick | Note |
-|---|---|---|
-| Harvest | 4-tier `fetch_products(domain)` over `curl_cffi` (chrome131) | Shopify `/products.json` → Woo Store API → JSON-LD(+sitemap) → Playwright. ~17/95 suppliers are clean Shopify JSON |
-| Embeddings | `Marqo/marqo-ecommerce-embeddings-B` (768-dim, open_clip) | text+image one space; `-L` only if B recall weak |
-| Vector store | `sqlite-vec` `vec0` table in `dsource.db` | one index serves Explore + Specify + novelty gate |
-| Enrichment | gemini-2.5-flash (near-dup) / claude-haiku-4-5 (novel) / claude-opus-4-8 (hard) | one Pydantic schema both providers; PDF via **pdfplumber** (never PyMuPDF/AGPL) |
-| Material→maint. | pure `derive_material_attributes()` + flat `material_attributes` table | 6 axes (Martindale/PEI/AC/Janka/ACT/GREENGUARD-CARB), each with `basis` enum |
-| Vendor | `vendor` + `vendor_offering` + `manufacturers.csv`; GODL pincode CSV + haversine | Bengaluru bootstrapped manually (20–50 vetted) |
-| Explore | FastSAM-s → same CLIP → cosine back-match; Flux canny+depth | avoids gated SAM 3 |
-| AR | `<model-viewer>` (MIT), curated GLB, tile/paint first | per-SKU GLB asset cost is the constraint |
+- `src/quarry/schema/` (Pydantic contract), `data/taxonomy.yaml`, `src/quarry/db/` (`ProductRow` + pgvector), `alembic/` baseline, `docker-compose.yml`, stub `match()` + `/match`(501) + `/healthz`.
+- **Verified:** Postgres healthy on host **5433**; `alembic upgrade head` created the products table + vector extension; `pytest tests/` = 5 green; `mypy` strict clean (schema+matching); `/match` returns 501, `/healthz` ok.
+- **FROZEN:** schema, db, taxonomy. Changes go via `NOTES.md`, not silent edits.
 
-**Patterns to mirror:** `routers/render.py` (provider-agnostic interface), `realdata.py` `ingest_hm_pricebooks` (warm-cache guard), `procurement/models.py` `seed_vendors`, `ingest/service.py` (upsert on `(manufacturer_code, sku)`, `infer_category`). Extend `models.py` `Product` (don't add a parallel table). Swappable model names go in `config.py` like `render_model`.
+## How to run
 
-## Current status
+```
+docker compose up -d                     # Postgres 16 + pgvector on :5433
+uv sync                                  # venv + deps (Python 3.12)
+uv run alembic upgrade head              # apply migration
+uv run pytest tests/ -q                  # contract tests
+uv run mypy                              # strict on schema + matching
+uv run uvicorn quarry.api:app --reload   # serve /healthz, /match (501 until Agent C)
+```
+DB URL: `postgresql+psycopg://quarry:quarry@localhost:5433/quarry` (config default; override via `DATABASE_URL`).
 
-- **Repo:** git initialized, pushed to GitHub `main` (initial commit `479966a`). `.gitignore` hardened (all `*.env` excluded; verified no secrets staged). `.claude/rules/git-workflow.md` added.
-- **Existing engine (from Studio):** CAD ingest (DXF/DWG + unit norm), faithful 2D+3D viewer, test-fit, wellbeing scoring, pricing connectors (~53% real), procurement RFQ/PO, Flux-Canny render proxy. 64 tests green. ~5,400 LoC Python, ~1,700 LoC TS.
-- **AI render:** just rewrote to a two-pass crisp line-art ControlNet capture for layout fidelity (`CadViewer.tsx` + `render.py` flux params). Awaiting in-app retest by user.
-- **Docs:** `CLAUDE.md`, `ROADMAP.md`, `memory.md` created.
-- **Phase 1 COMPLETE (catalog + embeddings, end-to-end on real data):**
-  - ✅ Dep gate: torch 2.12.1 + open_clip 3.3.0 + transformers 5.12.1 + sqlite-vec 0.1.9 + curl_cffi 0.15.0 + apsw 3.53.2 on Py3.13/arm64. **Gotcha:** stdlib `sqlite3` here lacks loadable extensions → `sqlite-vec` attaches via **apsw** (same `dsource.db`; SQLAlchemy keeps the stdlib driver for the ORM).
-  - ✅ Harvest: `app/harvest/` Tier-0 Shopify (curl_cffi client, pure parser, `upsert_harvest`). **Live-seeded ~749 real India products** (Nilkamal 250, TrustBasket 250, Ugaoo 249) with INR prices via `scripts/harvest_seed.py`.
-  - ✅ Embeddings: `app/embeddings/` (marqo-ecommerce-B embedder + SqliteVecIndex over apsw, cosine). 120 indexed.
-  - ✅ Match: `POST /api/match` (text/image → ranked real products + honest exact/close/no_match). Retrieval ranking is GOOD (text "mesh office chair" → the real Nilkamal mesh chairs; gibberish → no_match).
-  - **KEY FINDING — modality gap:** text↔image cosines (~0.12 for correct) sit FAR below image↔image (~0.5–0.9). So bands are calibrated PER MODALITY: text exact 0.16 / close 0.10 (from seed: true-match median 0.124 vs wrong p90 0.103); image exact 0.85 / close 0.72 (conservative — image calibration is category-noise-polluted, needs cleaner signal). In `config.py`.
-  - Bugs found+fixed by the live run (both now regression-tested): manufacturer re-insert under autoflush=False (flush in `resolve_manufacturer`); same-SKU size-variants colliding in one batch (in-batch dedup in `upsert_harvest`).
-- ✅ **Phase 1 polish done:** `calibrate_bands` now picks the best balanced-accuracy threshold per modality and reports TPR/TNR (seed: text BA 0.81, image BA 0.83); config bands set from it (text 0.13/0.08, image 0.80/0.68). `infer_category` broadened (lighting/planters/decor). Harvest now captures stripped `body_html` as `description` (feeds enrichment).
-- ✅ **Phase 1.5 enrichment done:** `app/enrichment/` — one Pydantic `MaterialEnrichment` (value/confidence/source per attr, 'missing' explicit) drives both providers via SDKs (anthropic 0.111, google-genai 2.9). `decide_provider` novelty-gates (near-dup of an enriched product → Gemini; novel → Claude); content-hash cache; resilient provider fallback. **Live-verified on real products via Gemini** (e.g. plastic/engineered-wood with honest image/title/inferred source). 8 unit tests (fakes). CLI: `scripts/enrich_seed.py`.
-- ⚠️ **ANTHROPIC_API_KEY is truncated** (confirmed: live Claude calls 401 → fall back to Gemini). Re-paste full key in `.env` to enable the novel-item Claude path; Gemini path works now.
-- **GST:** no canonical HSN table → `derive_gst(category)` (furniture 18% etc.), always flagged estimated.
-- ✅ **Phase 3 Specify material-swap done:** `CadViewer.tsx` palettes drive the 3D finishes live AND resolve each to a real SKU via `/api/match`. Materials BOM sums matched SKUs + GST and shows material + maintenance per line.
-- ✅ **Phase 2 material→maintenance done:** `app/materials/` pure `derive_material_attributes()` over a 20-family standard-backed table (6 axes, basis enum). `material_family_from()` maps freeform material text → table key (specific-before-generic; unmappable → None). Wired into `/api/match` results (`material`, `enrichment`, `maintenance`).
-- ✅ **Catalog broadened (fills Floor/Wall):** +8 verified INR Shopify brands — Imperial Knots/Obeetee (rugs→Floor), Giffywalls (wallpaper→Walls), Oorjaa/FIG/Purple Turtles/Decor Kart (lighting), Marshalls (wallpaper). Seed now per-brand-indexed (45 each, 7 brands) + resilient to a flaky domain. Floor→Obeetee rugs (₹12.6k–283.5k), Wall→Giffywalls wallpaper (priced after `_primary_variant` skips ₹0 sample variants). Furniture→Nilkamal.
-- **Parallel agents used (2026-06-24):** 3 concurrent (Phase 2 build · catalog research · match-API exposure) — disjoint files, integrated + committed individually.
-- ✅ **Bulk enrichment done (Gemini):** all **390 indexed products enriched** via `scripts/enrich_seed.py` (now index-driven — enriches exactly what's matchable; content-hash cache skips before fetch). Match results carry material + maintenance: e.g. mesh chair → dust 4/5·wipe 5/5, engineered-wood table → dust 2/5·wipe 4/5. Surfaced in the swap-panel BOM.
-- ⚠️ **Claude key STILL truncated** (77 chars vs ~108, 401, paste cuts at `…eHHmMx`). All enrichment routed to Gemini via fallback. To enable the Claude novel-item path the user must paste the FULL key (suggested: `! read -s` into .env, or a fenced code block). Gemini occasionally mislabels material (e.g. "Lantana" for a lamp) — carries source/confidence so not silently faked; Claude would improve novel-item accuracy.
-- **Honest gaps:** wool/viscose (rugs) and bare "walnut wood" don't map to a maintenance family → material shows, scores blank. tiles/paint/vinyl remain quote-only (no priced India source).
-- ✅ **De-mocked the Studio sidebar (2026-06-24):** removed the legacy US-dealer USD quote + Herman Miller/Knoll BOM + synthetic US vendors. New `/api/source/india` (`routers/source.py`, `build_india_source`) maps the test-fit furniture program → real Nilkamal SKUs via the match engine → INR BOM + GST (sample plate: 282 desks+chairs etc. → **₹1.02 cr**, 0 unmatched). Studio renders it; deleted orphaned `Procurement.tsx` + dead api/types (`usd`, `requestRfq`, `createPo`, `Po`/`VendorBid`/`RfqResponse`). Note: backend testfit still COMPUTES the US quote/bom (now unrendered, legacy, has tests) — real India vendor comparison is Phase 5.
-- **Still mock-ish but honestly-flagged (kept):** Wellbeing panel (light/acoustics/movement/social measured from geometry; others ≈ proxies). Test-fit stats are real geometry.
+## Next (parallelizable after Phase 0)
 
-## Real vs synthetic (honesty ledger)
+- **Agent A** ingestion: `SourceAdapter` ABC + CSV/PIM + BIM adapters + 5–10 seeds/leaf, idempotent upsert.
+- **Agent B** embeddings: `EmbeddingProvider` + backfill text_vec/image_vec.
+- **Agent C** matching+api: real hard filter → rank → `/match` with breakdowns.
+- **Agent D** eval: golden BOQ set + precision@k + zero hard-constraint violations (after C).
 
-- **Real:** ~53% of Studio quote (chairs/lounges from HM price books × real co-op discount); CAD geometry; `data/india/manufacturers.csv` (95 verified suppliers).
-- **Synthetic / flagged:** desks/tables pricing (`real=False`); procurement vendors; WELL certs. India catalog not yet ingested. No embeddings/vector code exists yet (greenfield).
+## Notes / open
 
-## Open questions (decide before/within Phase 1)
-
-1. **What is the real seed project?** Files/specs, SKU count, white-bg vs in-situ photos (drives B-vs-L model + ingest time + back-match mode).
-2. **Labeled calibration set** (30–50 known-in-catalog products) available now, or created from the seed? (Blocks Phase 1 step 5 threshold calibration.)
-3. **Demand-first scope:** full supplier catalogs, or only SKUs the seed BOM touches? (Decides whether Tiers 2–3 + most enrichment are needed for v1.)
-4. **First paying customer:** designer/dealer (SaaS) or GCC occupier + fit-out contractor (B2B project)? (Affects sequencing.)
-5. **Canonical HSN→GST table** for furniture/decor/lighting/textiles/plants — needed before deriving any GST.
-6. **Per-product enrichment cost ceiling** for the seed batch (sets Gemini vs Haiku vs Opus aggressiveness; whether Batches is mandatory).
-7. **Residential-proxy budget** for the handful of JS+WAF SPA suppliers, or defer them under free/local-first?
-8. **Anthropic API key** for the enrichment Claude path (add to `backend/.env` at Phase 1.5).
-9. Verify **Pixela.ai** exists (named as competitor; did not surface in research) — drop if unconfirmed.
-
-## Top risks
-
-1. `torch`+`open_clip` install on Py3.13/Apple-Silicon; MPS inference ~1 img/sec — verify wheels + one embed before committing; embed at ingest only, never per-request.
-2. Confidence thresholds are dataset-specific — re-derive on India data; gate on absolute cosine, not softmax.
-3. Material/finish is the weakest harvest field — `basis`/`source` flags mandatory.
-4. GST never in source — derive from HSN, flag `estimated`; wrong rate corrupts Specify BOM.
-5. Catalog cold-start: only ~16/95 suppliers list INR; long tail WAF/PDF/quote-only → high "no match" rate hurts Explore UX. Catalog is the bottleneck.
-6. Legal: public product harvest low-risk (DPDPA public-data exemption), but mass-scraping IndiaMART/Justdial + redistributing scraped pricing is riskier — keep vendor bootstrap manual; legal read before productizing redistribution.
+- Old DSource code (`backend/`, `frontend/`, `run.sh`, `PLAN.md`) — to be removed (git history preserves). `data/india/manufacturers.csv` + the harvested catalog (real task-chairs!) could seed Agent A's `ffe/seating/task-chair` leaf — worth reusing.
+- `embed_dim` = 512 (pgvector column width, config default); changing it needs a migration.
+- mypy strict scoped to `schema/`+`matching/` only (per spec); db/api/alembic are loose.
