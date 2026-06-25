@@ -1,0 +1,47 @@
+# Quarry taxonomy — controlled category tree (CONTRACT; the orchestrator owns this file).
+# Leaf paths (slash-joined keys) are the `category` values products and BOQ lines use.
+# Only the two v1 leaves are deep; the rest is skeleton (supported, not populated in v1).
+
+- key: finishes
+  label: Finishes
+  children:
+    - key: acoustic
+      label: Acoustic
+      children:
+        - key: wall-panel
+          label: Acoustic Wall Panel
+          hard_constraint_keys: [min_acoustic_nrc, fire_rating_min]
+    - key: flooring
+      label: Flooring
+    - key: wall-covering
+      label: Wall Covering
+    - key: paint
+      label: Paint
+
+- key: ffe
+  label: FF&E
+  children:
+    - key: seating
+      label: Seating
+      children:
+        - key: task-chair
+          label: Task Chair
+          hard_constraint_keys: [fire_rating_min]
+        - key: lounge
+          label: Lounge Seating
+        - key: stool
+          label: Stool
+    - key: tables
+      label: Tables
+    - key: storage
+      label: Storage
+    - key: lighting
+      label: Lighting
+
+- key: partitions
+  label: Partitions & Walls
+  children:
+    - key: glazed
+      label: Glazed Partition
+    - key: solid
+      label: Solid Partition
