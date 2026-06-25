@@ -36,12 +36,20 @@ uv run uvicorn quarry.api:app --reload   # serve /healthz, /match (501 until Age
 ```
 DB URL: `postgresql+psycopg://quarry:quarry@localhost:5433/quarry` (config default; override via `DATABASE_URL`).
 
-## Next (parallelizable after Phase 0)
+## V1 COMPLETE — all four agents merged, DoD §12 met (2026-06-25)
 
-- **Agent A** ingestion: `SourceAdapter` ABC + CSV/PIM + BIM adapters + 5–10 seeds/leaf, idempotent upsert.
-- **Agent B** embeddings: `EmbeddingProvider` + backfill text_vec/image_vec.
-- **Agent C** matching+api: real hard filter → rank → `/match` with breakdowns.
-- **Agent D** eval: golden BOQ set + precision@k + zero hard-constraint violations (after C).
+Built via 4 parallel subagents (A/B/C in parallel, D after C), integrated by the orchestrator. **60 tests green, mypy strict clean, ruff clean.**
+- **A ingestion** (`ingestion/`): `SourceAdapter` + CSV/PIM + BIM adapters; **12 seeds** (6 acoustic panels, 6 task chairs); idempotent upsert on (source, source_ref); `python -m quarry.ingestion`.
+- **B embeddings** (`enrichment/`): `StubProvider` (deterministic, stdlib) + `ClipProvider` (open_clip ViT-B/32, 512-d shared text+image space, lazy torch); `backfill_vectors` (idempotent).
+- **C matching** (`matching/`+`api/`): hard SQL filter (eliminates: category/dims/budget/certs/nrc/fire — NULL dim passes, NULL nrc/fire eliminated when a floor is set, fire A>B>C) → deterministic weighted rank + full Breakdown; `match()` §8; `POST /match`, `GET /products/{id}`, `/healthz`. **Proven: hard constraints never violated.**
+- **D eval** (`eval/`): 14 golden cases (stable source_ref keys); `python -m quarry.eval` → **precision@k = recall@k = 1.000, 0 violations**, fail-loud nonzero exit on any violation.
+
+**DoD run:** docker up → ingest → backfill → /match (both leaves) → eval = 46 candidates, **0 hard-constraint violations**.
+
+## Open / flags
+- **Render-seam gap (flagged per §2/§12):** the 6 acoustic wall panels have **no `model_3d`** (seed CSV `model_3d_uri` empty) → `has_geometry=False`; the render stage (5) can't place them. All 6 task chairs carry glTF. Fix = add panel glTF refs to the seed (Agent A).
+- **Embeddings ran on the StubProvider** (deterministic, no torch). precision/recall=1.0 comes from the hard FILTER (provider-independent); style ranking with the stub is deterministic-but-not-semantic. Real CLIP = install `open-clip-torch torch pillow` + `register_default_provider("clip")` + re-backfill. **B reported these deps; not yet installed.**
+- mypy strict scope = `schema/`+`matching/` only (per spec); other layers run plain ruff+mypy.
 
 ## Notes / open
 
