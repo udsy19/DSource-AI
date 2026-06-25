@@ -1,0 +1,151 @@
+{
+  "products": [
+    {
+      "source_ref": "bim:herman-miller-aeron-remastered",
+      "brand": "Herman Miller",
+      "name": "Aeron Chair (Remastered)",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 686, "d": 668, "h": 1041, "unit": "mm" },
+      "materials": ["8Z Pellicle Mesh", "Recycled Aluminium", "Glass-Reinforced Nylon"],
+      "colors": ["Graphite", "Carbon", "Mineral"],
+      "finish": "Matte",
+      "fire_rating": "Class A",
+      "weight": { "value": 18.6, "unit": "kg" },
+      "price": { "amount": 1395.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 35,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 72.4,
+        "certifications": ["GREENGUARD Gold", "BIFMA LEVEL 3", "Cradle to Cradle Bronze"]
+      },
+      "media": {
+        "images": [
+          "https://cdn.example.com/hermanmiller/aeron_front.jpg",
+          "https://cdn.example.com/hermanmiller/aeron_side.jpg"
+        ],
+        "thumbnail": "https://cdn.example.com/hermanmiller/aeron_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/hermanmiller/aeron.gltf" }
+    },
+    {
+      "source_ref": "bim:steelcase-leap-v2",
+      "brand": "Steelcase",
+      "name": "Leap V2 Task Chair",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 686, "d": 705, "h": 1118, "unit": "mm" },
+      "materials": ["Polyester Upholstery", "Recycled Steel", "Polypropylene"],
+      "colors": ["Licorice", "Graphite", "Wheat"],
+      "finish": "Fabric",
+      "fire_rating": "Class A",
+      "weight": { "value": 21.3, "unit": "kg" },
+      "price": { "amount": 1029.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 28,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 81.0,
+        "certifications": ["GREENGUARD Gold", "BIFMA LEVEL 3", "SCS Indoor Advantage Gold"]
+      },
+      "media": {
+        "images": ["https://cdn.example.com/steelcase/leapv2_front.jpg"],
+        "thumbnail": "https://cdn.example.com/steelcase/leapv2_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/steelcase/leapv2.gltf" }
+    },
+    {
+      "source_ref": "bim:humanscale-freedom-headrest",
+      "brand": "Humanscale",
+      "name": "Freedom Task Chair with Headrest",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 689, "d": 686, "h": 1118, "unit": "mm" },
+      "materials": ["Recycled Aluminium", "Corde 4 Textile", "Foam"],
+      "colors": ["Black", "Platinum", "Pewter"],
+      "finish": "Woven",
+      "fire_rating": "Class A",
+      "weight": { "value": 17.2, "unit": "kg" },
+      "price": { "amount": 1245.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 30,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 66.8,
+        "certifications": ["GREENGUARD Gold", "BIFMA LEVEL 3", "Living Product Challenge"]
+      },
+      "media": {
+        "images": ["https://cdn.example.com/humanscale/freedom_front.jpg"],
+        "thumbnail": "https://cdn.example.com/humanscale/freedom_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/humanscale/freedom.gltf" }
+    },
+    {
+      "source_ref": "bim:knoll-remix-high-back",
+      "brand": "Knoll",
+      "name": "ReGeneration ReMix High-Back",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 660, "d": 660, "h": 1080, "unit": "mm" },
+      "materials": ["Recycled Polyester Mesh", "Glass-Filled Nylon"],
+      "colors": ["Onyx", "Fog", "Cumin"],
+      "finish": "Mesh",
+      "fire_rating": "Class B",
+      "weight": { "value": 15.4, "unit": "kg" },
+      "price": { "amount": 879.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 24,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 58.3,
+        "certifications": ["GREENGUARD Gold", "SCS Indoor Advantage Gold"]
+      },
+      "media": {
+        "images": ["https://cdn.example.com/knoll/remix_front.jpg"],
+        "thumbnail": "https://cdn.example.com/knoll/remix_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/knoll/remix.gltf" }
+    },
+    {
+      "source_ref": "bim:haworth-fern-digital-knit",
+      "brand": "Haworth",
+      "name": "Fern Task Chair (Digital Knit)",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 711, "d": 654, "h": 1080, "unit": "mm" },
+      "materials": ["Digital Knit Polyester", "Recycled Aluminium", "Nylon"],
+      "colors": ["Nickel", "Seasalt", "Clementine"],
+      "finish": "Knit",
+      "fire_rating": "Class A",
+      "weight": { "value": 19.1, "unit": "kg" },
+      "price": { "amount": 949.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 26,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 63.7,
+        "certifications": ["GREENGUARD Gold", "BIFMA LEVEL 2"]
+      },
+      "media": {
+        "images": ["https://cdn.example.com/haworth/fern_front.jpg"],
+        "thumbnail": "https://cdn.example.com/haworth/fern_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/haworth/fern.gltf" }
+    },
+    {
+      "source_ref": "bim:vitra-id-mesh",
+      "brand": "Vitra",
+      "name": "ID Mesh Task Chair",
+      "category": "ffe/seating/task-chair",
+      "dimensions": { "w": 690, "d": 690, "h": 1110, "unit": "mm" },
+      "materials": ["Polyester Mesh", "Die-Cast Aluminium", "Polyamide"],
+      "colors": ["Nero", "Soft Grey", "Avocado"],
+      "finish": "Mesh",
+      "fire_rating": "Class B",
+      "weight": { "value": 16.7, "unit": "kg" },
+      "price": { "amount": 1110.0, "currency": "USD", "unit": "each" },
+      "lead_time_days": 33,
+      "sustainability": {
+        "has_epd": true,
+        "embodied_carbon": 69.5,
+        "certifications": ["GREENGUARD Gold", "EU Ecolabel"]
+      },
+      "media": {
+        "images": ["https://cdn.example.com/vitra/idmesh_front.jpg"],
+        "thumbnail": "https://cdn.example.com/vitra/idmesh_thumb.jpg"
+      },
+      "model": { "format": "gltf", "uri": "https://assets.example.com/vitra/idmesh.gltf" }
+    }
+  ]
+}
