@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import ProductRow, get_session
@@ -27,6 +28,23 @@ def healthz() -> dict[str, str]:
 @app.post("/match", response_model=MatchResponse)
 def post_match(line: BOQLine, session: SessionDep) -> MatchResponse:
     return match(line, session=session)
+
+
+class BoqRequest(BaseModel):
+    """A batch of BOQ lines — the stage-3 (Schematic+BOQ) -> stage-4 (Quarry) seam."""
+
+    lines: list[BOQLine]
+
+
+class BoqResponse(BaseModel):
+    results: list[MatchResponse]  # one MatchResponse per input line, order preserved
+
+
+@app.post("/boq", response_model=BoqResponse)
+def post_boq(req: BoqRequest, session: SessionDep) -> BoqResponse:
+    """Resolve a whole BOQ at once: each line -> its ranked, audited matches (each MatchResponse
+    echoes its query, so results are self-describing). Reuses the same resolver as POST /match."""
+    return BoqResponse(results=[match(line, session=session) for line in req.lines])
 
 
 @app.get("/products/{product_id}")
