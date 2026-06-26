@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import ProductRow, get_session
+from ..export import RenderExport, build_render_export
 from ..matching import match
 from ..schema import BOQLine, MatchResponse
 
@@ -45,6 +46,17 @@ def post_boq(req: BoqRequest, session: SessionDep) -> BoqResponse:
     """Resolve a whole BOQ at once: each line -> its ranked, audited matches (each MatchResponse
     echoes its query, so results are self-describing). Reuses the same resolver as POST /match."""
     return BoqResponse(results=[match(line, session=session) for line in req.lines])
+
+
+class ExportRequest(BaseModel):
+    """Selected products to hand off to the render stage (the stage-4 -> stage-5 seam)."""
+
+    product_ids: list[UUID]
+
+
+@app.post("/export", response_model=RenderExport)
+def post_export(req: ExportRequest, session: SessionDep) -> RenderExport:
+    return build_render_export(session, req.product_ids)
 
 
 @app.get("/products/{product_id}")
