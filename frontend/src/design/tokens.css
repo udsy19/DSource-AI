@@ -1,0 +1,67 @@
+:root {
+  /* Surfaces — warm gallery paper, light */
+  --paper: #f6f1e9;
+  --paper-2: #efe8dc;
+  --paper-3: #e8dfd0;
+
+  /* Ink — warm near-black */
+  --ink: #2a2420;
+  --ink-2: #4d453d;
+  --muted: #8a7f72;
+  --faint: #b6ab9c;
+
+  /* Hairlines */
+  --line: #e0d6c6;
+  --line-2: #d2c6b2;
+
+  /* Accent — one ember, terracotta */
+  --accent: #c05a36;
+  --accent-press: #a4492a;
+  --accent-soft: #f0d9cd;
+  --accent-line: #d98e72;
+
+  /* Semantic state tints (color is information, paired with text) */
+  --ok: #5f7d52;
+  --ok-soft: #dde7d4;
+  --warn: #b07d2e;
+  --warn-soft: #f0e2c8;
+
+  /* Type */
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --t-display: 2.6rem;
+  --t-title: 1.5rem;
+  --t-lead: 1.15rem;
+  --t-numeral: 2rem;
+  --t-body: 0.95rem;
+  --t-small: 0.8rem;
+
+  --tracking-eyebrow: 0.12em;
+
+  /* Space — 4-based scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+
+  /* Radius — mostly sharp */
+  --r0: 0;
+  --r1: 2px;
+  --r2: 6px;
+  --r-pill: 999px;
+
+  /* Elevation — paper, not glass */
+  --shadow-1: 0 1px 2px rgba(42, 36, 32, 0.06), 0 1px 1px rgba(42, 36, 32, 0.04);
+  --shadow-2: 0 4px 16px rgba(42, 36, 32, 0.1), 0 1px 3px rgba(42, 36, 32, 0.06);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 360ms;
+}
