@@ -36,6 +36,15 @@ uv run uvicorn quarry.api:app --reload   # serve /healthz, /match (501 until Age
 ```
 DB URL: `postgresql+psycopg://quarry:quarry@localhost:5433/quarry` (config default; override via `DATABASE_URL`).
 
+## Ranking is now REAL & MEASURED (2026-06-25, post-V1)
+
+CLIP enabled (open-clip-torch/torch/pillow). Key learning: **text→text CLIP is noise** (grey ranked over green); **text→image is the product** (CLIP's actual strength). `embed_image` now fetches URLs.
+- **Chair-leaf expanded:** +44 real Nilkamal chairs (real Shopify photos) as a committed PIM seed (`data/seeds/nilkamal_task_chairs.csv`); resilient backfill (dead URLs → `image_failed`, skip not crash). Catalog = 56 products, 44 with real `image_vec`.
+- **Eval re-derived (robust + measures the ranker):** filter cases now use DYNAMIC ground truth (independent per-product constraint re-check over the live catalog) → precision/recall robust at any size; new ranking section (text→image relevant@k + MRR). Measured: filter 1.000/1.000 & 0 violations; **ranking rel@3=1.0, MRR=0.929**.
+- **Honest read:** ranker chooses well on **coarse visual intent** (plastic→plastic, "chair for a child"→baby chairs, outdoor→sets at rank 1) but is **weak on fine intra-category attributes** (mesh vs high-back office chairs land rank ~18–27). Cause: plastic-dominated catalog + CLIP clustering on gross form. So Quarry is a product for coarse semantic retrieval; fine discrimination needs richer data (more office chairs w/ photos) and possibly attribute-aware ranking.
+- **⚠️ §8 finding (frozen-contract concern, NOT silently changed):** `cosine(style_vec, image_vec OR text_vec)` mixes incomparable scales — a product falling back to `text_vec` scores ~0.84 (CLIP text→text) and BURIES every `image_vec` product (~0.3 text→image). D worked around it in the eval (rank only over image_vec products); `match()` itself still has it. Needs adjudication: e.g. rank within one modality, or normalize per-modality. Flagged to user.
+- **acoustic-panel leaf:** still no real-image source → text-only, ranking untestable there.
+
 ## V1 COMPLETE — all four agents merged, DoD §12 met (2026-06-25)
 
 Built via 4 parallel subagents (A/B/C in parallel, D after C), integrated by the orchestrator. **60 tests green, mypy strict clean, ruff clean.**
