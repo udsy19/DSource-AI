@@ -42,6 +42,13 @@ _PLASTIC = frozenset(
 
 _BABY = frozenset({"CHR5027FPN", "CHR5027GNS", "K2GENIUS5260NWLLGN"})
 
+# Mesh office chairs — a FINE intra-category attribute. Coarse visual CLIP pulls up every office
+# chair (Kyoto/Giza/Alba rank above these on looks alone); the lexical attribute term lifts the
+# products whose own text actually says "mesh". The relevant set is the four real Compass/Locus chairs.
+_MESH_OFFICE = frozenset(
+    {"MCMPHBMCRED/BLK", "MCMPMBMCBLK/BLK", "MLCSHBMCBLU/BLK", "MLCSMBMCBLU/BLK"}
+)
+
 _ARMCHAIR = frozenset(
     {
         "CHR2051MBG",
@@ -120,6 +127,7 @@ def ranking_cases() -> list[RankingCase]:
         RankingCase("child_chair", _CHAIR, "small chair for a child", _BABY),
         RankingCase("baby_chair", _CHAIR, "baby chair", _BABY),
         RankingCase("plastic_arm_chair", _CHAIR, "plastic arm chair", _ARMCHAIR),
+        RankingCase("mesh_office", _CHAIR, "mesh office chair", _MESH_OFFICE),
         RankingCase(
             "outdoor_set", _CHAIR, "outdoor patio chair and table set", _OUTDOOR_SET
         ),

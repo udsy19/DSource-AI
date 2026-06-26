@@ -22,15 +22,17 @@ class Settings(BaseSettings):
     embed_provider: str = "clip"
 
     match_k: int = 20
-    weight_style: float = 0.5
+    weight_style: float = 0.45
+    weight_attribute: float = 0.15
     weight_budget: float = 0.2
-    weight_lead_time: float = 0.15
-    weight_sustainability: float = 0.15
+    weight_lead_time: float = 0.1
+    weight_sustainability: float = 0.1
 
     @property
     def weights(self) -> Weights:
         return Weights(
             style=self.weight_style,
+            attribute=self.weight_attribute,
             budget=self.weight_budget,
             lead_time=self.weight_lead_time,
             sustainability=self.weight_sustainability,

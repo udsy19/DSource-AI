@@ -41,5 +41,27 @@ edit the contract. The orchestrator adjudicates.
   violations. Regression test: `test_style_query_best_photo_outranks_strong_no_photo`. Approved by
   the user before editing the contract.
 
+- **2026-06-26 — attribute-aware ranking: new lexical `attribute_match` term (user-approved
+  contract change).** Adds a fifth soft-rank term + breakdown field: the fraction of the query's
+  attribute words (stopwords + leaf nouns stripped) that the product's own text claims — name +
+  materials + finish + colors + text_blob + category path. Reason: CLIP clusters on gross visual
+  form, so fine intra-category attributes ("mesh" vs "high-back" office chairs) get buried; the
+  lexical term breaks visual ties with exact evidence. Deterministic, per-product [0,1], no LLM
+  (keeps §4.3). **Schema (frozen) changed:** `Weights` gains `attribute`; `Breakdown` gains
+  `attribute_match`. **Weights rebalanced** to keep weights summing to 1.0 AND preserve the
+  2026-06-26 calibration guarantee (style+attribute must stay ≥ ~0.6 or a maxed no-photo product
+  can beat the best photo): style 0.5→0.45, attribute 0.15 (new), budget 0.20, lead 0.15→0.10,
+  sustainability 0.15→0.10. Config (`weight_*`) + frontend (breakdown bar + weights row) updated.
+  Tests: `test_attribute_term_breaks_visual_ties_lexically`; eval case `mesh_office`.
+- **2026-06-26 — seed data fix surfaced by the attribute term (Agent A data, orchestrator-applied).**
+  The 3 FeltRight felt-tile rows in `data/seeds/real_acoustic_panels.csv` had empty `materials`
+  despite being PET-felt acoustic tiles (brand "FeltRight" tokenizes to "feltright", not "felt"),
+  so on "square felt acoustic tile" they scored `attribute_match=0` and the best *visual* tiles
+  (style 1.0) were beaten by non-tile felt products (3D/divider) that state "felt" in their name.
+  Fix = declare `materials: PET Felt` on those rows (honest — they are felt). Re-seeded (vectors
+  preserved). **Scorecard after both changes: ranking rel@1=rel@3=rel@5 = 1.000, MRR = 1.000
+  across 11 cases (incl. the new fine-grained `mesh_office`); filter 1.000/1.000; 0 violations.**
+  Both approved by the user (chose "attribute-aware ranking") before editing the contract.
+
 ## Requests
 (none yet)

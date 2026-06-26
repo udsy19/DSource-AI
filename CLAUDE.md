@@ -172,7 +172,8 @@ candidates: [
     score: float,                    # 0..1, deterministic weighted sum
     hard_pass: true,                 # only passing products are returned
     breakdown: {
-      style_similarity: float,
+      style_similarity: float,         # VISUAL, pool-normalized (best photo ~1.0)
+      attribute_match: float,          # LEXICAL, per-product: fraction of query attr words the product claims
       budget_fit: float,
       lead_time_score: float,
       sustainability_bonus: float,
@@ -181,7 +182,7 @@ candidates: [
     has_geometry: bool               # false => render stage cannot use it
   }
 ]
-weights_used: {style, budget, lead_time, sustainability}
+weights_used: {style, attribute, budget, lead_time, sustainability}
 ```
 
 ---
@@ -222,15 +223,22 @@ def match(line: BOQLine, weights=DEFAULT_WEIGHTS, k=20) -> MatchResponse:
     #   other [0,1] terms, yet on a style query the best photo SHOULD win. No-photo products stay
     #   0.0; a single/all-equal photo pool -> 1.0. See NOTES.md.
     for p in pool:
+        attribute_match  = lexical_overlap(line.style_intent.text, p)
+        # ^ added 2026-06-26: FINE lexical evidence to complement COARSE visual style. CLIP
+        #   clusters on gross form (every office chair looks alike), so a "mesh office chair" query
+        #   can't visually separate the mesh ones. attribute_match = |query attr words ∩ product
+        #   words| / |query attr words|, where product words = name + materials + finish + colors +
+        #   text_blob + CATEGORY path, minus stopwords + the leaf nouns ("chair"/"panel"/"tile").
+        #   Per-product [0,1], deterministic, no LLM. No query text -> 0.0. See NOTES.md.
         budget_fit       = headroom_score(p.effective_price, line.budget_ceiling)
         lead_time_score  = lead_time_score(p.lead_time_days)
         sustainability   = sustainability_bonus(p.sustainability)
-        score = weighted_sum(style_similarity[p], budget_fit, ...)  # weights explicit + returned
+        score = weighted_sum(style_similarity[p], attribute_match, budget_fit, ...)  # weights explicit + returned
 
     return top-k with full breakdown
 ```
 
-Rules: hard filter is a `WHERE` clause, never a soft penalty. If `style_vec` is `None` (or no product has a photo), every `style_similarity` is `0.0` — rank on the remaining terms (don't fabricate similarity). The style term is the only pool-relative term; all others are per-product. Always return the breakdown.
+Rules: hard filter is a `WHERE` clause, never a soft penalty. If `style_vec` is `None` (or no product has a photo), every `style_similarity` is `0.0` — rank on the remaining terms (don't fabricate similarity). Style (visual) and attribute (lexical) are the two "fit" terms; weights must sum to 1.0 and `style + attribute` stays dominant (≥ ~0.6) so the best match to *what was asked* wins. The style term is the only pool-relative term; all others are per-product. Always return the breakdown.
 
 ---
 

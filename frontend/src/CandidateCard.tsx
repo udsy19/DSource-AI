@@ -9,10 +9,16 @@ interface CandidateCardProps {
   rank: number;
 }
 
-type NumericMetric = 'style_similarity' | 'budget_fit' | 'lead_time_score' | 'sustainability_bonus';
+type NumericMetric =
+  | 'style_similarity'
+  | 'attribute_match'
+  | 'budget_fit'
+  | 'lead_time_score'
+  | 'sustainability_bonus';
 
 const METRICS: { key: NumericMetric; label: string }[] = [
   { key: 'style_similarity', label: 'Style similarity' },
+  { key: 'attribute_match', label: 'Attribute match' },
   { key: 'budget_fit', label: 'Budget fit' },
   { key: 'lead_time_score', label: 'Lead time' },
   { key: 'sustainability_bonus', label: 'Sustainability' },

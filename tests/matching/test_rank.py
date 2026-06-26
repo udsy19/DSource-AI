@@ -101,10 +101,26 @@ def test_style_query_best_photo_outranks_strong_no_photo(session: Session) -> No
         embodied_carbon=10.0, lead_time_days=5,
     )
     line = _chair_line(style_intent=StyleIntent(text="warm matte terracotta"))
-    resp = match(line, session=session)  # DEFAULT weights (style 0.5 + nonzero others)
+    resp = match(line, session=session)  # DEFAULT weights (style 0.45 + nonzero others)
     assert resp.candidates[0].product_id == photo.id  # the visual match wins the style query
     photo_bd = next(c for c in resp.candidates if c.product_id == photo.id).breakdown
     assert photo_bd.style_similarity == pytest.approx(1.0)  # best photo normalized to ~1.0
+
+
+def test_attribute_term_breaks_visual_ties_lexically(session: Session) -> None:
+    """Two visually-identical products (same image_vec -> equal pool-normalized style) must be
+    separated by the lexical attribute term: the one whose own text claims more of the queried
+    attributes wins. CLIP blurs intra-category attributes; this is the fine signal. (§8)."""
+    enrichment.set_provider(StubProvider({"mesh office chair": axis_vector(0)}))
+    mesh = insert_product(session, name="Locus Mesh Office Chair", image_vec=axis_vector(0))
+    half = insert_product(session, name="Giza Office Chair", image_vec=axis_vector(0))
+    line = _chair_line(style_intent=StyleIntent(text="mesh office chair"))
+    resp = match(line, session=session)
+    assert resp.candidates[0].product_id == mesh.id
+    mesh_bd = next(c for c in resp.candidates if c.product_id == mesh.id).breakdown
+    half_bd = next(c for c in resp.candidates if c.product_id == half.id).breakdown
+    assert mesh_bd.attribute_match == pytest.approx(1.0)  # "mesh" + "office" both present
+    assert half_bd.attribute_match == pytest.approx(0.5)  # only "office" of {mesh, office}
 
 
 def test_precomputed_vector_used_without_provider(session: Session) -> None:

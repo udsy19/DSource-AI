@@ -12,12 +12,18 @@ from .boq import BOQLine
 
 
 class Weights(BaseModel):
-    """Soft-rank weights — explicit and echoed in every response."""
+    """Soft-rank weights — explicit and echoed in every response. Must sum to 1.0 so score ∈ [0,1].
 
-    style: float = 0.5
+    style + attribute together form the "fit" budget: style is coarse visual evidence (CLIP),
+    attribute is fine lexical evidence (does the product's text actually say "mesh"/"leather"/
+    "wood slat"?). CLIP blurs intra-category attributes, so the lexical term breaks visual ties.
+    """
+
+    style: float = 0.45
+    attribute: float = 0.15
     budget: float = 0.2
-    lead_time: float = 0.15
-    sustainability: float = 0.15
+    lead_time: float = 0.1
+    sustainability: float = 0.1
 
 
 DEFAULT_WEIGHTS = Weights()
@@ -25,6 +31,7 @@ DEFAULT_WEIGHTS = Weights()
 
 class Breakdown(BaseModel):
     style_similarity: float
+    attribute_match: float
     budget_fit: float
     lead_time_score: float
     sustainability_bonus: float

@@ -8,10 +8,52 @@ revisits a hard constraint; survivors are already known to pass.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 
 from ..schema import BOQLine, Breakdown, Candidate, Weights
 from ..db import ProductRow
+
+# Generic words carry no discriminating signal: English function words plus the v1 leaf nouns
+# ("chair"/"panel"/"tile"). Stripping them leaves the descriptive attributes — "mesh", "leather",
+# "wood", "slat", "high", "back", "outdoor" — which is exactly what the lexical term should match.
+_STOPWORDS = frozenset(
+    {
+        "a", "an", "the", "and", "or", "of", "for", "with", "without", "to", "in", "on",
+        "chair", "chairs", "panel", "panels", "tile", "tiles", "seating",
+    }
+)
+_WORD = re.compile(r"[a-z0-9]+")
+
+
+def _tokenize(text: str) -> set[str]:
+    return {t for t in _WORD.findall(text.lower()) if len(t) > 1 and t not in _STOPWORDS}
+
+
+def _product_tokens(product: ProductRow) -> set[str]:
+    """The product's searchable text: name + structured attributes + the embedding text_blob, plus
+    the category path. The category is structured truth — a `finishes/acoustic/wall-panel` IS
+    acoustic even if its terse seed text never says so — so category-implied query words ("acoustic")
+    match every product in the leaf uniformly, which is correct: they carry no intra-leaf signal."""
+    attrs = product.attributes or {}
+    parts = [product.name, product.text_blob, product.category, attrs.get("finish") or ""]
+    parts += attrs.get("materials") or []
+    parts += attrs.get("colors") or []
+    return _tokenize(" ".join(parts))
+
+
+def attribute_match(query_text: str | None, product: ProductRow) -> float:
+    """Fraction of the query's attribute words that the product actually claims (lexical, [0,1]).
+
+    Complements the visual style term: CLIP clusters on gross form, so a query for "mesh office
+    chair" pulls up any office chair — this term lifts the products whose own text says "mesh".
+    Deterministic and inspectable (no LLM). No query text (vector-only style) -> 0.0."""
+    if not query_text:
+        return 0.0
+    wanted = _tokenize(query_text)
+    if not wanted:
+        return 0.0
+    return len(wanted & _product_tokens(product)) / len(wanted)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -100,10 +142,12 @@ def rank_candidates(
     (§8 step 3). Every other term is per-product; only style needs the pool, because raw CLIP
     cosine is only meaningful relative to the other candidates' cosines for the same query."""
     styles = _normalize_pool([_raw_style(style_vec, product) for product in products])
+    query_text = line.style_intent.text
     candidates: list[Candidate] = []
     for product, style in zip(products, styles, strict=True):
         breakdown = Breakdown(
             style_similarity=style,
+            attribute_match=attribute_match(query_text, product),
             budget_fit=budget_fit(product, line),
             lead_time_score=lead_time_score(product.lead_time_days),
             sustainability_bonus=sustainability_bonus(product),
@@ -111,6 +155,7 @@ def rank_candidates(
         )
         score = (
             weights.style * breakdown.style_similarity
+            + weights.attribute * breakdown.attribute_match
             + weights.budget * breakdown.budget_fit
             + weights.lead_time * breakdown.lead_time_score
             + weights.sustainability * breakdown.sustainability_bonus

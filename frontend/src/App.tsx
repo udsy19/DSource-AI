@@ -7,6 +7,7 @@ import { CandidateCard } from 'src/CandidateCard';
 
 const WEIGHT_LABELS: { key: keyof MatchResponse['weights_used']; label: string }[] = [
   { key: 'style', label: 'style' },
+  { key: 'attribute', label: 'attribute' },
   { key: 'budget', label: 'budget' },
   { key: 'lead_time', label: 'lead time' },
   { key: 'sustainability', label: 'sustainability' },

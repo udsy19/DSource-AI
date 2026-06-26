@@ -71,8 +71,25 @@ the style term is pool-relative. TDD: `test_style_query_best_photo_outranks_stro
 Live check (`warm matte terracotta`, real 80-product catalog): best photo panel now style **1.000** and #1.
 CLAUDE.md §8 + NOTES.md updated.
 
-## Honest read on the ranker (unchanged thesis, now on both leaves)
-Coarse visual intent works great (plastic/baby/outdoor chairs, wood/tile panels -> rank 1). Fine intra-category attributes still weak (mesh vs high-back office chairs). render-seam gap real: most real chairs + real panels have has_geometry=False (no model_3d) — flagged by /export.
+## ✅ Attribute-aware ranking — fine lexical term added (2026-06-26)
+CLIP clusters on gross visual form, so fine intra-category attributes (mesh vs high-back office chairs)
+get buried. **Fix (user-approved §7/§8 change):** a 5th soft term `attribute_match` = fraction of the
+query's attribute words (stopwords + leaf nouns stripped) the product's own text claims (name + materials +
+finish + colors + text_blob + **category path**). Per-product [0,1], deterministic, no LLM. Implemented in
+`rank.py` (`attribute_match`/`_tokenize`/`_product_tokens`). **Weights rebalanced** (sum=1.0, style+attribute≥0.6
+to keep the calibration guarantee): style 0.45, attribute 0.15, budget 0.20, lead 0.10, sust 0.10. Schema
+(`Weights`+`Breakdown`), config, frontend (breakdown bar + weights row) all updated.
+- **Data fix the term surfaced:** 3 FeltRight felt-tile seed rows had empty `materials` (brand "FeltRight" ≠
+  token "felt") → scored attr 0 and lost to non-tile felt products. Set `materials: PET Felt` (honest); re-seeded.
+- **Scorecard (11 cases incl. new fine-grained `mesh_office`): rel@1=rel@3=rel@5=1.000, MRR=1.000; filter
+  1.000/1.000; 0 violations.** TDD: `test_attribute_term_breaks_visual_ties_lexically`. 77 tests green, mypy+ruff+tsc clean.
+
+## Honest read on the ranker (now coarse visual + fine lexical)
+Coarse visual intent works great (plastic/baby/outdoor chairs, wood/tile panels -> rank 1). Fine intra-category
+attributes are now handled by the lexical `attribute_match` term **when the product text states the attribute**
+(mesh office chairs -> rank 1). Remaining limit: attributes that are visual-only and absent from product text
+(e.g. a specific weave or sheen never written down) still rely on CLIP alone. render-seam gap real: 35/80 products
+have has_geometry=False (no model_3d) — flagged by /export.
 
 ## Standing items
 - Fine-grained ranking needs richer/more-varied data + maybe attribute-aware ranking.

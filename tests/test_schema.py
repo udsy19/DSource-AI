@@ -58,8 +58,9 @@ def test_match_response_echoes_query_and_weights():
         query=line, weights_used=Weights(),
         candidates=[Candidate(
             product_id=p.id, score=0.87, has_geometry=True,
-            breakdown=Breakdown(style_similarity=0.9, budget_fit=0.8, lead_time_score=0.7,
-                                sustainability_bonus=0.5, filters_passed=["category", "budget"]),
+            breakdown=Breakdown(style_similarity=0.9, attribute_match=0.6, budget_fit=0.8,
+                                lead_time_score=0.7, sustainability_bonus=0.5,
+                                filters_passed=["category", "budget"]),
         )],
     )
     assert resp.query.category == "ffe/seating/task-chair"

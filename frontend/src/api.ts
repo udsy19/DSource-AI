@@ -39,6 +39,7 @@ export interface BOQLine {
 
 export interface Breakdown {
   style_similarity: number;
+  attribute_match: number;
   budget_fit: number;
   lead_time_score: number;
   sustainability_bonus: number;
@@ -55,6 +56,7 @@ export interface Candidate {
 
 export interface Weights {
   style: number;
+  attribute: number;
   budget: number;
   lead_time: number;
   sustainability: number;

@@ -30,7 +30,8 @@ def test_post_match_returns_ranked_candidates_with_breakdowns(
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["query"]["category"] == "ffe/seating/task-chair"
-    assert payload["weights_used"]["style"] == 0.5
+    assert payload["weights_used"]["style"] == 0.45
+    assert payload["weights_used"]["attribute"] == 0.15
     candidates = payload["candidates"]
     assert len(candidates) == 2
     scores = [c["score"] for c in candidates]
@@ -38,6 +39,7 @@ def test_post_match_returns_ranked_candidates_with_breakdowns(
     for candidate in candidates:
         assert candidate["hard_pass"] is True
         assert "category" in candidate["breakdown"]["filters_passed"]
+        assert "attribute_match" in candidate["breakdown"]
         assert candidate["has_geometry"] is True
 
 
