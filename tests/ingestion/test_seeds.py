@@ -34,10 +34,15 @@ def test_seeds_yield_valid_products_across_both_leaves() -> None:
     assert by_leaf["ffe/seating/task-chair"] >= 5
 
 
-def test_acoustic_panels_have_required_constraint_fields() -> None:
+def test_spec_acoustic_panels_are_valid() -> None:
+    # Trade/PIM panels declare lab acoustics (NRC + fire rating, priced per sqm). Real
+    # e-commerce panels (Shopify) legitimately lack them — and the hard filter correctly
+    # excludes such panels from NRC-floored BOQ lines (NULL nrc can't prove compliance).
+    # So validate only the panels that actually declare a spec.
     panels = [p for p in _load_all() if p.category == "finishes/acoustic/wall-panel"]
-    for panel in panels:
-        assert panel.attributes.acoustic_nrc is not None
+    spec_panels = [p for p in panels if p.attributes.acoustic_nrc is not None]
+    assert spec_panels  # at least the spec'd panels carry acoustics
+    for panel in spec_panels:
         assert 0.5 <= panel.attributes.acoustic_nrc <= 1.0
         assert panel.attributes.fire_rating is not None
         assert panel.price.unit == "sqm"

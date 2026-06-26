@@ -73,6 +73,38 @@ _OUTDOOR_SET = frozenset(
 )
 
 
+_PANEL = "finishes/acoustic/wall-panel"
+
+_WOOD_PANEL = frozenset(
+    {
+        "feltright:oak-latte-wood-slat-ceiling-panel",
+        "feltright:walnut-wood-slat-ceiling-panel",
+        "feltright:oak-black-wood-wall-panel",
+        "feltright:walnut-wood-wall-panel",
+        "feltright:walnut-wood-wall-panel-1",
+        "feltright:oak-latte-wood-wall-panel",
+        "feltright:oak-latte-wood-wall-panel-1",
+        "feltright:teak-wood-panel-wainscoting",
+        "feltright:walnut-wood-wall-panels-for-office",
+    }
+)
+
+_FELT_TILE = frozenset(
+    {
+        "feltright:9mm-2x2-tile-blank",
+        "feltright:9mm-engraved-2x2-tiles-converge-set-of-8-copy",
+        "feltright:18mm-layered-engraved-2x2-tile-blank-set-of-8",
+        "inhabitliving:cantilever-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:corrugate-smooth-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:method-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:origami-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:kaleidoscope-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:jig-harmonycarv-acoustic-felt-wall-tiles",
+        "inhabitliving:end-grain-harmonycarv-acoustic-felt-wall-tiles",
+    }
+)
+
+
 @dataclass(frozen=True)
 class RankingCase:
     name: str
@@ -92,4 +124,8 @@ def ranking_cases() -> list[RankingCase]:
             "outdoor_set", _CHAIR, "outdoor patio chair and table set", _OUTDOOR_SET
         ),
         RankingCase("garden_set", _CHAIR, "garden furniture set", _OUTDOOR_SET),
+        # finishes/acoustic/wall-panel — real-photo panels (FeltRight + Inhabit)
+        RankingCase("wood_slat_panel", _PANEL, "wood slat acoustic wall panel", _WOOD_PANEL),
+        RankingCase("natural_wood_panel", _PANEL, "natural wood wall panel", _WOOD_PANEL),
+        RankingCase("square_felt_tile", _PANEL, "square felt acoustic tile", _FELT_TILE),
     ]

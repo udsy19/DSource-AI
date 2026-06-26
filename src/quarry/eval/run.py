@@ -152,8 +152,11 @@ def run_eval(session: Session | None = None, k: int | None = None) -> Scorecard:
         }
         # A larger k for ranking so the relevant image-vec product can appear past the BIM fallbacks.
         ranking_k = max(k_value, 60)
+        # The FILTER eval measures the WHERE-clause SET, not a top-k — return EVERY survivor so
+        # recall isn't capped by k when a line legitimately qualifies more than k products.
+        filter_k = db.query(ProductRow).count()
         filter_results = [
-            evaluate_filter_case(case, db, k_value, scope_for) for case in golden_cases()
+            evaluate_filter_case(case, db, filter_k, scope_for) for case in golden_cases()
         ]
         ranking_results = [
             evaluate_ranking_case(case, db, ranking_k) for case in ranking_cases()
