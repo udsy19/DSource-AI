@@ -95,6 +95,12 @@ class ClipProvider:
 
         if isinstance(image, bytes):
             return PILImage.open(BytesIO(image)).convert("RGB")
+        if isinstance(image, str) and image.startswith(("http://", "https://")):
+            import httpx  # noqa: PLC0415
+
+            resp = httpx.get(image, timeout=30, follow_redirects=True)
+            resp.raise_for_status()
+            return PILImage.open(BytesIO(resp.content)).convert("RGB")
         if isinstance(image, (str, Path)):
             return PILImage.open(image).convert("RGB")
         return image.convert("RGB")  # type: ignore[attr-defined]
