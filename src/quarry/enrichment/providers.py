@@ -78,15 +78,25 @@ class ClipProvider:
     dim = _DIM
 
     def __init__(self, model_name: str = "ViT-B-32", pretrained: str = "openai") -> None:
+        # Lazy: constructing a ClipProvider is instant (so it can be registered at app startup
+        # without blocking); the ~10s model load happens on the first embed call.
+        self._model_name = model_name
+        self._pretrained = pretrained
+        self._model: object | None = None
+
+    def _ensure_loaded(self) -> None:
+        if self._model is not None:
+            return
         import open_clip  # type: ignore[import-not-found]  # noqa: PLC0415
         import torch  # type: ignore[import-not-found]  # noqa: PLC0415
 
         self._torch = torch
-        self._model, _, self._preprocess = open_clip.create_model_and_transforms(
-            model_name, pretrained=pretrained
+        model, _, self._preprocess = open_clip.create_model_and_transforms(
+            self._model_name, pretrained=self._pretrained
         )
-        self._model.eval()
-        self._tokenizer = open_clip.get_tokenizer(model_name)
+        model.eval()
+        self._tokenizer = open_clip.get_tokenizer(self._model_name)
+        self._model = model
 
     def _open_image(self, image: object) -> Image:
         from io import BytesIO  # noqa: PLC0415
@@ -106,17 +116,19 @@ class ClipProvider:
         return image.convert("RGB")  # type: ignore[attr-defined]
 
     def embed_text(self, text: str) -> list[float]:
+        self._ensure_loaded()
         tokens = self._tokenizer([text])
         with self._torch.no_grad():
-            features = self._model.encode_text(tokens)
+            features = self._model.encode_text(tokens)  # type: ignore[attr-defined]
             features = features / features.norm(dim=-1, keepdim=True)
         vec: list[float] = features[0].tolist()
         return vec
 
     def embed_image(self, image: object) -> list[float]:
+        self._ensure_loaded()
         tensor = self._preprocess(self._open_image(image)).unsqueeze(0)
         with self._torch.no_grad():
-            features = self._model.encode_image(tensor)
+            features = self._model.encode_image(tensor)  # type: ignore[attr-defined]
             features = features / features.norm(dim=-1, keepdim=True)
         vec: list[float] = features[0].tolist()
         return vec

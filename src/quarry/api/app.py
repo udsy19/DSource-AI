@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 from uuid import UUID
 
@@ -7,15 +9,27 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import ProductRow, get_session
+from ..enrichment import register_default_provider
 from ..export import RenderExport, build_render_export
 from ..matching import match
 from ..schema import BOQLine, MatchResponse
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Register the embedding provider so style-intent queries resolve. Instant — the CLIP model
+    # loads lazily on the first style query, not here.
+    register_default_provider(settings.embed_provider)
+    yield
+
 
 app = FastAPI(
     title="Quarry — digital product library (resolver)",
     version="0.1.0",
     description="BOQ line -> ranked real products. Hard filter, then deterministic rank.",
+    lifespan=lifespan,
 )
 
 SessionDep = Annotated[Session, Depends(get_session)]

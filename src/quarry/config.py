@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # pgvector column width — Agent B's default provider (open_clip ViT-B/32) emits 512.
     embed_dim: int = 512
 
+    # Embedding provider registered at API startup ("clip" for real text->image style ranking,
+    # "stub" for a deterministic offline provider). CLIP loads lazily on first style query.
+    embed_provider: str = "clip"
+
     match_k: int = 20
     weight_style: float = 0.5
     weight_budget: float = 0.2
