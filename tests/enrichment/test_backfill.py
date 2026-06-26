@@ -17,7 +17,7 @@ def test_backfill_fills_null_vectors(session: Session, provider: StubProvider) -
 
     counts = backfill_vectors(session, provider)
 
-    assert counts == {"text_filled": 2, "image_filled": 2, "skipped": 0}
+    assert counts == {"text_filled": 2, "image_filled": 2, "image_failed": 0, "skipped": 0}
     for row in rows:
         session.refresh(row)
         assert row.text_vec is not None and len(row.text_vec) == 512
@@ -32,7 +32,7 @@ def test_backfill_is_idempotent(session: Session, provider: StubProvider) -> Non
     second = backfill_vectors(session, provider)
 
     assert first["text_filled"] == 1
-    assert second == {"text_filled": 0, "image_filled": 0, "skipped": 0}
+    assert second == {"text_filled": 0, "image_filled": 0, "image_failed": 0, "skipped": 0}
 
 
 def test_backfill_skips_image_when_no_media(session: Session, provider: StubProvider) -> None:
@@ -42,7 +42,7 @@ def test_backfill_skips_image_when_no_media(session: Session, provider: StubProv
 
     counts = backfill_vectors(session, provider)
 
-    assert counts == {"text_filled": 1, "image_filled": 0, "skipped": 0}
+    assert counts == {"text_filled": 1, "image_filled": 0, "image_failed": 0, "skipped": 0}
     session.refresh(row)
     assert row.text_vec is not None
     assert row.image_vec is None

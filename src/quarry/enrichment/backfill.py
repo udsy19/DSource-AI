@@ -6,11 +6,15 @@ columns; this job is what makes them non-null.
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from quarry.db import ProductRow
 from quarry.enrichment.provider import EmbeddingProvider, get_provider
+
+logger = logging.getLogger(__name__)
 
 
 def _primary_image(media: dict[str, object]) -> str | None:
@@ -36,6 +40,7 @@ def backfill_vectors(
 
     text_filled = 0
     image_filled = 0
+    image_failed = 0
     skipped = 0
 
     for row in session.execute(query).scalars():
@@ -49,12 +54,23 @@ def backfill_vectors(
         if row.image_vec is None:
             image = _primary_image(row.media or {})
             if image is not None:
-                row.image_vec = provider.embed_image(image)
-                image_filled += 1
-                changed = True
+                try:
+                    row.image_vec = provider.embed_image(image)
+                    image_filled += 1
+                    changed = True
+                except Exception as exc:  # noqa: BLE001 -- image fetch/decode boundary
+                    # Dead URL or undecodable image: leave image_vec NULL (§8 falls back to
+                    # text_vec) rather than abort the whole backfill.
+                    image_failed += 1
+                    logger.warning("image embed failed for %s: %s", row.source_ref, exc)
 
         if not changed:
             skipped += 1
 
     session.commit()
-    return {"text_filled": text_filled, "image_filled": image_filled, "skipped": skipped}
+    return {
+        "text_filled": text_filled,
+        "image_filled": image_filled,
+        "image_failed": image_failed,
+        "skipped": skipped,
+    }

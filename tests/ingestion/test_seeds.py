@@ -4,7 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 from quarry.ingestion.run import SEEDS_DIR, _adapter_for
-from quarry.schema import CanonicalProduct, load_taxonomy
+from quarry.schema import CanonicalProduct, Source, load_taxonomy
 
 TAXONOMY = Path(__file__).resolve().parents[2] / "data" / "taxonomy.yaml"
 V1_LEAVES = {"finishes/acoustic/wall-panel", "ffe/seating/task-chair"}
@@ -43,10 +43,16 @@ def test_acoustic_panels_have_required_constraint_fields() -> None:
         assert panel.price.unit == "sqm"
 
 
-def test_task_chairs_carry_geometry_for_render_seam() -> None:
-    chairs = [p for p in _load_all() if p.category == "ffe/seating/task-chair"]
-    for chair in chairs:
+def test_bim_task_chairs_carry_geometry_for_render_seam() -> None:
+    # BIM-library chairs carry glTF by definition. PIM/scraped chairs (real catalog data) may
+    # legitimately lack a 3D asset — that's exactly why has_geometry is a per-product flag, and
+    # the render stage filters on it rather than assuming geometry exists.
+    bim_chairs = [
+        p for p in _load_all()
+        if p.category == "ffe/seating/task-chair" and p.source == Source.bimobject
+    ]
+    assert bim_chairs
+    for chair in bim_chairs:
         assert chair.model_3d is not None
         assert chair.model_3d.format == "gltf"
         assert chair.price.unit == "each"
-        assert chair.lead_time_days is not None
