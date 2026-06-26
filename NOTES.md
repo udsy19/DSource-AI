@@ -27,5 +27,19 @@ edit the contract. The orchestrator adjudicates.
   text-search). Eval's prior image-vec restriction workaround removed — match() now handles mixed
   catalogs. Approved by the user before editing the contract.
 
+- **2026-06-26 — §8 style term normalized within the survivor pool (user-approved contract
+  change).** Was a per-product absolute `cosine(style_vec, p.image_vec)` mapped to [0,1]; now
+  min-max normalized ACROSS the pool so the best visual match earns ~1.0 relative. Reason: raw
+  CLIP text→image cosine is compressed into ~0.55-0.68 — too weak to win a style query against the
+  other [0,1] terms (budget/lead/sustainability). A no-photo product that was cheaper/greener/
+  faster could out-rank the true best visual match on a STYLE query, which is backwards. Pool min-
+  max fixes calibration without touching the other terms: products with no `image_vec` stay 0.0; a
+  single/all-equal-photo pool collapses to 1.0 each. `breakdown.style_similarity` now reports the
+  normalized value (it both drives and explains the score). Implemented as
+  `rank.rank_candidates(pool, ...)` (replaces the per-product `score_candidate`). No schema change.
+  Scorecard improved: ranking MRR 0.950 → **1.000**, rel@3/rel@5 = 1.0; filter 1.000/1.000, 0
+  violations. Regression test: `test_style_query_best_photo_outranks_strong_no_photo`. Approved by
+  the user before editing the contract.
+
 ## Requests
 (none yet)

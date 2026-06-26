@@ -60,6 +60,17 @@ Built via 3 concurrent subagents + orchestrator integration. **Catalog now 80 pr
 - ✅ **Panel leaf UNBLOCKED:** research found real photographed+priced acoustic panels on Shopify (FeltRight, Inhabit Living). Harvested 24 -> `data/seeds/real_acoustic_panels.csv`, backfilled real image_vec. **text->image now works on BOTH leaves** (wood-slat query->wood panels, tile->tiles).
 - ✅ **Eval covers both leaves:** added 3 panel ranking cases; fixed the filter eval to return ALL survivors (k=catalog size — recall was capped by ranking top-k once a line qualified >20 products). **Aggregate: filter 1.000/1.000, ranking rel@3=1.0 MRR=0.950, 0 violations.**
 
+## ✅ Style calibration fixed — pool-relative normalization (2026-06-26)
+Raw CLIP text→image cosine is compressed (~0.55-0.68 for a good match), so on a STYLE query a
+no-photo product that was cheaper/greener/faster could out-rank the true best visual match — backwards.
+**Fix (user-approved §8 change):** min-max normalize the style term WITHIN the survivor pool so the best
+photo earns ~1.0 relative; no-photo → 0.0; single/all-equal photo → 1.0. Implemented as
+`rank.rank_candidates(pool, ...)` (replaced per-product `score_candidate`); `service.match` calls it; only
+the style term is pool-relative. TDD: `test_style_query_best_photo_outranks_strong_no_photo`.
+**Scorecard improved:** ranking MRR 0.950 → **1.000**, rel@3/rel@5 = 1.0; filter 1.000/1.000, 0 violations.
+Live check (`warm matte terracotta`, real 80-product catalog): best photo panel now style **1.000** and #1.
+CLAUDE.md §8 + NOTES.md updated.
+
 ## Honest read on the ranker (unchanged thesis, now on both leaves)
 Coarse visual intent works great (plastic/baby/outdoor chairs, wood/tile panels -> rank 1). Fine intra-category attributes still weak (mesh vs high-back office chairs). render-seam gap real: most real chairs + real panels have has_geometry=False (no model_3d) — flagged by /export.
 

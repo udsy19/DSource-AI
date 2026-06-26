@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -72,6 +74,37 @@ def test_style_path_ranks_by_similarity(session: Session) -> None:
     assert ranked.index(orthogonal.id) < ranked.index(opposite.id)
     aligned_bd = next(c for c in resp.candidates if c.product_id == aligned.id).breakdown
     assert aligned_bd.style_similarity == pytest.approx(1.0)
+
+
+def _partial_match(cosine: float = 0.3) -> list[float]:
+    """A unit vector whose cosine with axis_vector(0) is `cosine` — i.e. a real-but-imperfect
+    visual match, sitting in CLIP's compressed text->image band rather than a clean 1.0."""
+    vec = axis_vector(0)
+    vec[0] = cosine
+    vec[1] = math.sqrt(1.0 - cosine * cosine)
+    return vec
+
+
+def test_style_query_best_photo_outranks_strong_no_photo(session: Session) -> None:
+    """On a STYLE query the best visual match must win — even when a no-photo spec'd product is
+    cheaper, greener, and faster. Raw CLIP cosine is too compressed (a good match scores ~0.65,
+    not a confident 1.0) to overcome the other terms on its own, so the style term is normalized
+    WITHIN the survivor pool: the best photo earns ~1.0 relative. (calibration, §8)."""
+    enrichment.set_provider(StubProvider({"warm matte terracotta": axis_vector(0)}))
+    # The best visual match — but, like real Shopify catalog data, no certs/EPD/lead and pricey.
+    photo = insert_product(
+        session, price_amount=950.0, lead_time_days=None, image_vec=_partial_match(0.2),
+    )
+    # No photo, but a spec'd product strong on every other term (cheap, green, fast).
+    insert_product(
+        session, price_amount=100.0, has_epd=True, certifications=["GREENGUARD"],
+        embodied_carbon=10.0, lead_time_days=5,
+    )
+    line = _chair_line(style_intent=StyleIntent(text="warm matte terracotta"))
+    resp = match(line, session=session)  # DEFAULT weights (style 0.5 + nonzero others)
+    assert resp.candidates[0].product_id == photo.id  # the visual match wins the style query
+    photo_bd = next(c for c in resp.candidates if c.product_id == photo.id).breakdown
+    assert photo_bd.style_similarity == pytest.approx(1.0)  # best photo normalized to ~1.0
 
 
 def test_precomputed_vector_used_without_provider(session: Session) -> None:

@@ -208,20 +208,29 @@ def match(line: BOQLine, weights=DEFAULT_WEIGHTS, k=20) -> MatchResponse:
     )
 
     # 3. SOFT RANK (deterministic) over the survivors
+    raw_style = {
+        p: cosine(style_vec, p.image_vec) if (style_vec and p.image_vec) else None
+        for p in pool
+    }
+    # ^ amended 2026-06-25: style is VISUAL — match against image_vec only. The old
+    #   `image_vec or text_vec` fallback mixed CLIP modality scales (text-text ~0.84 vs
+    #   text-image ~0.30) and buried image-matched products. None = no visual evidence.
+    style_similarity = minmax_normalize_over_pool(raw_style)
+    # ^ amended 2026-06-26: normalize the style term WITHIN the survivor pool, so the best
+    #   visual match earns ~1.0 RELATIVE, not an absolute ~0.28. Raw CLIP text->image cosine is
+    #   compressed (a good match maps to ~0.55-0.68) — too weak to win a style query against the
+    #   other [0,1] terms, yet on a style query the best photo SHOULD win. No-photo products stay
+    #   0.0; a single/all-equal photo pool -> 1.0. See NOTES.md.
     for p in pool:
-        style_similarity = cosine(style_vec, p.image_vec) if (style_vec and p.image_vec) else 0.0
-        # ^ amended 2026-06-25: style is VISUAL — match against image_vec only. The old
-        #   `image_vec or text_vec` fallback mixed CLIP modality scales (text-text ~0.84 vs
-        #   text-image ~0.30) and buried image-matched products. See NOTES.md.
         budget_fit       = headroom_score(p.effective_price, line.budget_ceiling)
         lead_time_score  = lead_time_score(p.lead_time_days)
         sustainability   = sustainability_bonus(p.sustainability)
-        score = weighted_sum(...)      # weights are explicit + returned
+        score = weighted_sum(style_similarity[p], budget_fit, ...)  # weights explicit + returned
 
     return top-k with full breakdown
 ```
 
-Rules: hard filter is a `WHERE` clause, never a soft penalty. If `style_vec` is `None`, rank on the remaining terms (don't fabricate similarity). Always return the breakdown.
+Rules: hard filter is a `WHERE` clause, never a soft penalty. If `style_vec` is `None` (or no product has a photo), every `style_similarity` is `0.0` — rank on the remaining terms (don't fabricate similarity). The style term is the only pool-relative term; all others are per-product. Always return the breakdown.
 
 ---
 

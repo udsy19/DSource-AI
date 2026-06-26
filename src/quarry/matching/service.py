@@ -11,7 +11,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..schema import BOQLine, MatchResponse, Weights
 from .filter import applied_filters, hard_filter
-from .rank import score_candidate
+from .rank import rank_candidates
 
 
 def resolve_style_vec(line: BOQLine) -> list[float] | None:
@@ -51,10 +51,7 @@ def match(
     style_vec = resolve_style_vec(line)
     filters_passed = applied_filters(line)
 
-    candidates = [
-        score_candidate(product, line, style_vec, weights_used, filters_passed)
-        for product in survivors
-    ]
+    candidates = rank_candidates(survivors, line, style_vec, weights_used, filters_passed)
     # Deterministic order: score desc, ties broken by product_id so the order is stable.
     candidates.sort(key=lambda c: (-c.score, str(c.product_id)))
 
