@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from .boq import BOQLine
 
@@ -24,6 +24,13 @@ class Weights(BaseModel):
     budget: float = 0.2
     lead_time: float = 0.1
     sustainability: float = 0.1
+
+    @model_validator(mode="after")
+    def _sum_to_one(self) -> Weights:
+        total = self.style + self.attribute + self.budget + self.lead_time + self.sustainability
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(f"weights must sum to 1.0 (score stays in [0,1]); got {total:.4f}")
+        return self
 
 
 DEFAULT_WEIGHTS = Weights()

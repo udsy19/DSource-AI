@@ -56,7 +56,7 @@ def test_every_candidate_has_populated_breakdown(session: Session) -> None:
 
 def test_weights_are_echoed(session: Session) -> None:
     insert_product(session)
-    weights = Weights(style=0.7, budget=0.1, lead_time=0.1, sustainability=0.1)
+    weights = Weights(style=0.6, attribute=0.1, budget=0.1, lead_time=0.1, sustainability=0.1)
     resp = match(_chair_line(), weights=weights, session=session)
     assert resp.weights_used == weights
 
@@ -67,7 +67,7 @@ def test_style_path_ranks_by_similarity(session: Session) -> None:
     orthogonal = insert_product(session, image_vec=axis_vector(1))
     opposite = insert_product(session, image_vec=axis_vector(0, magnitude=-1.0))
     line = _chair_line(style_intent=StyleIntent(text="warm terracotta"))
-    resp = match(line, weights=Weights(style=1.0, budget=0, lead_time=0, sustainability=0),
+    resp = match(line, weights=Weights(style=1.0, attribute=0, budget=0, lead_time=0, sustainability=0),
                  session=session)
     ranked = [c.product_id for c in resp.candidates]
     assert ranked[0] == aligned.id
@@ -127,7 +127,7 @@ def test_precomputed_vector_used_without_provider(session: Session) -> None:
     aligned = insert_product(session, image_vec=axis_vector(2))
     other = insert_product(session, image_vec=axis_vector(3))
     line = _chair_line(style_intent=StyleIntent(precomputed_vector=axis_vector(2)))
-    resp = match(line, weights=Weights(style=1.0, budget=0, lead_time=0, sustainability=0),
+    resp = match(line, weights=Weights(style=1.0, attribute=0, budget=0, lead_time=0, sustainability=0),
                  session=session)
     assert resp.candidates[0].product_id == aligned.id
     assert next(c for c in resp.candidates if c.product_id == other.id) is not None
@@ -137,7 +137,8 @@ def test_no_style_path_zero_similarity_ranks_on_other_terms(session: Session) ->
     cheap = insert_product(session, price_amount=100.0, lead_time_days=5)
     pricey = insert_product(session, price_amount=900.0, lead_time_days=80)
     line = _chair_line()  # empty style_intent
-    resp = match(line, weights=Weights(style=0.5, budget=0.3, lead_time=0.2, sustainability=0.0),
+    resp = match(line, weights=Weights(style=0.5, attribute=0, budget=0.3, lead_time=0.2,
+                                       sustainability=0.0),
                  session=session)
     for candidate in resp.candidates:
         assert candidate.breakdown.style_similarity == 0.0
@@ -148,7 +149,7 @@ def test_no_style_path_zero_similarity_ranks_on_other_terms(session: Session) ->
 def test_image_vec_preferred_over_text_vec(session: Session) -> None:
     product = insert_product(session, image_vec=axis_vector(4), text_vec=axis_vector(5))
     line = _chair_line(style_intent=StyleIntent(precomputed_vector=axis_vector(4)))
-    resp = match(line, weights=Weights(style=1.0, budget=0, lead_time=0, sustainability=0),
+    resp = match(line, weights=Weights(style=1.0, attribute=0, budget=0, lead_time=0, sustainability=0),
                  session=session)
     bd = next(c for c in resp.candidates if c.product_id == product.id).breakdown
     assert bd.style_similarity == pytest.approx(1.0)

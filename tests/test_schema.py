@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from quarry.schema import (
     BOQLine,
     BudgetCeiling,
@@ -65,6 +68,13 @@ def test_match_response_echoes_query_and_weights():
     )
     assert resp.query.category == "ffe/seating/task-chair"
     assert resp.candidates[0].breakdown.filters_passed  # auditable: why it passed
+
+
+def test_weights_must_sum_to_one():
+    """Score is a weighted sum that must stay in [0,1]; weights not summing to 1.0 are rejected."""
+    Weights(style=0.5, attribute=0.2, budget=0.1, lead_time=0.1, sustainability=0.1)  # exactly 1.0
+    with pytest.raises(ValidationError):
+        Weights(style=0.9, attribute=0.5, budget=0.1, lead_time=0.1, sustainability=0.1)  # 1.7
 
 
 def test_taxonomy_loads_and_knows_v1_leaves():
