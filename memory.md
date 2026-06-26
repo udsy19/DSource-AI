@@ -44,8 +44,21 @@ CLIP enabled (open-clip-torch/torch/pillow). Key learning: **text→text CLIP is
 - **Honest read:** ranker chooses well on **coarse visual intent** (plastic→plastic, "chair for a child"→baby chairs, outdoor→sets at rank 1) but is **weak on fine intra-category attributes** (mesh vs high-back office chairs land rank ~18–27). Cause: plastic-dominated catalog + CLIP clustering on gross form. So Quarry is a product for coarse semantic retrieval; fine discrimination needs richer data (more office chairs w/ photos) and possibly attribute-aware ranking.
 - **✅ §8 AMENDED (user-approved 2026-06-25):** `style_similarity = cosine(style_vec, p.image_vec)` only (was `image_vec OR text_vec`); image-less product → style 0.0. Fixes the CLIP modality-scale mix (text→text ~0.84 buried text→image ~0.30). CLAUDE.md §8 + NOTES.md updated; scorecard unchanged (rank rel@3=1.0, MRR=0.929); 0 regressions.
 - **✅ /boq seam (Phase 6 upstream):** `POST /boq {lines:[BOQLine]} -> {results:[MatchResponse]}` — resolve a whole BOQ, one ranked+audited MatchResponse per line, hard constraints per line, order preserved. Reuses the frozen types + the `/match` resolver. Live-verified on the 56-product catalog.
-- **acoustic-panel leaf:** still no real-image source → text-only, ranking untestable there.
-- **Remaining:** Phase 6 render-export seam (emit selected products' model_3d refs for stage 5); richer chair data for fine-grained ranking; Phase 5 thin UI (held). Note: most real chairs have has_geometry=False (no model_3d) — real render-seam gap.
+## Finishing pass (2026-06-25) — parallel agents A/B/C + integration
+
+Built via 3 concurrent subagents + orchestrator integration. **Catalog now 80 products** (50 chairs, 30 panels; 68 with real image_vec). 75 tests green, mypy strict + ruff clean.
+- ✅ **Render-export seam (Phase 6 downstream):** `POST /export {product_ids}` -> `RenderExport {assets[{model_3d,has_geometry}], missing_geometry, not_found}` (the §2 half-match flag). `src/quarry/export/`. 5 tests.
+- ✅ **Thin review UI (Phase 5):** `frontend/` Vite+React+TS — BOQ form -> /match -> ranked cards (score, has_geometry badge, breakdown bars, filters_passed chips, per-candidate /products/{id}). Minimal design system per `frontend-style.md`; a11y. tsc+build clean. (Not browser-tested — verify by running.)
+- ✅ **Panel leaf UNBLOCKED:** research found real photographed+priced acoustic panels on Shopify (FeltRight, Inhabit Living). Harvested 24 -> `data/seeds/real_acoustic_panels.csv`, backfilled real image_vec. **text->image now works on BOTH leaves** (wood-slat query->wood panels, tile->tiles).
+- ✅ **Eval covers both leaves:** added 3 panel ranking cases; fixed the filter eval to return ALL survivors (k=catalog size — recall was capped by ranking top-k once a line qualified >20 products). **Aggregate: filter 1.000/1.000, ranking rel@3=1.0 MRR=0.950, 0 violations.**
+
+## Honest read on the ranker (unchanged thesis, now on both leaves)
+Coarse visual intent works great (plastic/baby/outdoor chairs, wood/tile panels -> rank 1). Fine intra-category attributes still weak (mesh vs high-back office chairs). render-seam gap real: most real chairs + real panels have has_geometry=False (no model_3d) — flagged by /export.
+
+## Standing items
+- Fine-grained ranking needs richer/more-varied data + maybe attribute-aware ranking.
+- Real 3D assets (model_3d) for the render seam — none of the real catalog has them.
+- Phase 5 UI not browser-verified.
 
 ## V1 COMPLETE — all four agents merged, DoD §12 met (2026-06-25)
 
