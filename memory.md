@@ -27,12 +27,20 @@ A **digital product library / resolver** — `match(BOQLine) -> ranked real prod
 ## How to run
 
 ```
+./run.sh                  # ROBUST one-command: Postgres + migrate + seed-if-empty + API :8000 + UI :5173
+./run.sh seed             # just (re)seed the catalog (ingest + CLIP backfill)
+./run.sh api              # Postgres + backend only
+```
+Manual / piecemeal:
+```
 docker compose up -d                     # Postgres 16 + pgvector on :5433
 uv sync                                  # venv + deps (Python 3.12)
 uv run alembic upgrade head              # apply migration
-uv run pytest tests/ -q                  # contract tests
-uv run mypy                              # strict on schema + matching
-uv run uvicorn quarry.api:app --reload   # serve /healthz, /match (501 until Agent C)
+uv run python scripts/seed.py            # ingest seeds + CLIP backfill (idempotent)
+uv run pytest tests/ -q                  # 75 tests
+uv run mypy && uv run ruff check src     # strict on schema+matching; lint
+uv run uvicorn quarry.api:app --port 8000 --reload   # /match /boq /export /products /healthz
+uv run --with playwright python scripts/browser_smoke.py  # headless-browser UI test (servers up)
 ```
 DB URL: `postgresql+psycopg://quarry:quarry@localhost:5433/quarry` (config default; override via `DATABASE_URL`).
 
