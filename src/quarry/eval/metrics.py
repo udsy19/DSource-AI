@@ -1,9 +1,17 @@
-"""Retrieval metrics + an independent hard-constraint re-check (Agent D, §9).
+"""Retrieval metrics + an independent re-implementation of the §8 hard constraints (Agent D).
 
-``precision_at_k`` / ``recall_at_k`` are pure set math over stable keys. ``hard_constraint_violations``
-does NOT trust the matcher: it re-derives, for one returned product, whether it satisfies the line's
-hard constraints (§8 step 1) using the same A>B>C fire order and exact-cert semantics as the filter.
-Any product the matcher returned that fails here is a contract breach the eval must fail loudly on.
+The eval never trusts the matcher to define correctness. ``satisfies(line, product)`` re-derives, in
+plain Python, whether one product clears a line's hard constraints (§8 step 1) — same A>B>C fire
+order, exact-cert semantics, NULL-dimension-passes rule, and per_unit/total budget basis as the SQL
+filter. From it we build BOTH halves of the filter eval:
+
+* the *ground truth* for a line is every current-catalog product for which ``satisfies`` is true, so
+  precision/recall hold on a catalog of any size (no hardcoded expected sets);
+* the *violation check* re-runs the per-constraint predicates on every returned product and reports
+  each breach by name, so a contract violation fails the run loudly.
+
+Ranking metrics (``relevant_at_k`` / ``mrr``) score an ordered list of retrieved keys against a
+hand-labelled relevant set — they measure the text->image style ranker, not the hard filter.
 """
 
 from __future__ import annotations
@@ -42,6 +50,19 @@ def recall_at_k(retrieved_keys: Sequence[str], expected_keys: frozenset[str], k:
     return hits / len(expected_keys)
 
 
+def relevant_at_k(retrieved_keys: Sequence[str], relevant_keys: frozenset[str], k: int) -> float:
+    """1.0 if at least one relevant key sits in the top-k, else 0.0 — the ranking hit rate."""
+    return 1.0 if any(key in relevant_keys for key in retrieved_keys[:k]) else 0.0
+
+
+def mrr(retrieved_keys: Sequence[str], relevant_keys: frozenset[str]) -> float:
+    """Reciprocal rank of the first relevant key (1/rank); 0.0 if none retrieved."""
+    for index, key in enumerate(retrieved_keys, start=1):
+        if key in relevant_keys:
+            return 1.0 / index
+    return 0.0
+
+
 @dataclass(frozen=True)
 class Violation:
     product_key: str
@@ -55,61 +76,71 @@ def _effective_price(product: ProductRow, line: BOQLine) -> float:
     return product.price_amount
 
 
+def constraint_breaches(
+    line: BOQLine,
+    product: ProductRow,
+    categories_in_scope: Sequence[str],
+) -> list[Violation]:
+    """Every hard constraint this product breaches, by name. Empty list => the product satisfies the
+    line. This is the single source of truth for both ``satisfies`` and the violation re-check."""
+    key = product.source_ref
+    breaches: list[Violation] = []
+
+    if product.category not in categories_in_scope:
+        breaches.append(
+            Violation(key, "category", f"{product.category} not in {list(categories_in_scope)}")
+        )
+
+    if line.envelope is not None:
+        env = line.envelope
+        for axis, value, ceiling in (
+            ("w", product.dim_w, env.max_w),
+            ("d", product.dim_d, env.max_d),
+            ("h", product.dim_h, env.max_h),
+        ):
+            if ceiling is not None and value is not None and value > ceiling:
+                breaches.append(Violation(key, "envelope", f"dim_{axis} {value} > max {ceiling}"))
+
+    price = _effective_price(product, line)
+    if price > line.budget_ceiling.amount:
+        breaches.append(
+            Violation(key, "budget", f"effective {price} > ceiling {line.budget_ceiling.amount}")
+        )
+
+    missing = [c for c in line.required_certs if c not in product.certifications]
+    if missing:
+        breaches.append(Violation(key, "certifications", f"missing {missing}"))
+
+    min_nrc = line.hard_constraints.min_acoustic_nrc
+    if min_nrc is not None and (product.acoustic_nrc is None or product.acoustic_nrc < min_nrc):
+        breaches.append(Violation(key, "acoustic_nrc", f"nrc {product.acoustic_nrc} < min {min_nrc}"))
+
+    fire_min = line.hard_constraints.fire_rating_min
+    if fire_min is not None:
+        floor = _fire_rank(fire_min)
+        actual = _fire_rank(product.fire_rating)
+        if actual is None or (floor is not None and actual < floor):
+            breaches.append(
+                Violation(key, "fire_rating", f"{product.fire_rating} below min {fire_min}")
+            )
+
+    return breaches
+
+
+def satisfies(line: BOQLine, product: ProductRow, categories_in_scope: Sequence[str]) -> bool:
+    """Independent re-implementation of §8 step 1: does this product clear every hard constraint?"""
+    return not constraint_breaches(line, product, categories_in_scope)
+
+
 def hard_constraint_violations(
     line: BOQLine,
     retrieved: Sequence[ProductRow],
     categories_in_scope: Sequence[str],
 ) -> list[Violation]:
     """Re-check every returned product against the line's hard constraints, independently of the
-    matcher. Returns one Violation per breached constraint; an empty list means the pool is clean.
-
-    ``categories_in_scope`` is the requested category plus its descendant leaves (the matcher's own
-    scope), so a product in a sibling leaf is flagged rather than silently accepted.
-    """
-    violations: list[Violation] = []
-    for product in retrieved:
-        key = product.source_ref
-
-        if product.category not in categories_in_scope:
-            violations.append(
-                Violation(key, "category", f"{product.category} not in {list(categories_in_scope)}")
-            )
-
-        if line.envelope is not None:
-            env = line.envelope
-            for axis, value, ceiling in (
-                ("w", product.dim_w, env.max_w),
-                ("d", product.dim_d, env.max_d),
-                ("h", product.dim_h, env.max_h),
-            ):
-                if ceiling is not None and value is not None and value > ceiling:
-                    violations.append(
-                        Violation(key, "envelope", f"dim_{axis} {value} > max {ceiling}")
-                    )
-
-        price = _effective_price(product, line)
-        if price > line.budget_ceiling.amount:
-            violations.append(
-                Violation(key, "budget", f"effective {price} > ceiling {line.budget_ceiling.amount}")
-            )
-
-        missing = [c for c in line.required_certs if c not in product.certifications]
-        if missing:
-            violations.append(Violation(key, "certifications", f"missing {missing}"))
-
-        min_nrc = line.hard_constraints.min_acoustic_nrc
-        if min_nrc is not None and (product.acoustic_nrc is None or product.acoustic_nrc < min_nrc):
-            violations.append(
-                Violation(key, "acoustic_nrc", f"nrc {product.acoustic_nrc} < min {min_nrc}")
-            )
-
-        fire_min = line.hard_constraints.fire_rating_min
-        if fire_min is not None:
-            floor = _fire_rank(fire_min)
-            actual = _fire_rank(product.fire_rating)
-            if actual is None or (floor is not None and actual < floor):
-                violations.append(
-                    Violation(key, "fire_rating", f"{product.fire_rating} below min {fire_min}")
-                )
-
-    return violations
+    matcher. One Violation per breached constraint; an empty list means the pool is clean."""
+    return [
+        breach
+        for product in retrieved
+        for breach in constraint_breaches(line, product, categories_in_scope)
+    ]

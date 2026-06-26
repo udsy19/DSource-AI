@@ -1,8 +1,8 @@
-"""Unit tests for precision/recall math and the independent hard-constraint re-check.
+"""Pure unit tests for the eval metric functions — no DB, no model.
 
-Synthetic key sets exercise the metric edges (empty, partial, perfect, over-fetch). The violation
-check is fed deliberately-bad and known-good ProductRows so we prove it flags breaches and clears
-compliant products without touching the DB.
+precision/recall/relevant@k/MRR run on synthetic key lists. The hard-constraint re-implementation
+(``satisfies`` / ``hard_constraint_violations``) runs on hand-built ProductRows so we prove it flags
+every breach and clears compliant products without touching the DB.
 """
 
 from __future__ import annotations
@@ -12,8 +12,11 @@ from uuid import uuid4
 from quarry.db import ProductRow
 from quarry.eval.metrics import (
     hard_constraint_violations,
+    mrr,
     precision_at_k,
     recall_at_k,
+    relevant_at_k,
+    satisfies,
 )
 from quarry.schema import (
     BOQLine,
@@ -49,16 +52,11 @@ def _row(**overrides: object) -> ProductRow:
 
 
 def test_precision_counts_only_expected_in_top_k() -> None:
-    retrieved = ["a", "b", "c", "d"]
-    expected = frozenset({"a", "c"})
-    assert precision_at_k(retrieved, expected, k=4) == 0.5
+    assert precision_at_k(["a", "b", "c", "d"], frozenset({"a", "c"}), k=4) == 0.5
 
 
 def test_precision_respects_k_cutoff() -> None:
-    retrieved = ["a", "x", "y"]
-    expected = frozenset({"a", "z"})
-    # Only the first key is in scope at k=1, and it is expected.
-    assert precision_at_k(retrieved, expected, k=1) == 1.0
+    assert precision_at_k(["a", "x", "y"], frozenset({"a", "z"}), k=1) == 1.0
 
 
 def test_precision_empty_retrieval_is_one() -> None:
@@ -66,23 +64,43 @@ def test_precision_empty_retrieval_is_one() -> None:
 
 
 def test_recall_finds_expected_within_top_k() -> None:
-    retrieved = ["a", "b", "c"]
-    expected = frozenset({"a", "c", "z"})
-    assert recall_at_k(retrieved, expected, k=3) == 2 / 3
+    assert recall_at_k(["a", "b", "c"], frozenset({"a", "c", "z"}), k=3) == 2 / 3
 
 
 def test_recall_misses_expected_beyond_k() -> None:
-    retrieved = ["a", "b", "c"]
-    expected = frozenset({"c"})
     # 'c' is at index 2, outside k=2.
-    assert recall_at_k(retrieved, expected, k=2) == 0.0
+    assert recall_at_k(["a", "b", "c"], frozenset({"c"}), k=2) == 0.0
 
 
 def test_recall_empty_expected_is_one() -> None:
     assert recall_at_k(["a", "b"], frozenset(), k=5) == 1.0
 
 
-def test_violations_clears_a_compliant_product() -> None:
+def test_relevant_at_k_hits_when_relevant_in_top_k() -> None:
+    assert relevant_at_k(["x", "rel", "y"], frozenset({"rel"}), k=3) == 1.0
+
+
+def test_relevant_at_k_misses_when_relevant_below_cutoff() -> None:
+    assert relevant_at_k(["x", "y", "rel"], frozenset({"rel"}), k=2) == 0.0
+
+
+def test_relevant_at_k_zero_when_none_relevant() -> None:
+    assert relevant_at_k(["x", "y"], frozenset({"rel"}), k=5) == 0.0
+
+
+def test_mrr_is_reciprocal_of_first_relevant_rank() -> None:
+    assert mrr(["x", "y", "rel", "rel2"], frozenset({"rel", "rel2"})) == 1 / 3
+
+
+def test_mrr_is_one_when_first_is_relevant() -> None:
+    assert mrr(["rel", "x"], frozenset({"rel"})) == 1.0
+
+
+def test_mrr_is_zero_when_no_relevant() -> None:
+    assert mrr(["x", "y"], frozenset({"rel"})) == 0.0
+
+
+def test_satisfies_true_for_a_compliant_product() -> None:
     line = BOQLine(
         category=_CHAIR,
         quantity=Quantity(value=1),
@@ -91,6 +109,7 @@ def test_violations_clears_a_compliant_product() -> None:
         required_certs=["GREENGUARD Gold"],
         hard_constraints=HardConstraints(fire_rating_min="A"),
     )
+    assert satisfies(line, _row(), _SCOPE)
     assert hard_constraint_violations(line, [_row()], _SCOPE) == []
 
 
@@ -112,6 +131,7 @@ def test_violations_flags_every_breached_constraint() -> None:
         acoustic_nrc=0.5,
         fire_rating="Class C",
     )
+    assert not satisfies(line, bad, _SCOPE)
     constraints = {v.constraint for v in hard_constraint_violations(line, [bad], _SCOPE)}
     assert constraints == {
         "category",
