@@ -209,7 +209,10 @@ def match(line: BOQLine, weights=DEFAULT_WEIGHTS, k=20) -> MatchResponse:
 
     # 3. SOFT RANK (deterministic) over the survivors
     for p in pool:
-        style_similarity = cosine(style_vec, p.image_vec or p.text_vec) if style_vec else 0.0
+        style_similarity = cosine(style_vec, p.image_vec) if (style_vec and p.image_vec) else 0.0
+        # ^ amended 2026-06-25: style is VISUAL — match against image_vec only. The old
+        #   `image_vec or text_vec` fallback mixed CLIP modality scales (text-text ~0.84 vs
+        #   text-image ~0.30) and buried image-matched products. See NOTES.md.
         budget_fit       = headroom_score(p.effective_price, line.budget_ceiling)
         lead_time_score  = lead_time_score(p.lead_time_days)
         sustainability   = sustainability_bonus(p.sustainability)

@@ -26,14 +26,16 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 def style_similarity(style_vec: list[float] | None, product: ProductRow) -> float:
-    """§8: cosine(style_vec, image_vec or text_vec). No style vector => 0.0 (never fabricated).
-    A survivor with no embeddings also scores 0.0 — absence of signal, not a penalty."""
-    if style_vec is None:
+    """§8 (amended 2026-06-25): style is VISUAL — cosine(style_vec, product.image_vec).
+
+    The original `image_vec or text_vec` fallback mixed CLIP's modality scales (text↔text ~0.84
+    vs text↔image ~0.30), letting image-less products bury image-matched ones. Visual style is
+    matched against the product's appearance; a product with no image_vec earns no style signal
+    (0.0 — absence of evidence, not a penalty) and competes on the other terms. text↔text style
+    was measured to be noise, so nothing real is lost. See NOTES.md."""
+    if style_vec is None or product.image_vec is None:
         return 0.0
-    product_vec = product.image_vec if product.image_vec is not None else product.text_vec
-    if product_vec is None:
-        return 0.0
-    return cosine_similarity(style_vec, product_vec)
+    return cosine_similarity(style_vec, product.image_vec)
 
 
 def effective_price(product: ProductRow, line: BOQLine) -> float:

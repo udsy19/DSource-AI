@@ -4,10 +4,12 @@ Each case is a natural-language ``style_intent.text`` query plus a hand-labelled
 Nilkamal chairs (by ``source_ref``) that are genuinely good answers. The runner embeds the query with
 CLIP text and ranks it against the stored ``image_vec`` (text->IMAGE), then scores relevant@k and MRR.
 
-Only the 44 real chairs carry a real ``image_vec``; the 6 synthetic BIM chairs and the panels have a
-NULL ``image_vec`` and fall back to ``text_vec`` (§8), where CLIP text-vs-text similarity dominates
-and is not a fair test of the image ranker. So the runner restricts ranking to image-vec products —
-these cases assert the quality of text->image retrieval over the photographed catalogue.
+Only the 44 real chairs carry a real ``image_vec``. As of the 2026-06-25 §8 amendment, image-less
+products score style_similarity 0.0 (no visual evidence) and drop out of style rankings on their own
+in ``match()`` — so the modality-scale collision that used to bury image-matched products is gone.
+The runner still scopes the ranking metric to image-vec products: this isolates the quality of
+text->image retrieval over the photographed catalogue (the soft ranker's actual job) from the
+budget/lead-time/sustainability terms, rather than working around a match() bug.
 
 Relevant sets were verified against live ``match()`` output before being frozen here; the queries
 chosen are ones the ranker can actually answer (distinct visual categories: plastic, baby, outdoor),
