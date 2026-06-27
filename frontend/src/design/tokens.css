@@ -52,4 +52,23 @@
   --dur-1: 0.18s;
   --dur-2: 0.4s;
   --dur-3: 0.7s;
+
+  /* ── extracted-layout semantics (quiet tints — wall types share one ink/accent family) ── */
+  --wall-drywall:      #6f6a5e;   /* solid partition — warm grey ink */
+  --wall-half-drywall: #9a9385;   /* low partition — lighter grey */
+  --wall-glass:        #7c97a0;   /* glazed — cool muted slate (only non-warm, reads as glass) */
+  --wall-core:         #3c382f;   /* structural core — darkest ink */
+  --wall-perimeter:    #1a1813;   /* building edge — ink */
+  --wall-door:         #b8552f;   /* door — the single accent */
+  --wall-unknown:      #b9b3a3;   /* faint */
+
+  --room-fill:         rgba(26, 24, 19, 0.035);
+  --room-line:         rgba(26, 24, 19, 0.16);
+
+  /* furniture footprints by category — ink family + one accent for seating */
+  --furn-seat:         #b8552f;   /* chair / sofa / stool — accent */
+  --furn-work:         #6f6a5e;   /* desk / workstation / table */
+  --furn-storage:      #54524b;   /* storage / panel / tv */
+  --furn-green:        #6f8a5e;   /* planter — the only foliage tint */
+  --furn-other:        #97917f;   /* other — muted */
 }

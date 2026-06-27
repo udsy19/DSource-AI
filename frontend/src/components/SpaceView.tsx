@@ -3,7 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Component, type ReactNode, useMemo, useState } from "react";
 import * as THREE from "three";
 import { renderView } from "../api";
-import type { Instance, Plan } from "../types";
+import type { ExtractedFurniture, ExtractedLayout, Instance, Plan } from "../types";
 
 /* Guards the WebGL canvas: if the browser/GPU can't start WebGL, show a calm fallback instead of
    crashing the whole Studio (the 2D Plan and every export keep working). */
@@ -43,26 +43,25 @@ const WALL_H = 3.2;
 const ROOM_H = 7;
 const MAX_RENDER = 2500; // safety cap so a pathological plan never freezes the browser
 
-function centroid(boundary: [number, number][]) {
-  const xs = boundary.map((p) => p[0]);
-  const ys = boundary.map((p) => p[1]);
-  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2] as const;
+type World = { cx: number; cy: number; size: number; wx: (x: number) => number; wz: (y: number) => number };
+
+/* map plan (x,y) feet → world (x, z); y is up. Shared by both render modes. */
+function worldFromBounds(minx: number, miny: number, maxx: number, maxy: number): World {
+  const cx = (minx + maxx) / 2;
+  const cy = (miny + maxy) / 2;
+  const size = Math.max(maxx - minx, maxy - miny);
+  return { cx, cy, size, wx: (x) => x - cx, wz: (y) => -(y - cy) };
 }
 
-/* map plan (x,y) feet → world (x, z); y is up. */
 function useWorld(plan: Plan) {
   return useMemo(() => {
-    const [cx, cy] = centroid(plan.boundary);
     const xs = plan.boundary.map((p) => p[0]);
     const ys = plan.boundary.map((p) => p[1]);
-    const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-    const wx = (x: number) => x - cx;
-    const wz = (y: number) => -(y - cy);
-    return { cx, cy, size, wx, wz };
+    return worldFromBounds(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
   }, [plan]);
 }
 
-function Floor({ plan, w, finish }: { plan: Plan; w: ReturnType<typeof useWorld>; finish: typeof FLOORS[number] }) {
+function Floor({ plan, w, finish }: { plan: Plan; w: World; finish: typeof FLOORS[number] }) {
   const geo = useMemo(() => {
     const shape = new THREE.Shape(plan.boundary.map(([x, y]) => new THREE.Vector2(w.wx(x), -w.wz(y))));
     for (const core of plan.cores) {
@@ -78,7 +77,7 @@ function Floor({ plan, w, finish }: { plan: Plan; w: ReturnType<typeof useWorld>
   );
 }
 
-function Walls({ plan, w }: { plan: Plan; w: ReturnType<typeof useWorld> }) {
+function Walls({ plan, w }: { plan: Plan; w: World }) {
   const edges = useMemo(() => {
     const out: { x: number; z: number; len: number; angle: number }[] = [];
     const b = plan.boundary;
@@ -240,6 +239,199 @@ function Sofa({ color, w }: { color: string; w: number }) {
   );
 }
 
+/* small stool: round seat on a slim post */
+function Stool({ color }: { color: string }) {
+  return (
+    <group>
+      <mesh position={[0, 1.5, 0]} castShadow>
+        <cylinderGeometry args={[0.7, 0.7, 0.2, 16]} />
+        <meshStandardMaterial color={color} roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.75, 0]} castShadow>
+        <cylinderGeometry args={[0.1, 0.1, 1.4, 10]} />
+        <meshStandardMaterial color={PEDESTAL} roughness={0.4} metalness={0.45} />
+      </mesh>
+    </group>
+  );
+}
+
+/* tv / screen: a thin dark panel on a small floor stand */
+function Tv({ w, h }: { w: number; h: number }) {
+  const sw = Math.min(Math.max(w, h), 5.5);
+  return (
+    <group>
+      <mesh position={[0, 4, 0]} castShadow>
+        <boxGeometry args={[sw, sw * 0.56, 0.12]} />
+        <meshStandardMaterial color="#23211d" roughness={0.25} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, 1.4, 0]} castShadow>
+        <boxGeometry args={[0.2, 2.8, 0.2]} />
+        <meshStandardMaterial color={LEG} roughness={0.5} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <boxGeometry args={[sw * 0.4, 0.2, 0.8]} />
+        <meshStandardMaterial color={LEG} roughness={0.5} metalness={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+/* storage: a simple cabinet box filling its footprint */
+function Cabinet({ w, h }: { w: number; h: number }) {
+  return (
+    <mesh position={[0, 1.6, 0]} castShadow receiveShadow>
+      <boxGeometry args={[w * 0.9, 3.2, h * 0.9]} />
+      <meshStandardMaterial color={WOOD} roughness={0.6} />
+    </mesh>
+  );
+}
+
+/* panel: a translucent glass partition slab spanning the footprint's long side */
+function GlassPanel({ w, h }: { w: number; h: number }) {
+  const span = Math.max(w, h);
+  return (
+    <mesh position={[0, WALL_H / 2, 0]} castShadow>
+      <boxGeometry args={[span, WALL_H, 0.16]} />
+      <meshStandardMaterial color="#aec4cc" transparent opacity={0.28} roughness={0.1} metalness={0.1} />
+    </mesh>
+  );
+}
+
+/* planter: a small green box */
+function Planter({ w, h }: { w: number; h: number }) {
+  const s = Math.min(w, h, 2.4);
+  return (
+    <group>
+      <mesh position={[0, 0.5, 0]} castShadow>
+        <boxGeometry args={[s, 1.0, s]} />
+        <meshStandardMaterial color="#7d6a4f" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 1.6, 0]} castShadow>
+        <boxGeometry args={[s * 0.95, 1.4, s * 0.95]} />
+        <meshStandardMaterial color="#6f8a5e" roughness={0.95} />
+      </mesh>
+    </group>
+  );
+}
+
+/* a low generic box for unrecognised categories */
+function LowBox({ w, h }: { w: number; h: number }) {
+  return (
+    <mesh position={[0, 0.6, 0]} castShadow receiveShadow>
+      <boxGeometry args={[w * 0.85, 1.2, h * 0.85]} />
+      <meshStandardMaterial color="#b6b2a9" roughness={0.8} />
+    </mesh>
+  );
+}
+
+/* map an extracted-furniture category → existing/new procedural geometry */
+function CategoryPiece({ f, finish }: { f: ExtractedFurniture; finish: string }) {
+  const { category, w, h } = f;
+  switch (category) {
+    case "chair":
+      return <Chair uph={finish} />;
+    case "stool":
+      return <Stool color={finish} />;
+    case "desk":
+    case "workstation":
+      return <Desk w={w} h={h} />;
+    case "table":
+      return <Table w={w} h={h} />;
+    case "sofa":
+      return <Sofa color={finish} w={w} />;
+    case "tv":
+      return <Tv w={w} h={h} />;
+    case "storage":
+      return <Cabinet w={w} h={h} />;
+    case "panel":
+      return <GlassPanel w={w} h={h} />;
+    case "planter":
+      return <Planter w={w} h={h} />;
+    default:
+      return <LowBox w={w} h={h} />;
+  }
+}
+
+/* a wall segment extruded from a polyline; height + material vary by type.
+   glass = translucent, core = darker solid, everything else = solid drywall. */
+function LayoutWalls({ layout, w }: { layout: ExtractedLayout; w: World }) {
+  const segs = useMemo(() => {
+    const out: { x: number; z: number; len: number; angle: number; type: ExtractedLayout["walls"][number]["type"] }[] = [];
+    for (const wall of layout.walls) {
+      for (let i = 0; i < wall.points.length - 1; i++) {
+        const a = wall.points[i];
+        const b = wall.points[i + 1];
+        const ax = w.wx(a[0]), az = w.wz(a[1]), bx = w.wx(b[0]), bz = w.wz(b[1]);
+        const dx = bx - ax, dz = bz - az;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.1) continue;
+        out.push({ x: (ax + bx) / 2, z: (az + bz) / 2, len, angle: -Math.atan2(dz, dx), type: wall.type });
+      }
+    }
+    return out;
+  }, [layout, w]);
+
+  return (
+    <>
+      {segs.map((s, i) => {
+        const glass = s.type === "glass";
+        const half = s.type === "half_drywall";
+        const core = s.type === "core";
+        const h = half ? WALL_H * 0.5 : WALL_H;
+        const thickness = glass ? 0.16 : core ? 0.7 : 0.45;
+        return (
+          <mesh key={i} position={[s.x, h / 2, s.z]} rotation-y={s.angle} castShadow>
+            <boxGeometry args={[s.len + (glass ? 0 : 0.3), h, thickness]} />
+            {glass ? (
+              <meshStandardMaterial color="#aec4cc" transparent opacity={0.26} roughness={0.1} metalness={0.1} />
+            ) : (
+              <meshStandardMaterial color={core ? "#5a564d" : "#efeae0"} roughness={0.9} />
+            )}
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
+
+function LayoutScene({ layout, floor, finish }: {
+  layout: ExtractedLayout; floor: typeof FLOORS[number]; finish: typeof FINISHES[number];
+}) {
+  const [minx, miny, maxx, maxy] = layout.bounds;
+  const w = useMemo(() => worldFromBounds(minx, miny, maxx, maxy), [minx, miny, maxx, maxy]);
+  return (
+    <>
+      <color attach="background" args={["#f4f1ea"]} />
+      <ambientLight intensity={0.85} />
+      <hemisphereLight args={["#fff7ec", "#d8d2c4", 0.55]} />
+      <directionalLight
+        position={[w.size, w.size * 1.4, w.size * 0.6]}
+        intensity={1.25}
+        color="#fff4e6"
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+      />
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[(maxx - minx) * 1.1, (maxy - miny) * 1.1]} />
+        <meshStandardMaterial color={floor.color} roughness={floor.roughness} side={THREE.DoubleSide} />
+      </mesh>
+      <LayoutWalls layout={layout} w={w} />
+      {layout.furniture.slice(0, MAX_RENDER).map((f, i) => (
+        <group
+          key={i}
+          position={[w.wx(f.x + f.w / 2), 0, w.wz(f.y + f.h / 2)]}
+          rotation-y={(-f.rotation * Math.PI) / 180}
+        >
+          <CategoryPiece f={f} finish={finish.color} />
+        </group>
+      ))}
+      <ContactShadows position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.2} opacity={0.3} far={20} />
+      <OrbitControls makeDefault enablePan target={[0, 0, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={20} />
+    </>
+  );
+}
+
 function Piece({ it, finish }: { it: Instance; finish: string }) {
   const { type, w, h } = it;
   const model = MODELS[type];
@@ -333,11 +525,20 @@ function Scene({ plan, instances, floor, finish }: {
   );
 }
 
-export default function SpaceView({ plan, instances }: { plan: Plan; instances: Instance[] }) {
+type SpaceViewProps = { plan: Plan; instances: Instance[] } | { layout: ExtractedLayout };
+
+export default function SpaceView(props: SpaceViewProps) {
   const [floor, setFloor] = useState(FLOORS[0]);
   const [finish, setFinish] = useState(FINISHES[0]);
   const [render, setRender] = useState<null | { busy: boolean; img: string | null; err: string | null }>(null);
-  const { size } = useWorld(plan);
+  const size = "layout" in props
+    ? Math.max(props.layout.bounds[2] - props.layout.bounds[0], props.layout.bounds[3] - props.layout.bounds[1])
+    : worldFromBounds(
+        Math.min(...props.plan.boundary.map((p) => p[0])),
+        Math.min(...props.plan.boundary.map((p) => p[1])),
+        Math.max(...props.plan.boundary.map((p) => p[0])),
+        Math.max(...props.plan.boundary.map((p) => p[1])),
+      ).size;
 
   async function handleRender() {
     const canvas = document.querySelector(".space3d canvas") as HTMLCanvasElement | null;
@@ -361,7 +562,11 @@ export default function SpaceView({ plan, instances }: { plan: Plan; instances: 
           camera={{ position: [size * 0.75, size * 0.7, size * 0.85], fov: 34 }}
           dpr={[1, 2]}
         >
-          <Scene plan={plan} instances={instances} floor={floor} finish={finish} />
+          {"layout" in props ? (
+            <LayoutScene layout={props.layout} floor={floor} finish={finish} />
+          ) : (
+            <Scene plan={props.plan} instances={props.instances} floor={floor} finish={finish} />
+          )}
         </Canvas>
       </WebGLBoundary>
 

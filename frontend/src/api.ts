@@ -75,6 +75,14 @@ export async function cadGeometry(file: File): Promise<import("./types").CadGeom
   return res.json();
 }
 
+export async function ingestCad(file: File): Promise<import("./types").ExtractedLayout> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/ingest/cad", { method: "POST", body: fd });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  return res.json();
+}
+
 interface AltOpts {
   headcount?: number;
   density_rsf_per_person?: number;

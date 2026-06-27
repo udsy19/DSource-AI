@@ -183,3 +183,71 @@ export interface ReportProject {
   style: string;
   floor: string;
 }
+
+// ── Extracted layout (the user's REAL CAD layout) — from POST /api/ingest/cad ──
+export type WallType =
+  | "drywall"
+  | "half_drywall"
+  | "glass"
+  | "core"
+  | "perimeter"
+  | "door"
+  | "unknown";
+
+export type FurnitureCategory =
+  | "chair"
+  | "desk"
+  | "workstation"
+  | "table"
+  | "sofa"
+  | "stool"
+  | "tv"
+  | "storage"
+  | "planter"
+  | "panel"
+  | "other";
+
+export interface ExtractedWall {
+  points: [number, number][];
+  type: WallType;
+}
+
+export interface ExtractedDoor {
+  x: number;
+  y: number;
+  width: number;
+  rotation: number;
+}
+
+export interface ExtractedRoom {
+  id: string;
+  label: string;
+  area_sf: number;
+  polygon: [number, number][];
+  type: string;
+}
+
+export interface ExtractedFurniture {
+  category: FurnitureCategory;
+  block_name: string;
+  brand: string;
+  model: string;
+  x: number; // bounding-box MIN corner
+  y: number;
+  w: number;
+  h: number;
+  rotation: number; // degrees, about the item's center
+}
+
+export interface ExtractedLayout {
+  source: string;
+  units: string;
+  bounds: [number, number, number, number]; // [minx, miny, maxx, maxy]
+  walls: ExtractedWall[];
+  doors: ExtractedDoor[];
+  rooms: ExtractedRoom[];
+  furniture: ExtractedFurniture[];
+  inventory: Record<string, number>;
+  needs_confirmation: boolean;
+  notes: string[];
+}
