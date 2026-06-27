@@ -225,6 +225,7 @@ export interface ExtractedRoom {
   label: string;
   area_sf: number;
   polygon: [number, number][];
+  center?: [number, number] | null;
   type: string;
 }
 

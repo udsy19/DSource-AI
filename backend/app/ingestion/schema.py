@@ -26,7 +26,8 @@ class Room(BaseModel):
     id: str  # stable unique id (e.g. "R-12" or the OCR'd room number)
     label: str | None  # "OFFICE 1", "HUDDLE", ... when known
     area_sf: float | None
-    polygon: list[tuple[float, float]]  # closed boundary in feet
+    polygon: list[tuple[float, float]]  # closed boundary in feet (may be empty if walls don't close)
+    center: tuple[float, float] | None = None  # anchor for the label — polygon centroid or label point
     type: str  # office | meeting | open | huddle | reception | core | circulation | unknown
 
 

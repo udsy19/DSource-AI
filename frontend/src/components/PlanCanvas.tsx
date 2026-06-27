@@ -140,20 +140,23 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
   return (
     <div className="layout-plan">
       <svg viewBox={`0 0 ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet">
-        {/* rooms — faint filled polygons with label + area */}
+        {/* rooms — faint filled polygons (where the walls close) with the label + area placed at
+            the room's anchor, so every read room shows on the plan even without a closed boundary */}
         {layout.rooms.map((r) => {
-          const cx = r.polygon.reduce((s, p) => s + view.fx(p[0]), 0) / r.polygon.length;
-          const cy = r.polygon.reduce((s, p) => s + view.fy(p[1]), 0) / r.polygon.length;
+          const cx = r.center ? view.fx(r.center[0]) : null;
+          const cy = r.center ? view.fy(r.center[1]) : null;
           return (
             <g key={`room-${r.id}`}>
-              <polygon
-                points={polyline(r.polygon)}
-                fill="var(--room-fill)"
-                stroke="var(--room-line)"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-              {r.label && (
+              {r.polygon.length >= 3 && (
+                <polygon
+                  points={polyline(r.polygon)}
+                  fill="var(--room-fill)"
+                  stroke="var(--room-line)"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {r.label && cx != null && cy != null && (
                 <text className="room-label" x={cx} y={cy} textAnchor="middle">
                   <tspan x={cx}>{r.label}</tspan>
                   {r.area_sf > 0 && (

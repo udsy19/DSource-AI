@@ -293,7 +293,10 @@ function GlassPanel({ w, h }: { w: number; h: number }) {
   return (
     <mesh position={[0, LAYOUT_WALL_H / 2, 0]} castShadow>
       <boxGeometry args={[span, LAYOUT_WALL_H, 0.16]} />
-      <meshStandardMaterial color="#aec4cc" transparent opacity={0.22} roughness={0.1} metalness={0.1} />
+      <meshStandardMaterial
+        color="#aec4cc" transparent opacity={0.18} roughness={0.1} metalness={0.1}
+        depthWrite={false}
+      />
     </mesh>
   );
 }
@@ -386,9 +389,15 @@ function LayoutWalls({ layout, w }: { layout: ExtractedLayout; w: World }) {
           <mesh key={i} position={[s.x, h / 2, s.z]} rotation-y={s.angle} castShadow>
             <boxGeometry args={[s.len + (glass ? 0 : 0.3), h, thickness]} />
             {glass ? (
-              <meshStandardMaterial color="#aec4cc" transparent opacity={0.26} roughness={0.1} metalness={0.1} />
+              <meshStandardMaterial
+                color="#aec4cc" transparent opacity={0.22} roughness={0.1} metalness={0.1}
+                depthWrite={false}
+              />
             ) : (
-              <meshStandardMaterial color={core ? "#5a564d" : "#efeae0"} roughness={0.9} />
+              <meshStandardMaterial
+                color={core ? "#5a564d" : "#efeae0"} roughness={0.9}
+                polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1}
+              />
             )}
           </mesh>
         );

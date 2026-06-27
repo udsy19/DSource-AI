@@ -266,6 +266,7 @@ def _read_rooms(wall_lines: list[LineString], msp, lf: float) -> tuple[list[Room
             label=label,
             area_sf=area_sf,
             polygon=[(round(x, 2), round(y, 2)) for x, y in poly.exterior.coords],
+            center=(round(poly.centroid.x, 2), round(poly.centroid.y, 2)),
             type=_classify_room(label),
         ))
         next_id += 1
@@ -276,7 +277,7 @@ def _read_rooms(wall_lines: list[LineString], msp, lf: float) -> tuple[list[Room
     for (lx, ly, label, area_sf) in unplaced:
         rooms.append(Room(
             id=f"R-{next_id}", label=label, area_sf=area_sf,
-            polygon=[], type=_classify_room(label),
+            polygon=[], center=(round(lx, 2), round(ly, 2)), type=_classify_room(label),
         ))
         next_id += 1
 
