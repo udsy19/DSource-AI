@@ -84,6 +84,18 @@ to keep the calibration guarantee): style 0.45, attribute 0.15, budget 0.20, lea
 - **Scorecard (11 cases incl. new fine-grained `mesh_office`): rel@1=rel@3=rel@5=1.000, MRR=1.000; filter
   1.000/1.000; 0 violations.** TDD: `test_attribute_term_breaks_visual_ties_lexically`. 77 tests green, mypy+ruff+tsc clean.
 
+## ✅ Render seam (stage 4->5) — honest 3-way placement (2026-06-26)
+The export was binary (`has_geometry` true/false). Catalog reality: only 6/80 carry a real mesh; 56/80 have
+neither mesh nor dimensions (Shopify scrapes captured price+image only). Can't fabricate geometry. So enriched
+`RenderExport`/`RenderAsset` (export/ — NOT frozen schema) to a 3-way `placement`, real-data only:
+- **exact** — real product mesh (`model_3d`); place as-is. (6)
+- **proxy** — no mesh but real w/d/h; render stage places an HONEST dimensioned bounding box, marked as a
+  stand-in. (6 dims-only panels) `dimensions` (reused schema `Dimensions`) rides along to size it.
+- **none** — no mesh, no dims; genuinely unplaceable, flagged. (68)
+`RenderExport` adds `unplaceable` (placement==none) alongside `missing_geometry` (no real mesh = proxy+none,
+preserves §2 half-match). **Placeable doubled 6 -> 12 with zero fabrication; the 68-product gap is now quantified
++ actionable (a data-acquisition problem, Agent A).** 4 new export tests; 80 green, mypy strict + ruff clean.
+
 ## Honest read on the ranker (now coarse visual + fine lexical)
 Coarse visual intent works great (plastic/baby/outdoor chairs, wood/tile panels -> rank 1). Fine intra-category
 attributes are now handled by the lexical `attribute_match` term **when the product text states the attribute**
