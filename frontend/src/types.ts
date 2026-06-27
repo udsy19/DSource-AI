@@ -140,3 +140,34 @@ export interface MatchResult {
   enrichment: Record<string, { value: string | null; confidence: number; source: string }> | null;
   maintenance: Record<string, MaintenanceAxis> | null;
 }
+
+// Space-planning deliverables (Qbiq-style: 3 scored test-fit alternatives per plate).
+export interface Metrics {
+  usf: number;
+  seats: number;
+  open_space_seats: number;
+  offices: number;
+  conf_rooms: number;
+  density_sf_per_person: number;
+  daylight_pct: number; // 0..1
+  privacy_pct: number; // 0..1
+  efficiency_pct: number; // 0..1
+}
+
+export interface Alternative {
+  id: string;
+  testfit: { instances: Instance[] };
+  metrics: Metrics;
+}
+
+export interface AlternativesResponse {
+  plan: Plan;
+  alternatives: Alternative[];
+}
+
+export interface ReportProject {
+  client: string;
+  building: string;
+  style: string;
+  floor: string;
+}

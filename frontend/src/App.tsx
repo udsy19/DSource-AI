@@ -1,10 +1,11 @@
 import { useState } from "react";
 import ProcessRail from "./components/ProcessRail";
+import Deliverables from "./components/Deliverables";
 import DesignSystem from "./design/DesignSystem";
 import { Segmented } from "./design/ui";
 import Studio from "./Studio";
 
-type View = "studio" | "system";
+type View = "studio" | "deliverables" | "system";
 
 export default function App() {
   const [view, setView] = useState<View>("studio");
@@ -16,7 +17,11 @@ export default function App() {
           DSOURCE <span className="studio-mark">STUDIO</span>
         </span>
         <span className="sub">
-          {view === "studio" ? "Workplace design intelligence" : "Design system"}
+          {view === "studio"
+            ? "Workplace design intelligence"
+            : view === "deliverables"
+              ? "Plate → three options → report, takeoff"
+              : "Design system"}
         </span>
         {view === "studio" && (
           <div className="bar-rail">
@@ -29,6 +34,7 @@ export default function App() {
             onChange={setView}
             options={[
               { value: "studio", label: "Studio" },
+              { value: "deliverables", label: "Deliverables" },
               { value: "system", label: "System" },
             ]}
           />
@@ -36,7 +42,9 @@ export default function App() {
         </div>
       </header>
 
-      <div className="view">{view === "studio" ? <Studio /> : <DesignSystem />}</div>
+      <div className="view">
+        {view === "studio" ? <Studio /> : view === "deliverables" ? <Deliverables /> : <DesignSystem />}
+      </div>
     </div>
   );
 }

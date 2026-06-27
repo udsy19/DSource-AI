@@ -75,6 +75,63 @@ export async function cadGeometry(file: File): Promise<import("./types").CadGeom
   return res.json();
 }
 
+interface AltOpts {
+  headcount?: number;
+  density_rsf_per_person?: number;
+}
+
+function planForm(file: File, opts?: AltOpts): FormData {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (opts?.headcount != null) fd.append("headcount", String(opts.headcount));
+  if (opts?.density_rsf_per_person != null)
+    fd.append("density_rsf_per_person", String(opts.density_rsf_per_person));
+  return fd;
+}
+
+async function downloadBlob(res: Response, filename: string): Promise<void> {
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function generateAlternatives(
+  file: File,
+  opts?: AltOpts,
+): Promise<import("./types").AlternativesResponse> {
+  const res = await fetch("/api/testfit/alternatives", { method: "POST", body: planForm(file, opts) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  return res.json();
+}
+
+export async function downloadTakeoff(file: File, opts?: AltOpts): Promise<void> {
+  await downloadBlob(
+    await fetch("/api/testfit/takeoff", { method: "POST", body: planForm(file, opts) }),
+    "quantity-takeoff.xlsx",
+  );
+}
+
+export async function downloadReport(reportData: {
+  project: import("./types").ReportProject;
+  plan: import("./types").Plan;
+  alternatives: import("./types").Alternative[];
+}): Promise<void> {
+  await downloadBlob(
+    await fetch("/api/testfit/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reportData),
+    }),
+    "space-planning-report.pdf",
+  );
+}
+
 export const inr = (n: number, frac = 0) =>
   n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: frac });
 
