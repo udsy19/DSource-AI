@@ -201,6 +201,18 @@ header.bar {
 .quote .row .n { font-variant-numeric: tabular-nums; }
 .disclaim { font-size: 11px; line-height: 1.55; color: var(--faint); }
 
+/* elements · bill of components */
+.elements .el-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 22px; }
+.el-count {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--line);
+}
+.el-n {
+  font-family: var(--serif); font-size: 23px; font-weight: 400; line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.el-k { font-size: 11px; letter-spacing: 0.04em; color: var(--muted); }
+
 /* export · deliverables */
 .exports .export-actions { display: flex; flex-direction: column; gap: 9px; }
 .export-btn {

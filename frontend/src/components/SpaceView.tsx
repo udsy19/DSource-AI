@@ -112,10 +112,10 @@ function GltfPiece({ url }: { url: string }) {
 
 const PEDESTAL = "#2b2a27";
 
-/* Real downloaded 3D model (Khronos SheenChair, CC0) proving the real-model pipeline:
-   real .glb → loaded here. A converted manufacturer model (.skp/.rfa → .glb via Blender/
-   trimesh) would replace this one URL. Set to "" to fall back to the procedural chair. */
-const CHAIR_MODEL = "/models/SheenChair.glb";
+/* A real .glb chair can be dropped in here (e.g. "/models/chair.glb") to render real geometry.
+   Empty by default = procedural chair: a single high-poly model cloned across hundreds of seats
+   would freeze the browser (and 404s when absent), so procedural is the safe, scalable default. */
+const CHAIR_MODEL = "";
 
 /* loads a real .glb chair, auto-scaled to ~3.4 ft tall with its base on the floor */
 function RealChair({ url }: { url: string }) {

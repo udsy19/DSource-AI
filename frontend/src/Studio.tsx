@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  cadGeometry,
   cadSvg,
   downloadIfc,
   downloadReport,
@@ -11,12 +10,12 @@ import {
   num,
   sourceIndia,
 } from "./api";
-import { Cad3D, CadSvg } from "./components/CadViewer";
+import { CadSvg } from "./components/CadViewer";
 import Dropzone from "./components/Dropzone";
 import PlanCanvas from "./components/PlanCanvas";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented, Stat } from "./design/ui";
-import type { CadGeometry, IndiaSource, TestFitResponse } from "./types";
+import type { IndiaSource, TestFitResponse } from "./types";
 
 const LEGEND = [
   { k: "Workstation", c: "rgba(184,85,47,0.5)", f: "rgba(184,85,47,0.11)" },
@@ -27,7 +26,7 @@ const LEGEND = [
 
 export default function Studio() {
   const [res, setRes] = useState<TestFitResponse | null>(null);
-  const [cad, setCad] = useState<{ svg: string; geometry: CadGeometry } | null>(null);
+  const [cad, setCad] = useState<{ svg: string } | null>(null);
   const [source, setSource] = useState<IndiaSource | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -42,14 +41,13 @@ export default function Studio() {
     setSource(null);
     setFile(file);
     try {
-      // Render the user's ACTUAL drawing (CAD svg + geometry) AND run the analysis (test-fit).
-      const [tf, svg, geo] = await Promise.all([
+      // Run the analysis (test-fit) and capture the user's actual drawing for the 2D Plan view.
+      const [tf, svg] = await Promise.all([
         generateTestFit(file),
         cadSvg(file).catch(() => null),
-        cadGeometry(file).catch(() => null),
       ]);
       setRes(tf);
-      if (svg && geo) setCad({ svg: svg.svg, geometry: geo });
+      if (svg) setCad({ svg: svg.svg });
       // Source the test-fit's furniture to REAL India catalog SKUs (INR). Runs after; the
       // first call warms the embedder so it may take a moment.
       const c = tf.testfit;
@@ -92,6 +90,7 @@ export default function Studio() {
   }
 
   const tf = res?.testfit;
+  const el = res?.elements;
 
   return (
     <main className="studio">
@@ -108,9 +107,11 @@ export default function Studio() {
                 ]}
               />
             </div>
-            {cad ? (
-              mode === "plan" ? <CadSvg svg={cad.svg} /> : <Cad3D geometry={cad.geometry} />
-            ) : mode === "plan" ? (
+            {mode === "space" ? (
+              <SpaceView plan={res.plan} instances={res.testfit.instances} />
+            ) : cad ? (
+              <CadSvg svg={cad.svg} />
+            ) : (
               <>
                 <PlanCanvas plan={res.plan} instances={res.testfit.instances} />
                 <div className="legend">
@@ -122,8 +123,6 @@ export default function Studio() {
                   ))}
                 </div>
               </>
-            ) : (
-              <SpaceView plan={res.plan} instances={res.testfit.instances} />
             )}
           </>
         ) : (
@@ -160,6 +159,30 @@ export default function Studio() {
                 ))}
               </div>
             </div>
+
+            {el && (
+              <>
+                <hr className="ds-rule" />
+                <div className="elements">
+                  <Eyebrow style={{ display: "block", marginBottom: 14 }}>
+                    Elements · bill of components
+                  </Eyebrow>
+                  <div className="el-grid">
+                    <ElCount n={el.furniture.chairs} k="chairs" />
+                    <ElCount n={el.furniture.desks} k="desks" />
+                    <ElCount n={el.furniture.tables} k="tables" />
+                    <ElCount n={el.furniture.sofas} k="lounge sofas" />
+                    <ElCount n={el.construction.walls} k="walls" />
+                    <ElCount n={el.spaces.huddle_spaces} k="huddle spaces" />
+                  </div>
+                  <p className="disclaim" style={{ marginTop: 12 }}>
+                    Counted from the generated test-fit — reconciles with the takeoff. Walls ={" "}
+                    {el.construction.perimeter_walls} perimeter + {el.construction.room_partitions} room
+                    partitions.
+                  </p>
+                </div>
+              </>
+            )}
 
             {res.wellbeing && (
               <>
@@ -287,6 +310,15 @@ function Row({ k, n }: { k: string; n: string }) {
     <div className="row">
       <span className="k">{k}</span>
       <span className="n">{n}</span>
+    </div>
+  );
+}
+
+function ElCount({ n, k }: { n: number; k: string }) {
+  return (
+    <div className="el-count">
+      <span className="el-n">{num(n)}</span>
+      <span className="el-k">{k}</span>
     </div>
   );
 }

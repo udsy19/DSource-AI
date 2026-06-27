@@ -83,9 +83,21 @@ export interface CadGeometry {
   paths: CadPath[];
 }
 
+export interface Elements {
+  furniture: { chairs: number; desks: number; tables: number; sofas: number; ottomans: number };
+  spaces: {
+    workstations: number;
+    private_offices: number;
+    meeting_rooms: number;
+    huddle_spaces: number;
+  };
+  construction: { perimeter_walls: number; room_partitions: number; walls: number };
+}
+
 export interface TestFitResponse {
   plan: Plan;
   testfit: TestFit;
+  elements?: Elements;
   wellbeing?: Wellbeing;
   bom?: BomLine[];
   quote?: Quote;
