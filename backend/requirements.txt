@@ -37,3 +37,5 @@ apsw==3.53.2.0
 # Phase 1.5 enrichment — vision-LLM structured material extraction (schema-constrained).
 anthropic==0.111.0
 google-genai==2.9.0
+# Raster ingest OCR (optional — room-label text; needs the separate `tesseract` binary)
+pytesseract==0.3.13
