@@ -174,6 +174,25 @@ export async function downloadIfc(file: File, opts?: AltOpts): Promise<void> {
   );
 }
 
+// Export a SELECTED generated version directly from its plan + fit (no regeneration).
+type FitExport = { plan: import("./types").Plan; testfit: import("./types").Alternative["testfit"] };
+
+async function postFit(path: string, body: FitExport, filename: string): Promise<void> {
+  await downloadBlob(
+    await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    filename,
+  );
+}
+
+export const downloadTakeoffFromFit = (b: FitExport) =>
+  postFit("/api/testfit/takeoff-from-fit", b, "quantity-takeoff.xlsx");
+export const downloadIfcFromFit = (b: FitExport) =>
+  postFit("/api/testfit/ifc-from-fit", b, "model.ifc");
+
 export async function downloadReport(reportData: {
   project: import("./types").ReportProject;
   plan: import("./types").Plan;

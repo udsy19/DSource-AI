@@ -14,7 +14,8 @@ from .realdata import apply_coop_hmi_band, ingest_hm_pricebooks
 from .routers import (
     alternatives, brief, cad, catalog, coop, floorplan, floorplan_raster, generate,
     generate_detailed, gsa, ifc, ingest, ingest_cad, ingest_raster, layout_takeoff, match,
-    procurement, projects, quote, render, report, source, takeoff, testfit, wellcatalog,
+    procurement, projects, quote, render, report, source, takeoff, testfit, version_export,
+    wellcatalog,
 )
 from .seed import seed
 from .wellcatalog.seed import seed_certs
@@ -91,6 +92,7 @@ app.include_router(testfit.router)    # Phase 2: generative test-fit (workstatio
 app.include_router(alternatives.router)  # Qbiq: 3 test-fit alternatives + space metrics
 app.include_router(generate.router)      # Qbiq Concept: program + plate -> generated test-fit versions
 app.include_router(generate_detailed.router)  # Qbiq Detailed: explicit room counts + placement -> versions
+app.include_router(version_export.router)     # export a selected generated version (takeoff/IFC from its fit)
 app.include_router(takeoff.router)       # Qbiq: quantity-takeoff Excel (BOM) export
 app.include_router(report.router)        # Qbiq: styled multi-page space-planning PDF report
 app.include_router(ifc.router)           # Qbiq: IFC4/BIM export (open-standard editable model)

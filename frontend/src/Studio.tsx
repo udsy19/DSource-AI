@@ -1,8 +1,10 @@
 import { useState } from "react";
 import {
   downloadIfc,
+  downloadIfcFromFit,
   downloadLayoutTakeoff,
   downloadReport,
+  downloadTakeoffFromFit,
   generateAlternatives,
   generateDetailed,
   generateFromConcept,
@@ -170,6 +172,7 @@ export default function Studio() {
     });
   }
 
+  const building = file?.name.replace(/\.(dxf|dwg)$/i, "") ?? "Plan";
   const inv = layout?.inventory ?? {};
   const rooms = (layout?.rooms ?? []).filter((r) => r.label);
   const selected = versions?.alternatives.find((a) => a.id === selectedId) ?? null;
@@ -371,6 +374,62 @@ export default function Studio() {
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
+
+            {versions && selected && (
+              <>
+                <hr className="ds-rule" />
+                <div className="exports">
+                  <Eyebrow style={{ display: "block", marginBottom: 14 }}>
+                    Export · version {selected.id}
+                  </Eyebrow>
+                  <div className="export-actions">
+                    <button
+                      className="export-btn export-btn--primary"
+                      onClick={() =>
+                        runExport("report", () =>
+                          downloadReport({
+                            project: { client: "", building, style: "Modern", floor: "" },
+                            plan: versions.plan,
+                            alternatives: versions.alternatives,
+                          }),
+                        )
+                      }
+                      disabled={!!exporting}
+                    >
+                      <span className="export-btn-label">Space-planning report</span>
+                      <span className="export-btn-meta">{exporting === "report" ? "Preparing…" : "PDF · 3 options"}</span>
+                    </button>
+                    <button
+                      className="export-btn"
+                      onClick={() =>
+                        runExport("takeoff", () =>
+                          downloadTakeoffFromFit({ plan: versions.plan, testfit: selected.testfit }),
+                        )
+                      }
+                      disabled={!!exporting}
+                    >
+                      <span className="export-btn-label">Quantity takeoff</span>
+                      <span className="export-btn-meta">{exporting === "takeoff" ? "Preparing…" : "Excel · BOM"}</span>
+                    </button>
+                    <button
+                      className="export-btn"
+                      onClick={() =>
+                        runExport("ifc", () =>
+                          downloadIfcFromFit({ plan: versions.plan, testfit: selected.testfit }),
+                        )
+                      }
+                      disabled={!!exporting}
+                    >
+                      <span className="export-btn-label">BIM model</span>
+                      <span className="export-btn-meta">{exporting === "ifc" ? "Preparing…" : "IFC"}</span>
+                    </button>
+                  </div>
+                  <p className="disclaim" style={{ marginTop: 12 }}>
+                    Report compares all three versions; takeoff &amp; BIM export the selected one.
+                  </p>
+                </div>
+              </>
+            )}
           </>
         )}
       </aside>
