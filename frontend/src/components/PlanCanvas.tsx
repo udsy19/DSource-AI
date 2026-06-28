@@ -129,26 +129,41 @@ export default function PlanCanvas(props: Props) {
   return <FitPlan {...props} />;
 }
 
-/* ── generated-fit plan (existing behaviour) ── */
+/* ── generated-fit plan ──
+   Drawn to read like LayoutPlan: the building edge and each enclosed room are SOLID poché
+   walls (reusing pocheBands), open furniture is hairline ink contained in its footprint, and
+   every enclosed room is inset + clipped so no chair mark ever crosses a wall. Enclosed rooms
+   stay pinnable for the iterate loop. */
 function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
   const xs = plan.boundary.map((p) => p[0]);
   const ys = plan.boundary.map((p) => p[1]);
-  const view = useView(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+  const view = useView(minX, minY, maxX, maxY);
 
-  const poly = (pts: [number, number][]) =>
-    pts.map(([x, y]) => `${view.fx(x).toFixed(2)},${view.fy(y).toFixed(2)}`).join(" ");
+  // a closed ring (boundary/core polygons may omit the closing point) — pocheBands draws per
+  // segment, so append the first point to seal the loop into one continuous wall.
+  const closed = (pts: [number, number][]): [number, number][] =>
+    pts.length > 1 && (pts[0][0] !== pts[pts.length - 1][0] || pts[0][1] !== pts[pts.length - 1][1])
+      ? [...pts, pts[0]]
+      : pts;
 
   return (
     <svg viewBox={`0 0 ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet">
+      {/* cores — faint structural fill ringed by a heavy core-poché wall */}
       {plan.cores.map((c, i) => (
-        <polygon
-          key={`core-${i}`}
-          points={poly(c)}
-          fill="rgba(26,24,19,0.06)"
-          stroke="rgba(26,24,19,0.22)"
-          strokeWidth={1}
-          vectorEffect="non-scaling-stroke"
-        />
+        <g key={`core-${i}`}>
+          <polygon
+            points={c.map(([x, y]) => `${view.fx(x).toFixed(2)},${view.fy(y).toFixed(2)}`).join(" ")}
+            fill="var(--poche-core)"
+            fillOpacity={0.12}
+          />
+          {pocheBands(closed(c), WALL.core.thickness, view.fx, view.fy).map((pts, j) => (
+            <polygon key={j} points={pts} fill="var(--poche-core)" />
+          ))}
+        </g>
       ))}
 
       {instances.map((it, i) => {
@@ -162,11 +177,32 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
         const pinnable = !!kind.room && !!onTogglePin;
         const pinned = pinnable && (pinnedKeys?.has(instanceKey(it)) ?? false);
         const pin = pinnable ? () => onTogglePin!(it) : undefined;
+
+        // open furniture (workstations, collab) — hairline symbol inside its own footprint
+        if (!kind.room) {
+          return (
+            <g
+              key={`i-${i}`}
+              transform={`translate(${ox} ${oy}) rotate(${-it.rotation} ${cx - ox} ${cy - oy})`}
+              fill={`var(${kind.tint})`}
+              fillOpacity={0.14}
+            >
+              {furnitureSymbol(kind.symbol, it.w, it.h)}
+            </g>
+          );
+        }
+
+        // enclosed room — poché-wall perimeter + faint fill + an INSET, CLIPPED furniture glyph
+        // so chair marks can never cross the wall, regardless of the symbol's own math.
+        const m = Math.min(it.w, it.h) * 0.16; // wall→furniture margin (feet)
+        const iw = Math.max(it.w - m * 2, 0.1);
+        const ih = Math.max(it.h - m * 2, 0.1);
+        const clipId = `fit-room-clip-${i}`;
         return (
           <g
             key={`i-${i}`}
             transform={`translate(${ox} ${oy}) rotate(${-it.rotation} ${cx - ox} ${cy - oy})`}
-            className={pinnable ? "fit-room--pinnable" : undefined}
+            className="fit-room--pinnable"
             role={pinnable ? "button" : undefined}
             tabIndex={pinnable ? 0 : undefined}
             aria-pressed={pinnable ? pinned : undefined}
@@ -183,27 +219,39 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
                 : undefined
             }
           >
-            {kind.room && (
-              <rect
-                x={0}
-                y={0}
-                width={it.w}
-                height={it.h}
-                fill={pinned ? "var(--accent-soft)" : "var(--room-fill)"}
-                stroke={pinned ? "var(--accent)" : "var(--room-line)"}
-                strokeWidth={pinned ? 2.4 : 1.4}
-                vectorEffect="non-scaling-stroke"
-                rx={0.4}
-              />
-            )}
-            <g fill={`var(${kind.tint})`} fillOpacity={0.14}>
-              {furnitureSymbol(kind.symbol, it.w, it.h)}
+            <clipPath id={clipId}>
+              <rect x={m} y={m} width={iw} height={ih} />
+            </clipPath>
+            {/* faint floor fill — accent-soft when pinned */}
+            <rect
+              x={0}
+              y={0}
+              width={it.w}
+              height={it.h}
+              fill={pinned ? "var(--accent-soft)" : "var(--room-fill)"}
+            />
+            {/* inset, clipped furniture glyph — nothing escapes the interior */}
+            <g clipPath={`url(#${clipId})`}>
+              <g
+                transform={`translate(${m} ${m})`}
+                fill={`var(${kind.tint})`}
+                fillOpacity={0.14}
+              >
+                {furnitureSymbol(kind.symbol, iw, ih)}
+              </g>
             </g>
-            {kind.room && (
-              <text className="fit-room-label" x={it.w / 2} y={it.h / 2} textAnchor="middle">
-                {kind.room}
-              </text>
-            )}
+            {/* room wall — solid poché perimeter, accent stroke when pinned */}
+            {pocheBands(
+              [[0, 0], [it.w, 0], [it.w, it.h], [0, it.h], [0, 0]],
+              WALL.drywall.thickness,
+              (x) => x,
+              (y) => y,
+            ).map((pts, j) => (
+              <polygon key={j} points={pts} fill={pinned ? "var(--accent)" : "var(--poche-drywall)"} />
+            ))}
+            <text className="fit-room-label" x={it.w / 2} y={it.h / 2} textAnchor="middle">
+              {kind.room}
+            </text>
             {pinned && <circle cx={it.w - 1.3} cy={1.3} r={0.9} fill="var(--accent)" />}
           </g>
         );
@@ -213,16 +261,28 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
         <circle key={`col-${i}`} cx={view.fx(x)} cy={view.fy(y)} r={0.9} fill="var(--ink)" opacity={0.55} />
       ))}
 
-      <polygon
-        className="draw"
-        points={poly(plan.boundary)}
-        fill="none"
-        stroke="var(--ink)"
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-        pathLength={1}
-      />
+      {/* building edge — one closed perimeter poché wall, drawn last on top */}
+      {pocheBands(closed(plan.boundary), WALL.perimeter.thickness, view.fx, view.fy).map((pts, j) => (
+        <polygon key={`b-${j}`} points={pts} fill="var(--poche-perimeter)" />
+      ))}
+
+      {/* scale bar — quiet ruled bar of round length, bottom-right */}
+      {(() => {
+        const ft = niceScaleFeet(maxX - minX);
+        const y = view.h - PAD * 0.55;
+        const x1 = view.w - PAD - ft;
+        const x2 = view.w - PAD;
+        return (
+          <g stroke="var(--scale-bar)" vectorEffect="non-scaling-stroke">
+            <line x1={x1} y1={y} x2={x2} y2={y} vectorEffect="non-scaling-stroke" />
+            <line x1={x1} y1={y - 0.6} x2={x1} y2={y + 0.6} vectorEffect="non-scaling-stroke" />
+            <line x1={x2} y1={y - 0.6} x2={x2} y2={y + 0.6} vectorEffect="non-scaling-stroke" />
+            <text className="scale-label" x={(x1 + x2) / 2} y={y - 1} textAnchor="middle">
+              {ft} ft
+            </text>
+          </g>
+        );
+      })()}
     </svg>
   );
 }
