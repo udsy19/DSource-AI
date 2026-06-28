@@ -40,7 +40,10 @@ const FINISHES = [
 ];
 
 const WALL_H = 3.2;
-const LAYOUT_WALL_H = 8.0; // real extracted walls + generated-fit glass partitions: ceiling-ish, so rooms enclose
+const LAYOUT_WALL_H = 8.0; // generated-fit glass partitions: ceiling-ish, so clean synthesized rooms enclose
+// Extracted-CAD walls are messy FRAGMENTS — full-height opaque slabs read as a chaotic forest that
+// blocks the view. Cut them at a dollhouse height so you see OVER them into the furnished space.
+const DOLLHOUSE_H = 3.6;
 const MAX_RENDER = 2500; // safety cap so a pathological plan never freezes the browser
 
 type World = { cx: number; cy: number; size: number; wx: (x: number) => number; wz: (y: number) => number };
@@ -341,11 +344,11 @@ function Cabinet({ w, h }: { w: number; h: number }) {
 function GlassPanel({ w, h }: { w: number; h: number }) {
   const span = Math.max(w, h);
   return (
-    <mesh position={[0, LAYOUT_WALL_H / 2, 0]} castShadow>
-      <boxGeometry args={[span, LAYOUT_WALL_H, 0.16]} />
+    <mesh position={[0, DOLLHOUSE_H / 2, 0]} castShadow>
+      <boxGeometry args={[span, DOLLHOUSE_H, 0.16]} />
       <meshStandardMaterial
         color="#aec4cc" transparent opacity={0.16} roughness={0.06} metalness={0.25}
-        envMapIntensity={1.5} depthWrite={false}
+        envMapIntensity={1.2} depthWrite={false} side={THREE.DoubleSide}
       />
     </mesh>
   );
@@ -433,19 +436,21 @@ function LayoutWalls({ layout, w }: { layout: ExtractedLayout; w: World }) {
         const glass = s.type === "glass";
         const half = s.type === "half_drywall";
         const core = s.type === "core";
-        const h = half ? LAYOUT_WALL_H * 0.45 : LAYOUT_WALL_H;
+        // dollhouse cut so you see over the wall fragments; half-walls lower still
+        const h = half ? DOLLHOUSE_H * 0.6 : DOLLHOUSE_H;
         const thickness = glass ? 0.16 : core ? 0.7 : 0.45;
         return (
-          <mesh key={i} position={[s.x, h / 2, s.z]} rotation-y={s.angle} castShadow>
+          <mesh key={i} position={[s.x, h / 2, s.z]} rotation-y={s.angle} castShadow receiveShadow>
             <boxGeometry args={[s.len + (glass ? 0 : 0.3), h, thickness]} />
             {glass ? (
               <meshStandardMaterial
-                color="#aec4cc" transparent opacity={0.18} roughness={0.06} metalness={0.25}
-                envMapIntensity={1.5} depthWrite={false}
+                color="#aec4cc" transparent opacity={0.16} roughness={0.06} metalness={0.25}
+                envMapIntensity={1.2} depthWrite={false} side={THREE.DoubleSide}
               />
             ) : (
               <meshStandardMaterial
-                color={core ? "#5a564d" : "#efeae0"} roughness={0.9}
+                color={core ? "#6b665b" : "#e7e1d4"} roughness={0.94} envMapIntensity={0.2}
+                side={THREE.DoubleSide}
                 polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1}
               />
             )}

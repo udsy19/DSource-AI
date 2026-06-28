@@ -419,6 +419,26 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
     [layout.walls],
   );
 
+  // De-conflict room labels: place the largest rooms first and skip any whose label box would
+  // collide with one already placed, so dense clusters of small rooms don't pile into an
+  // unreadable smear. (Box sizes are in feet — the SVG units — estimated from the label length.)
+  const labelled = useMemo(() => {
+    const placed: { x: number; y: number; hw: number; hh: number }[] = [];
+    const show = new Set<string>();
+    for (const r of [...layout.rooms].filter((r) => r.label && r.center).sort((a, b) => b.area_sf - a.area_sf)) {
+      const x = view.fx(r.center![0]);
+      const y = view.fy(r.center![1]);
+      // label box in feet: ~1.05 ft per char wide, two lines (name + area) tall, + breathing room
+      const hw = Math.max(r.label.length * 0.62, 5);
+      const hh = r.area_sf > 0 ? 3.4 : 1.8;
+      if (!placed.some((p) => Math.abs(p.x - x) < p.hw + hw && Math.abs(p.y - y) < p.hh + hh)) {
+        placed.push({ x, y, hw, hh });
+        show.add(r.id);
+      }
+    }
+    return show;
+  }, [layout.rooms, view]);
+
   const polyline = (pts: [number, number][]) =>
     pts.map(([x, y]) => `${view.fx(x).toFixed(2)},${view.fy(y).toFixed(2)}`).join(" ");
 
@@ -446,7 +466,7 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
                   />
                 </>
               )}
-              {r.label && cx != null && cy != null && (
+              {r.label && cx != null && cy != null && labelled.has(r.id) && (
                 <text className="room-label" x={cx} y={cy} textAnchor="middle">
                   <tspan x={cx}>{r.label}</tspan>
                   {r.area_sf > 0 && (
