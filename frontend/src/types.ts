@@ -192,6 +192,23 @@ export interface ConceptProgram {
   closed_ratio: number; // 0..1 — share of seats in closed offices vs open plan
 }
 
+// Detailed-mode program — explicit room-type counts + placement preference per type.
+export type RoomType = "office" | "meeting" | "huddle" | "phone_booth";
+export type Placement = "window" | "core" | "flexible";
+
+export interface RoomRequest {
+  type: RoomType;
+  count: number;
+  placement: Placement;
+}
+
+export interface DetailedProgram {
+  rooms: RoomRequest[];
+  desk_type: ConceptProgram["desk_type"];
+  desk_width_cm: number;
+  desk_depth_cm: number;
+}
+
 export interface ReportProject {
   client: string;
   building: string;

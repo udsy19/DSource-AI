@@ -97,20 +97,26 @@ def place_perimeter_rooms(
     cores: list[Polygon],
     column_circles: list,
     setback_ft: float,
-    target_offices: int,
-    target_meetings: int,
+    target_offices: int = 0,
+    target_meetings: int = 0,
     column_clearance_ft: float = 1.5,
+    room_order: list[RoomSpec] | None = None,
+    occupied_polys: list[Polygon] | None = None,
 ) -> list[PlacedRoom]:
     """Greedy edge-march placement of enclosed rooms along the exterior wall.
 
     Returns axis-aligned PlacedRoom rects. We only place rooms on axis-aligned edges
     (horizontal/vertical), which covers orthogonal office plates; skewed walls are skipped
-    (deferred). Counts are targets, not guarantees — we place up to the target that fits.
+    (deferred). Counts are targets, not guarantees — we place up to what fits.
+
+    `room_order` lets callers pass an explicit ordered list of RoomSpec to place (used by the
+    Detailed program for arbitrary per-type counts incl. huddle/phone_booth). When omitted, the
+    legacy `target_meetings`/`target_offices` path runs (meeting rooms first, then offices).
+    `occupied_polys` are footprints already placed elsewhere (e.g. core rooms) to avoid.
     """
     placed: list[PlacedRoom] = []
-    placed_polys: list[Polygon] = []
-    usable = boundary_poly
-    prepared_usable = prep(usable)
+    placed_polys: list[Polygon] = list(occupied_polys or [])
+    prepared_usable = prep(boundary_poly)
 
     def valid(rect: Polygon) -> bool:
         if not prepared_usable.contains(rect):
@@ -123,48 +129,47 @@ def place_perimeter_rooms(
             return False
         return True
 
-    # Try meeting rooms first (scarcer, bigger), then offices, walking each wall edge.
-    plan_order = (
-        [MEETING_ROOM] * target_meetings + [PRIVATE_OFFICE] * target_offices
-    )
-    remaining = {"meeting_room": target_meetings, "private_office": target_offices}
+    if room_order is None:
+        # Legacy: meeting rooms first (scarcer, bigger), then offices.
+        room_order = [MEETING_ROOM] * target_meetings + [PRIVATE_OFFICE] * target_offices
 
-    edges = _edges(boundary_poly)
-    for (p1, p2) in edges:
+    # Largest-first so big rooms claim wall before small ones fragment it, preserving determinism.
+    queue = sorted(room_order, key=lambda s: s.width_ft * s.depth_ft, reverse=True)
+
+    for spec in queue:
+        if _place_one_along_walls(spec, boundary_poly, setback_ft, valid, placed, placed_polys):
+            continue
+    return placed
+
+
+def _place_one_along_walls(
+    spec: RoomSpec,
+    boundary_poly: Polygon,
+    setback_ft: float,
+    valid,
+    placed: list[PlacedRoom],
+    placed_polys: list[Polygon],
+) -> bool:
+    """March `spec` along every axis-aligned wall edge; place at the first valid slot."""
+    for (p1, p2) in _edges(boundary_poly):
         tangent, normal, length = _interior_normal(boundary_poly, p1, p2)
         if tangent is None:
             continue
         tx, ty = tangent
-        # only axis-aligned edges (orthogonal plates)
-        if abs(tx) > 1e-6 and abs(ty) > 1e-6:
+        if abs(tx) > 1e-6 and abs(ty) > 1e-6:  # only axis-aligned edges
             continue
         along = 0.0
         guard = 0
-        while along < length and guard < 200:
+        while along + spec.width_ft <= length + 1e-6 and guard < 200:
             guard += 1
-            specs = [s for s in (MEETING_ROOM, PRIVATE_OFFICE) if remaining[s.type] > 0]
-            if not specs:
-                break
-            placed_one = False
-            for spec in specs:
-                if remaining[spec.type] <= 0:
-                    continue
-                if along + spec.width_ft > length + 1e-6:
-                    continue
-                rect = _room_rect(p1, tangent, normal, along, spec.width_ft, spec.depth_ft, setback_ft)
-                if not rect.is_valid or rect.area <= 0:
-                    continue
-                if valid(rect):
-                    minx, miny, maxx, maxy = _axis_aligned_bbox(rect)
-                    placed.append(PlacedRoom(
-                        type=spec.type, x=round(minx, 2), y=round(miny, 2),
-                        w=round(maxx - minx, 2), h=round(maxy - miny, 2), rotation=0,
-                    ))
-                    placed_polys.append(rect)
-                    remaining[spec.type] -= 1
-                    along += spec.width_ft  # march past this room
-                    placed_one = True
-                    break
-            if not placed_one:
-                along += 2.0  # nudge along the wall and retry
-    return placed
+            rect = _room_rect(p1, tangent, normal, along, spec.width_ft, spec.depth_ft, setback_ft)
+            if rect.is_valid and rect.area > 0 and valid(rect):
+                minx, miny, maxx, maxy = _axis_aligned_bbox(rect)
+                placed.append(PlacedRoom(
+                    type=spec.type, x=round(minx, 2), y=round(miny, 2),
+                    w=round(maxx - minx, 2), h=round(maxy - miny, 2), rotation=0,
+                ))
+                placed_polys.append(rect)
+                return True
+            along += 2.0
+    return False

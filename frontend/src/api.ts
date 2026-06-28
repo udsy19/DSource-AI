@@ -136,6 +136,20 @@ export async function generateFromConcept(
   return res.json();
 }
 
+// Detailed mode: explicit room-type counts + placement per type drive the layout.
+// Same response shape as generateFromConcept; program is sent as a JSON string.
+export async function generateDetailed(
+  file: File,
+  program: import("./types").DetailedProgram,
+): Promise<import("./types").AlternativesResponse> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("program", JSON.stringify(program));
+  const res = await fetch("/api/generate/detailed", { method: "POST", body: fd });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  return res.json();
+}
+
 export async function downloadTakeoff(file: File, opts?: AltOpts): Promise<void> {
   await downloadBlob(
     await fetch("/api/testfit/takeoff", { method: "POST", body: planForm(file, opts) }),

@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from shapely.geometry import Polygon, box
 from shapely.prepared import prep
 
+from .rooms import PlacedRoom, RoomSpec
+
 COLLAB_SIZE_FT = 12.0  # ~12x12 lounge cluster
 
 
@@ -29,6 +31,26 @@ class PlacedZone:
     w: float
     h: float
     rotation: int = 0
+
+
+def _interior_candidates(
+    region: Polygon, w: float, h: float, margin_ft: float
+) -> list[tuple[float, float]]:
+    """Coarse grid of (x, y) origins for a w x h footprint, sorted centroid-first (interior bias)."""
+    minx, miny, maxx, maxy = region.bounds
+    cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
+    step = max(w, h) + margin_ft
+    out: list[tuple[float, float, float]] = []
+    y = miny
+    while y + h <= maxy:
+        x = minx
+        while x + w <= maxx:
+            ox, oy = x + w / 2, y + h / 2
+            out.append(((ox - cx) ** 2 + (oy - cy) ** 2, x, y))
+            x += step / 2  # finer scan than the placement step for better fits
+        y += step / 2
+    out.sort(key=lambda t: t[0])
+    return [(x, y) for _d, x, y in out]
 
 
 def place_collaboration_zones(
@@ -51,25 +73,7 @@ def place_collaboration_zones(
     placed: list[PlacedZone] = []
     placed_polys: list[Polygon] = list(occupied_polys)
 
-    minx, miny, maxx, maxy = placeable_region.bounds
-    cx = (minx + maxx) / 2
-    cy = (miny + maxy) / 2
-
-    # Candidate origins on a coarse grid, sorted by distance from centroid (interior-first).
-    step = size_ft + margin_ft
-    candidates: list[tuple[float, float, float]] = []
-    y = miny
-    while y + size_ft <= maxy:
-        x = minx
-        while x + size_ft <= maxx:
-            ox, oy = x + size_ft / 2, y + size_ft / 2
-            dist = (ox - cx) ** 2 + (oy - cy) ** 2
-            candidates.append((dist, x, y))
-            x += step / 2  # finer scan than the placement step for better fits
-        y += step / 2
-    candidates.sort(key=lambda t: t[0])
-
-    for _dist, x, y in candidates:
+    for x, y in _interior_candidates(placeable_region, size_ft, size_ft, margin_ft):
         if len(placed) >= target_count:
             break
         rect = box(x, y, x + size_ft, y + size_ft)
@@ -83,4 +87,39 @@ def place_collaboration_zones(
             w=size_ft, h=size_ft, rotation=0,
         ))
         placed_polys.append(rect)
+    return placed
+
+
+def place_interior_rooms(
+    placeable_region: Polygon,
+    occupied_polys: list[Polygon],
+    room_order: list[RoomSpec],
+    margin_ft: float = 2.0,
+) -> list[PlacedRoom]:
+    """Drop explicit rooms (core placement) into the interior, biased toward the centroid/core.
+
+    Mirrors `place_collaboration_zones` but for arbitrary RoomSpec footprints — used by the
+    Detailed program for `placement="core"` rooms. Largest-first so big rooms claim space before
+    small ones fragment it. Returns PlacedRoom rects; geometric validity + non-overlap enforced.
+    """
+    if not room_order or placeable_region.is_empty:
+        return []
+
+    prepared = prep(placeable_region)
+    placed: list[PlacedRoom] = []
+    placed_polys: list[Polygon] = list(occupied_polys)
+
+    for spec in sorted(room_order, key=lambda s: s.width_ft * s.depth_ft, reverse=True):
+        w, h = spec.width_ft, spec.depth_ft
+        for x, y in _interior_candidates(placeable_region, w, h, margin_ft):
+            rect = box(x, y, x + w, y + h)
+            if not prepared.contains(rect):
+                continue
+            if any(rect.buffer(margin_ft, join_style=2).intersects(pp) for pp in placed_polys):
+                continue
+            placed.append(PlacedRoom(
+                type=spec.type, x=round(x, 2), y=round(y, 2), w=w, h=h, rotation=0,
+            ))
+            placed_polys.append(rect)
+            break
     return placed

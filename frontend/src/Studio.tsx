@@ -4,6 +4,7 @@ import {
   downloadLayoutTakeoff,
   downloadReport,
   generateAlternatives,
+  generateDetailed,
   generateFromConcept,
   ingestCad,
   num,
@@ -12,7 +13,16 @@ import Dropzone from "./components/Dropzone";
 import PlanCanvas from "./components/PlanCanvas";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented } from "./design/ui";
-import type { Alternative, ConceptProgram, ExtractedLayout, Metrics } from "./types";
+import type {
+  Alternative,
+  ConceptProgram,
+  DetailedProgram,
+  ExtractedLayout,
+  Metrics,
+  Placement,
+  Plan,
+  RoomType,
+} from "./types";
 
 // The component categories surfaced in the bill, in reading order; only non-zero rows render.
 const INVENTORY_ROWS: { key: string; label: string }[] = [
@@ -55,6 +65,31 @@ const DEFAULT_CONCEPT: ConceptProgram = {
   closed_ratio: 0.2,
 };
 
+// Detailed mode — room types in reading order, with labels and a sensible starter program.
+const ROOM_TYPES: { type: RoomType; label: string }[] = [
+  { type: "office", label: "Office" },
+  { type: "meeting", label: "Meeting room" },
+  { type: "huddle", label: "Huddle" },
+  { type: "phone_booth", label: "Phone booth" },
+];
+const PLACEMENTS: { value: Placement; label: string }[] = [
+  { value: "window", label: "Window" },
+  { value: "core", label: "Core" },
+  { value: "flexible", label: "Flexible" },
+];
+
+const DEFAULT_DETAILED: DetailedProgram = {
+  rooms: [
+    { type: "office", count: 4, placement: "window" },
+    { type: "meeting", count: 2, placement: "flexible" },
+    { type: "huddle", count: 2, placement: "core" },
+    { type: "phone_booth", count: 1, placement: "core" },
+  ],
+  desk_type: "workstations",
+  desk_width_cm: 140,
+  desk_depth_cm: 70,
+};
+
 export default function Studio() {
   const [studioMode, setStudioMode] = useState<"read" | "generate">("read");
 
@@ -62,9 +97,11 @@ export default function Studio() {
   const [layout, setLayout] = useState<ExtractedLayout | null>(null);
   const [file, setFile] = useState<File | null>(null);
 
-  // Generate state (the Concept flow) — kept separate from the read-layout state.
+  // Generate state — Concept | Detailed sub-mode, kept separate from the read-layout state.
+  const [genMode, setGenMode] = useState<"concept" | "detailed">("concept");
   const [concept, setConcept] = useState<ConceptProgram>(DEFAULT_CONCEPT);
-  const [versions, setVersions] = useState<{ plan: import("./types").Plan; alternatives: Alternative[] } | null>(null);
+  const [detailed, setDetailed] = useState<DetailedProgram>(DEFAULT_DETAILED);
+  const [versions, setVersions] = useState<{ plan: Plan; alternatives: Alternative[] } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -95,9 +132,12 @@ export default function Studio() {
     setSelectedId(null);
     setFile(f);
     try {
-      // Generate scored test-fit versions from the plate + the simple brief, then let the user
-      // compare them side by side and open one in 2D / 3D.
-      const res = await generateFromConcept(f, concept);
+      // Generate scored test-fit versions from the plate + the program (Concept brief or the
+      // explicit Detailed counts), then compare them side by side and open one in 2D / 3D.
+      const res =
+        genMode === "detailed"
+          ? await generateDetailed(f, detailed)
+          : await generateFromConcept(f, concept);
       setVersions(res);
       setSelectedId(res.alternatives[0]?.id ?? null);
     } catch (e) {
@@ -288,16 +328,50 @@ export default function Studio() {
             )}
           </>
         ) : (
-          <ConceptForm
-            concept={concept}
-            onChange={setConcept}
-            busy={busy}
-            file={file}
-            onGenerate={generate}
-            versions={versions}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
+          <>
+            <div className="brief-field">
+              <Segmented
+                value={genMode}
+                onChange={(m) => {
+                  setGenMode(m);
+                  setErr(null);
+                }}
+                options={[
+                  { value: "concept", label: "Concept" },
+                  { value: "detailed", label: "Detailed" },
+                ]}
+              />
+            </div>
+
+            <Dropzone busy={busy} onFile={generate} />
+            {file && <p className="disclaim">{file.name}</p>}
+
+            {genMode === "concept" ? (
+              <ConceptForm
+                concept={concept}
+                onChange={setConcept}
+                busy={busy}
+                file={file}
+                onGenerate={generate}
+                hasVersions={!!versions}
+              />
+            ) : (
+              <DetailedForm
+                program={detailed}
+                onChange={setDetailed}
+                busy={busy}
+                file={file}
+                onGenerate={generate}
+                hasVersions={!!versions}
+              />
+            )}
+
+            <VersionList
+              versions={versions}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
+          </>
         )}
       </aside>
     </main>
@@ -319,115 +393,225 @@ function ConceptForm({
   busy,
   file,
   onGenerate,
-  versions,
-  selectedId,
-  onSelect,
+  hasVersions,
 }: {
   concept: ConceptProgram;
   onChange: (c: ConceptProgram) => void;
   busy: boolean;
   file: File | null;
   onGenerate: (f: File) => void;
-  versions: { plan: import("./types").Plan; alternatives: Alternative[] } | null;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  hasVersions: boolean;
 }) {
   const sizeValue = `${concept.desk_width_cm}x${concept.desk_depth_cm}`;
   const ratioPct = Math.round(concept.closed_ratio * 100);
 
   return (
-    <>
-      {/* the plate to plan on — same Dropzone; once a file is chosen the brief drives re-generation */}
-      <Dropzone busy={busy} onFile={onGenerate} />
-      {file && <p className="disclaim">{file.name}</p>}
+    <div className="brief">
+      <Eyebrow style={{ display: "block", marginBottom: 12 }}>Program · brief</Eyebrow>
 
-      <div className="brief">
-        <Eyebrow style={{ display: "block", marginBottom: 12 }}>Program · brief</Eyebrow>
-
-        <div className="brief-field">
-          <span className="brief-label">Planning style</span>
-          <Segmented
-            value={concept.planning_style}
-            onChange={(v) => onChange({ ...concept, planning_style: v })}
-            options={PLANNING_STYLES}
-          />
-        </div>
-
-        <div className="brief-field">
-          <span className="brief-label">Desk type</span>
-          <Segmented
-            value={concept.desk_type}
-            onChange={(v) => onChange({ ...concept, desk_type: v })}
-            options={DESK_TYPES}
-          />
-        </div>
-
-        <div className="brief-field">
-          <span className="brief-label">Desk size · cm</span>
-          <Segmented
-            value={sizeValue}
-            onChange={(v) => {
-              const s = DESK_SIZES.find((d) => d.value === v);
-              if (s) onChange({ ...concept, desk_width_cm: s.w, desk_depth_cm: s.d });
-            }}
-            options={DESK_SIZES.map((s) => ({ value: s.value, label: s.label }))}
-          />
-        </div>
-
-        <div className="brief-field">
-          <label className="brief-label" htmlFor="closed-ratio">
-            Closed offices vs open · <span className="brief-val">{ratioPct}%</span>
-          </label>
-          <input
-            id="closed-ratio"
-            className="brief-slider"
-            type="range"
-            min={0}
-            max={CLOSED_RATIOS.length - 1}
-            step={1}
-            value={CLOSED_RATIOS.indexOf(concept.closed_ratio)}
-            onChange={(e) =>
-              onChange({ ...concept, closed_ratio: CLOSED_RATIOS[Number(e.target.value)] })
-            }
-            aria-valuetext={`${ratioPct}% closed offices`}
-          />
-          <div className="brief-ticks" aria-hidden="true">
-            {CLOSED_RATIOS.map((r) => (
-              <span key={r}>{Math.round(r * 100)}</span>
-            ))}
-          </div>
-        </div>
-
-        <button
-          className="ds-btn ds-btn--primary brief-go"
-          onClick={() => file && onGenerate(file)}
-          disabled={!file || busy}
-        >
-          {busy ? "Generating…" : versions ? "Regenerate versions" : "Generate versions"}
-        </button>
+      <div className="brief-field">
+        <span className="brief-label">Planning style</span>
+        <Segmented
+          value={concept.planning_style}
+          onChange={(v) => onChange({ ...concept, planning_style: v })}
+          options={PLANNING_STYLES}
+        />
       </div>
 
-      {versions && versions.alternatives.length > 0 && (
-        <>
-          <hr className="ds-rule" />
-          <div>
-            <Eyebrow style={{ display: "block", marginBottom: 12 }}>
-              Versions · {versions.alternatives.length}
-            </Eyebrow>
-            <div className="versions" role="list">
-              {versions.alternatives.map((alt) => (
-                <VersionCard
-                  key={alt.id}
-                  alt={alt}
-                  plan={versions.plan}
-                  selected={alt.id === selectedId}
-                  onSelect={() => onSelect(alt.id)}
-                />
-              ))}
+      <div className="brief-field">
+        <span className="brief-label">Desk type</span>
+        <Segmented
+          value={concept.desk_type}
+          onChange={(v) => onChange({ ...concept, desk_type: v })}
+          options={DESK_TYPES}
+        />
+      </div>
+
+      <div className="brief-field">
+        <span className="brief-label">Desk size · cm</span>
+        <Segmented
+          value={sizeValue}
+          onChange={(v) => {
+            const s = DESK_SIZES.find((d) => d.value === v);
+            if (s) onChange({ ...concept, desk_width_cm: s.w, desk_depth_cm: s.d });
+          }}
+          options={DESK_SIZES.map((s) => ({ value: s.value, label: s.label }))}
+        />
+      </div>
+
+      <div className="brief-field">
+        <label className="brief-label" htmlFor="closed-ratio">
+          Closed offices vs open · <span className="brief-val">{ratioPct}%</span>
+        </label>
+        <input
+          id="closed-ratio"
+          className="brief-slider"
+          type="range"
+          min={0}
+          max={CLOSED_RATIOS.length - 1}
+          step={1}
+          value={CLOSED_RATIOS.indexOf(concept.closed_ratio)}
+          onChange={(e) =>
+            onChange({ ...concept, closed_ratio: CLOSED_RATIOS[Number(e.target.value)] })
+          }
+          aria-valuetext={`${ratioPct}% closed offices`}
+        />
+        <div className="brief-ticks" aria-hidden="true">
+          {CLOSED_RATIOS.map((r) => (
+            <span key={r}>{Math.round(r * 100)}</span>
+          ))}
+        </div>
+      </div>
+
+      <GenerateButton busy={busy} file={file} onGenerate={onGenerate} hasVersions={hasVersions} />
+    </div>
+  );
+}
+
+function DetailedForm({
+  program,
+  onChange,
+  busy,
+  file,
+  onGenerate,
+  hasVersions,
+}: {
+  program: DetailedProgram;
+  onChange: (p: DetailedProgram) => void;
+  busy: boolean;
+  file: File | null;
+  onGenerate: (f: File) => void;
+  hasVersions: boolean;
+}) {
+  const sizeValue = `${program.desk_width_cm}x${program.desk_depth_cm}`;
+  const setRoom = (type: RoomType, patch: Partial<DetailedProgram["rooms"][number]>) =>
+    onChange({
+      ...program,
+      rooms: program.rooms.map((r) => (r.type === type ? { ...r, ...patch } : r)),
+    });
+
+  return (
+    <div className="brief">
+      <Eyebrow style={{ display: "block", marginBottom: 12 }}>Program · rooms</Eyebrow>
+
+      <div className="room-reqs">
+        {ROOM_TYPES.map(({ type, label }) => {
+          const room = program.rooms.find((r) => r.type === type);
+          if (!room) return null;
+          return (
+            <div className="room-req" key={type}>
+              <div className="room-req-head">
+                <span className="brief-label">{label}</span>
+                <div className="room-stepper" role="group" aria-label={`${label} count`}>
+                  <button
+                    type="button"
+                    className="room-step"
+                    aria-label={`Fewer ${label}`}
+                    disabled={room.count <= 0}
+                    onClick={() => setRoom(type, { count: Math.max(0, room.count - 1) })}
+                  >
+                    −
+                  </button>
+                  <span className="room-count" aria-live="polite">
+                    {num(room.count)}
+                  </span>
+                  <button
+                    type="button"
+                    className="room-step"
+                    aria-label={`More ${label}`}
+                    onClick={() => setRoom(type, { count: room.count + 1 })}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <Segmented
+                value={room.placement}
+                onChange={(v) => setRoom(type, { placement: v })}
+                options={PLACEMENTS}
+              />
             </div>
-          </div>
-        </>
-      )}
+          );
+        })}
+      </div>
+
+      <div className="brief-field">
+        <span className="brief-label">Desk type</span>
+        <Segmented
+          value={program.desk_type}
+          onChange={(v) => onChange({ ...program, desk_type: v })}
+          options={DESK_TYPES}
+        />
+      </div>
+
+      <div className="brief-field">
+        <span className="brief-label">Desk size · cm</span>
+        <Segmented
+          value={sizeValue}
+          onChange={(v) => {
+            const s = DESK_SIZES.find((d) => d.value === v);
+            if (s) onChange({ ...program, desk_width_cm: s.w, desk_depth_cm: s.d });
+          }}
+          options={DESK_SIZES.map((s) => ({ value: s.value, label: s.label }))}
+        />
+      </div>
+
+      <GenerateButton busy={busy} file={file} onGenerate={onGenerate} hasVersions={hasVersions} />
+    </div>
+  );
+}
+
+function GenerateButton({
+  busy,
+  file,
+  onGenerate,
+  hasVersions,
+}: {
+  busy: boolean;
+  file: File | null;
+  onGenerate: (f: File) => void;
+  hasVersions: boolean;
+}) {
+  return (
+    <button
+      className="ds-btn ds-btn--primary brief-go"
+      onClick={() => file && onGenerate(file)}
+      disabled={!file || busy}
+    >
+      {busy ? "Generating…" : hasVersions ? "Regenerate versions" : "Generate versions"}
+    </button>
+  );
+}
+
+function VersionList({
+  versions,
+  selectedId,
+  onSelect,
+}: {
+  versions: { plan: Plan; alternatives: Alternative[] } | null;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  if (!versions || versions.alternatives.length === 0) return null;
+  return (
+    <>
+      <hr className="ds-rule" />
+      <div>
+        <Eyebrow style={{ display: "block", marginBottom: 12 }}>
+          Versions · {versions.alternatives.length}
+        </Eyebrow>
+        <div className="versions" role="list">
+          {versions.alternatives.map((alt) => (
+            <VersionCard
+              key={alt.id}
+              alt={alt}
+              plan={versions.plan}
+              selected={alt.id === selectedId}
+              onSelect={() => onSelect(alt.id)}
+            />
+          ))}
+        </div>
+      </div>
     </>
   );
 }
@@ -439,7 +623,7 @@ function VersionCard({
   onSelect,
 }: {
   alt: Alternative;
-  plan: import("./types").Plan;
+  plan: Plan;
   selected: boolean;
   onSelect: () => void;
 }) {
