@@ -90,13 +90,42 @@ header.bar {
   padding: 20px; overflow: hidden; animation: fade 0.5s ease both; }
 .cad-svg svg { width: 100%; height: 100%; max-height: 100%; max-width: 100%; }
 
-/* real extracted-layout 2D plan */
-.layout-plan { position: absolute; inset: 0; animation: fade 0.5s ease both; }
-.layout-plan svg { width: 100%; height: 100%; max-height: 78vh; overflow: visible; }
-.layout-plan .room-label { font-family: var(--sans); font-size: 1.9px; font-weight: 600;
+/* interactive 2D plan (fit + extracted layout) — pan/zoom viewport, top padding clears the toggle */
+.plan-viewport { position: absolute; inset: 0; box-sizing: border-box; padding-top: 72px;
+  animation: fade 0.5s ease both; touch-action: none; }
+/* clip the zoomed/panned drawing to its frame so it never spills over the toggle or side panel */
+.plan-viewport svg { width: 100%; height: 100%; max-height: 100%; overflow: hidden;
+  cursor: grab; user-select: none; }
+.plan-viewport svg.is-panning { cursor: grabbing; }
+.plan-viewport .room-label { font-family: var(--sans); font-size: 1.9px; font-weight: 600;
   fill: var(--ink-2); letter-spacing: 0.02em; pointer-events: none; }
-.layout-plan .room-label .room-area { font-family: var(--serif); font-weight: 400;
+.plan-viewport .room-label .room-area { font-family: var(--serif); font-weight: 400;
   font-size: 1.8px; fill: var(--accent); }
+
+/* hover/focus room highlight — extracted-layout rooms shift to the accent */
+.layout-room { cursor: pointer; }
+.layout-room:focus-visible { outline: none; }
+.layout-room:hover .room-shape,
+.layout-room:focus-visible .room-shape { fill: var(--accent-soft); stroke: var(--accent); }
+
+/* floating room tag — name + area near the cursor / focused room */
+.room-tag { position: absolute; z-index: 7; transform: translate(-50%, calc(-100% - 10px));
+  pointer-events: none; display: flex; flex-direction: column; gap: 1px;
+  padding: 5px 9px; background: var(--paper-veil); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); border-radius: var(--r2); box-shadow: var(--shadow-2); }
+.room-tag-name { font: var(--t-small); font-weight: 600; color: var(--ink); letter-spacing: 0.02em; }
+.room-tag-area { font-family: var(--serif); font-size: 12px; color: var(--accent); }
+
+/* pan/zoom affordance — hint + reset, bottom-centre (clear of the legend and scale bar) */
+.plan-controls { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  background: var(--paper-veil); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); border-radius: var(--r-pill); }
+.plan-hint { font: var(--t-small); color: var(--muted); letter-spacing: 0.02em; }
+.plan-reset { border: none; background: none; padding: 0; cursor: pointer;
+  font: 500 12px/1 var(--sans); color: var(--accent); }
+.plan-reset:hover { text-decoration: underline; }
+.plan-reset:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; border-radius: var(--r1); }
 .scale-label { font-family: var(--sans); font-size: 1.6px; fill: var(--ink-2);
   letter-spacing: 0.02em; pointer-events: none; }
 
@@ -275,12 +304,14 @@ header.bar {
 }
 .link-btn:hover { text-decoration: underline; }
 .link-btn:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
-/* a pinnable room on the 2D plan: hover/focus hints it's interactive */
-/* the room's poché wall (polygon bands) takes the accent on hover/focus to hint it's pinnable */
+/* enclosed fit-room on the 2D plan: hover/focus shifts the wall to the accent + washes the floor.
+   Pinnable rooms also get a pointer cursor; pinned rooms stay filled accent via their inline fill. */
 .fit-room--pinnable { cursor: pointer; }
 .fit-room--pinnable:focus-visible { outline: none; }
-.fit-room--pinnable:focus-visible polygon { fill: var(--accent); }
-.fit-room--pinnable:hover polygon { fill: var(--accent); }
+.fit-room:hover .poche-band,
+.fit-room--pinnable:focus-visible .poche-band { fill: var(--accent); }
+.fit-room:hover .fit-room-floor,
+.fit-room--pinnable:focus-visible .fit-room-floor { fill: var(--accent-soft); }
 .room-req-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .room-stepper {
   display: inline-flex; align-items: center; gap: var(--s2);

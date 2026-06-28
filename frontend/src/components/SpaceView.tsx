@@ -115,7 +115,7 @@ function Floor({ plan, w, finish }: { plan: Plan; w: World; finish: typeof FLOOR
         color={finish.color}
         roughness={finish.roughness}
         metalness={0}
-        envMapIntensity={0.25}
+        envMapIntensity={0.4}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -309,22 +309,30 @@ function Stool({ color }: { color: string }) {
   );
 }
 
-/* tv / screen: a thin dark panel on a small floor stand */
+/* tv / screen: a clean wall-mounted panel. Sized so its top stays under the 3.6 ft dollhouse cut,
+   given real depth + a small standoff off the wall behind it, and polygonOffset so the dark face
+   always wins the depth test against that wall (no z-fight flicker, no floating over the wall). */
 function Tv({ w, h }: { w: number; h: number }) {
-  const sw = Math.min(Math.max(w, h), 5.5);
+  const sw = Math.min(Math.max(w, h), 4.4);
+  const screenH = sw * 0.56;
+  const cy = Math.min(2.2, DOLLHOUSE_H - screenH / 2 - 0.1); // keep top under the dollhouse cut
+  const depth = 0.3;
+  const standoff = depth / 2 + 0.06; // push the panel just off any wall it backs onto
   return (
-    <group>
-      <mesh position={[0, 4, 0]} castShadow>
-        <boxGeometry args={[sw, sw * 0.56, 0.12]} />
-        <meshStandardMaterial color="#23211d" roughness={0.25} metalness={0.1} />
+    <group position={[0, 0, standoff]}>
+      <mesh position={[0, cy, 0]} castShadow>
+        <boxGeometry args={[sw + 0.12, screenH + 0.12, depth]} />
+        <meshStandardMaterial
+          color="#1a1916" roughness={0.5} metalness={0.2}
+          polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2}
+        />
       </mesh>
-      <mesh position={[0, 1.4, 0]} castShadow>
-        <boxGeometry args={[0.2, 2.8, 0.2]} />
-        <meshStandardMaterial color={LEG} roughness={0.5} metalness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.1, 0]} castShadow>
-        <boxGeometry args={[sw * 0.4, 0.2, 0.8]} />
-        <meshStandardMaterial color={LEG} roughness={0.5} metalness={0.3} />
+      <mesh position={[0, cy, depth / 2 + 0.01]} castShadow>
+        <boxGeometry args={[sw, screenH, 0.03]} />
+        <meshStandardMaterial
+          color="#26241f" roughness={0.16} metalness={0.1} envMapIntensity={0.6}
+          polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2}
+        />
       </mesh>
     </group>
   );
@@ -461,11 +469,30 @@ function LayoutWalls({ layout, w }: { layout: ExtractedLayout; w: World }) {
   );
 }
 
+/* Extracted CAD often carries stacked duplicates — the same chair/desk drawn twice at virtually
+   the same spot — which read as overlapping clutter in 3D. Keep the first of any same-category
+   pair whose centres sit within ~0.5 ft of each other. */
+function dedupeFurniture(furniture: ExtractedFurniture[]): ExtractedFurniture[] {
+  const kept: ExtractedFurniture[] = [];
+  for (const f of furniture) {
+    const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+    const overlaps = kept.some(
+      (k) => k.category === f.category && Math.hypot(k.x + k.w / 2 - cx, k.y + k.h / 2 - cy) < 0.5,
+    );
+    if (!overlaps) kept.push(f);
+  }
+  return kept;
+}
+
 function LayoutScene({ layout, floor, finish }: {
   layout: ExtractedLayout; floor: typeof FLOORS[number]; finish: typeof FINISHES[number];
 }) {
   const [minx, miny, maxx, maxy] = layout.bounds;
   const w = useMemo(() => worldFromBounds(minx, miny, maxx, maxy), [minx, miny, maxx, maxy]);
+  const furniture = useMemo(
+    () => dedupeFurniture(layout.furniture).slice(0, MAX_RENDER),
+    [layout.furniture],
+  );
   return (
     <>
       <SceneLighting size={w.size} />
@@ -475,12 +502,12 @@ function LayoutScene({ layout, floor, finish }: {
           color={floor.color}
           roughness={floor.roughness}
           metalness={0}
-          envMapIntensity={0.25}
+          envMapIntensity={0.4}
           side={THREE.DoubleSide}
         />
       </mesh>
       <LayoutWalls layout={layout} w={w} />
-      {layout.furniture.slice(0, MAX_RENDER).map((f, i) => (
+      {furniture.map((f, i) => (
         <group
           key={i}
           position={[w.wx(f.x + f.w / 2), 0, w.wz(f.y + f.h / 2)]}
@@ -489,7 +516,7 @@ function LayoutScene({ layout, floor, finish }: {
           <CategoryPiece f={f} finish={finish.color} />
         </group>
       ))}
-      <ContactShadows frames={1} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.6} opacity={0.32} far={20} />
+      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.1} opacity={0.42} far={22} />
       <OrbitControls makeDefault enablePan target={[0, 0, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={20} />
     </>
   );
@@ -581,7 +608,7 @@ function Scene({ plan, instances, floor, finish }: {
           <Piece it={it} finish={finish.color} />
         </group>
       ))}
-      <ContactShadows frames={1} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.6} opacity={0.32} far={20} />
+      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.1} opacity={0.42} far={22} />
       <OrbitControls makeDefault enablePan target={[0, 0, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={20} />
     </>
   );

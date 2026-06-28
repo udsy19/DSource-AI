@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   ExtractedLayout,
   FurnitureCategory,
@@ -260,6 +260,202 @@ function sheetName(source: string): string {
   return clean || "EXTRACTED LAYOUT";
 }
 
+// ── pan + zoom ──
+// One shared interaction for both plans: wheel zooms toward the cursor, pointer-drag pans, and
+// double-click resets. Transform lives in viewBox units and drives a single <g> wrapping the whole
+// sheet — strokes carry vectorEffect="non-scaling-stroke" so they stay crisp at any zoom.
+const MIN_K = 1;
+const MAX_K = 10;
+const DRAG_THRESHOLD = 4; // px of pointer travel before a press counts as a pan (not a click)
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+type Transform = { k: number; tx: number; ty: number };
+
+function usePanZoom(w: number, h: number) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [t, setT] = useState<Transform>({ k: 1, tx: 0, ty: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const moved = useRef(false); // true once the active gesture passed the drag threshold
+
+  // keep the sheet filling the viewport: at k=1 pan is pinned to 0, so the plan can never be lost.
+  const settle = (k: number, tx: number, ty: number): Transform => {
+    const kk = clamp(k, MIN_K, MAX_K);
+    return { k: kk, tx: clamp(tx, w * (1 - kk), 0), ty: clamp(ty, h * (1 - kk), 0) };
+  };
+
+  // client px → viewBox units (honours preserveAspectRatio letterboxing)
+  const toViewBox = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM();
+    if (!svg || !ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    return pt.matrixTransform(ctm.inverse());
+  };
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault(); // zoom the plan instead of scrolling the page
+      const p = toViewBox(e.clientX, e.clientY);
+      if (!p) return;
+      setT((prev) => {
+        const k = clamp(prev.k * Math.exp(-e.deltaY * 0.0015), MIN_K, MAX_K);
+        const cx = (p.x - prev.tx) / prev.k;
+        const cy = (p.y - prev.ty) / prev.k;
+        return settle(k, p.x - cx * k, p.y - cy * k);
+      });
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [w, h]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    svgRef.current?.setPointerCapture(e.pointerId);
+    drag.current = { x: e.clientX, y: e.clientY, tx: t.tx, ty: t.ty };
+    moved.current = false;
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!moved.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    moved.current = true;
+    if (!isPanning) setIsPanning(true);
+    const ctm = svgRef.current?.getScreenCTM();
+    if (!ctm) return;
+    setT((prev) => settle(prev.k, d.tx + dx / ctm.a, d.ty + dy / ctm.d));
+  };
+
+  const endDrag = (e: React.PointerEvent) => {
+    if (svgRef.current?.hasPointerCapture(e.pointerId)) svgRef.current.releasePointerCapture(e.pointerId);
+    drag.current = null;
+    if (isPanning) setIsPanning(false);
+    // moved.current is left set until the next press so the trailing click can be ignored
+  };
+
+  const reset = () => setT({ k: 1, tx: 0, ty: 0 });
+  const zoomed = t.k > 1.001 || t.tx !== 0 || t.ty !== 0;
+
+  return {
+    svgRef,
+    transform: `translate(${t.tx} ${t.ty}) scale(${t.k})`,
+    isPanning,
+    zoomed,
+    reset,
+    didDrag: () => moved.current,
+    handlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: endDrag,
+      onPointerCancel: endDrag,
+      onDoubleClick: reset,
+    },
+  };
+}
+
+type RoomTag = { name: string; area: number; left: number; top: number };
+
+// What a plan's `draw` closure receives: a click guard (so a pan never fires a room's onClick) and a
+// binder that wires hover/focus highlight + the floating room tag onto a room <g>.
+type PlanApi = {
+  didDrag: () => boolean;
+  bindRoom: (name: string, area: number) => {
+    onPointerEnter: (e: React.PointerEvent) => void;
+    onPointerMove: (e: React.PointerEvent) => void;
+    onPointerLeave: () => void;
+    onFocus: (e: React.FocusEvent<SVGGElement>) => void;
+    onBlur: () => void;
+  };
+};
+
+// Shared sheet shell for both plans: the pan/zoom <svg>, the drafted sheet furniture, the hover
+// room tag, and the pan/zoom hint + reset control. `draw` paints the plan body inside the transform.
+function PlanStage({
+  view,
+  span,
+  title,
+  kind,
+  draw,
+  overlay,
+}: {
+  view: View;
+  span: number;
+  title: string;
+  kind: string;
+  draw: (api: PlanApi) => ReactNode;
+  overlay?: ReactNode;
+}) {
+  const pz = usePanZoom(view.w, view.h);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [tag, setTag] = useState<RoomTag | null>(null);
+
+  const showTag = (name: string, area: number, clientX: number, clientY: number) => {
+    if (pz.isPanning) return;
+    const host = hostRef.current;
+    if (!host) return;
+    const r = host.getBoundingClientRect();
+    setTag({ name, area, left: clientX - r.left, top: clientY - r.top });
+  };
+
+  const api: PlanApi = {
+    didDrag: pz.didDrag,
+    bindRoom: (name, area) => ({
+      onPointerEnter: (e) => showTag(name, area, e.clientX, e.clientY),
+      onPointerMove: (e) => showTag(name, area, e.clientX, e.clientY),
+      onPointerLeave: () => setTag(null),
+      onFocus: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        showTag(name, area, r.left + r.width / 2, r.top);
+      },
+      onBlur: () => setTag(null),
+    }),
+  };
+
+  return (
+    <div className="plan-viewport" ref={hostRef}>
+      <svg
+        ref={pz.svgRef}
+        viewBox={`0 0 ${view.w} ${view.h}`}
+        preserveAspectRatio="xMidYMid meet"
+        className={pz.isPanning ? "is-panning" : undefined}
+        role="application"
+        aria-label={`${title} floor plan — drag to pan, scroll to zoom`}
+        {...pz.handlers}
+      >
+        <PlanDefs />
+        <g transform={pz.transform}>
+          {draw(api)}
+          <SheetFurniture view={view} span={span} title={title} kind={kind} />
+        </g>
+      </svg>
+      {tag && (
+        <div className="room-tag" style={{ left: tag.left, top: tag.top }} aria-hidden="true">
+          <span className="room-tag-name">{tag.name}</span>
+          {tag.area > 0 && <span className="room-tag-area">{Math.round(tag.area)} sf</span>}
+        </div>
+      )}
+      <div className="plan-controls">
+        <span className="plan-hint">drag to pan · scroll to zoom</span>
+        {pz.zoomed && (
+          <button type="button" className="plan-reset" onClick={pz.reset}>
+            Reset view
+          </button>
+        )}
+      </div>
+      {overlay}
+    </div>
+  );
+}
+
 export default function PlanCanvas(props: Props) {
   if ("layout" in props) return <LayoutPlan layout={props.layout} />;
   return <FitPlan {...props} />;
@@ -287,8 +483,8 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
       : pts;
 
   return (
-    <svg viewBox={`0 0 ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet">
-      <PlanDefs />
+    <PlanStage view={view} span={maxX - minX} title="TEST-FIT" kind="SPACE PLAN" draw={(api) => (
+    <>
       {/* cores — faint structural fill ringed by a heavy core-poché wall */}
       {plan.cores.map((c, i) => (
         <g key={`core-${i}`}>
@@ -339,12 +535,17 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
           <g
             key={`i-${i}`}
             transform={`translate(${ox} ${oy}) rotate(${-it.rotation} ${cx - ox} ${cy - oy})`}
-            className="fit-room--pinnable"
-            role={pinnable ? "button" : undefined}
+            className={pinnable ? "fit-room fit-room--pinnable" : "fit-room"}
+            role={pinnable ? "button" : "img"}
             tabIndex={pinnable ? 0 : undefined}
             aria-pressed={pinnable ? pinned : undefined}
-            aria-label={pinnable ? `${pinned ? "Unpin" : "Pin"} ${kind.room}` : undefined}
-            onClick={pin}
+            aria-label={
+              pinnable
+                ? `${pinned ? "Unpin" : "Pin"} ${kind.room}, ${Math.round(it.w * it.h)} square feet`
+                : `${kind.room}, ${Math.round(it.w * it.h)} square feet`
+            }
+            {...api.bindRoom(kind.room!, it.w * it.h)}
+            onClick={pin ? () => { if (!api.didDrag()) pin(); } : undefined}
             onKeyDown={
               pin
                 ? (e) => {
@@ -361,8 +562,9 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
             </clipPath>
             {/* soft lift — an opaque paper caster (invisible against the sheet) casts the shadow */}
             <rect x={0} y={0} width={it.w} height={it.h} fill="var(--paper)" filter="url(#plan-lift)" />
-            {/* floor fill — subtle program-family tint, accent-soft when pinned */}
+            {/* floor fill — subtle program-family tint, accent-soft when pinned or hovered */}
             <rect
+              className="fit-room-floor"
               x={0}
               y={0}
               width={it.w}
@@ -404,9 +606,8 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin }: FitProps) {
       {pocheBands(closed(plan.boundary), WALL.perimeter.thickness, view.fx, view.fy).map((pts, j) => (
         <polygon key={`b-${j}`} className="poche-band" points={pts} fill="var(--poche-perimeter)" vectorEffect="non-scaling-stroke" />
       ))}
-
-      <SheetFurniture view={view} span={maxX - minX} title="TEST-FIT" kind="SPACE PLAN" />
-    </svg>
+    </>
+    )} />
   );
 }
 
@@ -419,18 +620,21 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
     [layout.walls],
   );
 
-  // De-conflict room labels: place the largest rooms first and skip any whose label box would
-  // collide with one already placed, so dense clusters of small rooms don't pile into an
-  // unreadable smear. (Box sizes are in feet — the SVG units — estimated from the label length.)
+  // De-conflict room labels: place the largest rooms first and drop any whose (padded) label box
+  // would collide with one already placed, so dense office/conference clusters never smear. Rooms
+  // too small to hold a legible label are dropped outright — every room still lists in the side
+  // panel and reveals its name + area on hover. (Box half-extents are in feet — the SVG units.)
+  const MIN_LABEL_AREA = 60; // sf — below this a two-line label can't fit inside the room
   const labelled = useMemo(() => {
     const placed: { x: number; y: number; hw: number; hh: number }[] = [];
     const show = new Set<string>();
     for (const r of [...layout.rooms].filter((r) => r.label && r.center).sort((a, b) => b.area_sf - a.area_sf)) {
+      if (r.area_sf > 0 && r.area_sf < MIN_LABEL_AREA) continue;
       const x = view.fx(r.center![0]);
       const y = view.fy(r.center![1]);
-      // label box in feet: ~1.05 ft per char wide, two lines (name + area) tall, + breathing room
-      const hw = Math.max(r.label.length * 0.62, 5);
-      const hh = r.area_sf > 0 ? 3.4 : 1.8;
+      // padded label box: ~0.75 ft per char wide (+1.5 ft breathing room), two lines tall
+      const hw = Math.max(r.label.length * 0.75, 6.5) + 1.5;
+      const hh = r.area_sf > 0 ? 4.4 : 2.8;
       if (!placed.some((p) => Math.abs(p.x - x) < p.hw + hw && Math.abs(p.y - y) < p.hh + hh)) {
         placed.push({ x, y, hw, hh });
         show.add(r.id);
@@ -443,21 +647,49 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
     pts.map(([x, y]) => `${view.fx(x).toFixed(2)},${view.fy(y).toFixed(2)}`).join(" ");
 
   return (
-    <div className="layout-plan">
-      <svg viewBox={`0 0 ${view.w} ${view.h}`} preserveAspectRatio="xMidYMid meet">
-        <PlanDefs />
+    <PlanStage
+      view={view}
+      span={maxx - minx}
+      title={sheetName(layout.source)}
+      kind="EXTRACTED LAYOUT"
+      overlay={
+        // wall-type legend — only the types actually present
+        <ul className="wall-legend" aria-label="Wall types">
+          {(Object.keys(WALL) as WallType[])
+            .filter((t) => usedTypes.has(t))
+            .map((t) => (
+              <li key={t}>
+                <span className="swatch" style={{ background: `var(${WALL[t].token})` }} aria-hidden="true" />
+                {WALL[t].label}
+              </li>
+            ))}
+        </ul>
+      }
+      draw={(api) => (
+      <>
         {/* rooms — faint filled polygons (where the walls close) with the label + area placed at
-            the room's anchor, so every read room shows on the plan even without a closed boundary */}
+            the room's anchor, so every read room shows on the plan even without a closed boundary.
+            Closed rooms are hover/focus targets: the shape shifts to the accent and a name + area
+            tag follows the cursor (so even de-conflicted, label-suppressed rooms stay identifiable). */}
         {layout.rooms.map((r) => {
           const cx = r.center ? view.fx(r.center[0]) : null;
           const cy = r.center ? view.fy(r.center[1]) : null;
+          const interactive = r.polygon.length >= 3;
           return (
-            <g key={`room-${r.id}`}>
-              {r.polygon.length >= 3 && (
+            <g
+              key={`room-${r.id}`}
+              className={interactive ? "layout-room" : undefined}
+              role={interactive ? "img" : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              aria-label={interactive ? `${r.label || "Room"}, ${Math.round(r.area_sf)} square feet` : undefined}
+              {...(interactive ? api.bindRoom(r.label || "Room", r.area_sf) : {})}
+            >
+              {interactive && (
                 <>
                   {/* soft lift — opaque paper caster (invisible against the sheet) carries the shadow */}
                   <polygon points={polyline(r.polygon)} fill="var(--paper)" filter="url(#plan-lift)" />
                   <polygon
+                    className="room-shape"
                     points={polyline(r.polygon)}
                     fill={`var(${r.label ? roomFamilyFill(r.label) : "--room-fill"})`}
                     stroke="var(--room-line)"
@@ -538,21 +770,8 @@ function LayoutPlan({ layout }: { layout: ExtractedLayout }) {
             </g>
           );
         })}
-
-        <SheetFurniture view={view} span={maxx - minx} title={sheetName(layout.source)} kind="EXTRACTED LAYOUT" />
-      </svg>
-
-      {/* wall-type legend — only the types actually present */}
-      <ul className="wall-legend" aria-label="Wall types">
-        {(Object.keys(WALL) as WallType[])
-          .filter((t) => usedTypes.has(t))
-          .map((t) => (
-            <li key={t}>
-              <span className="swatch" style={{ background: `var(${WALL[t].token})` }} aria-hidden="true" />
-              {WALL[t].label}
-            </li>
-          ))}
-      </ul>
-    </div>
+      </>
+      )}
+    />
   );
 }
