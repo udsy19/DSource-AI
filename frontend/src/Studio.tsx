@@ -17,6 +17,7 @@ import Dropzone from "./components/Dropzone";
 import PlanCanvas, { instanceKey } from "./components/PlanCanvas";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented } from "./design/ui";
+import { layoutFromFit } from "./fitToLayout";
 import type {
   Alternative,
   ConceptProgram,
@@ -217,6 +218,16 @@ export default function Studio() {
     }
   }
 
+  // Adopt the selected generated version as a read-layout — synthesize the ExtractedLayout and
+  // open it in Read mode, so the generated design gets the full room/wall/inventory treatment.
+  function adoptLayout() {
+    const sel = versions?.alternatives.find((a) => a.id === selectedId);
+    if (!versions || !sel) return;
+    setLayout(layoutFromFit(versions.plan, sel.testfit.instances));
+    setStudioMode("read");
+    setView("plan");
+  }
+
   const togglePin = (it: Instance) => {
     const key = instanceKey(it);
     setPinned((prev) =>
@@ -380,35 +391,42 @@ export default function Studio() {
                 )}
 
                 <hr className="ds-rule" />
-                <div className="exports">
-                  <Eyebrow style={{ display: "block", marginBottom: 14 }}>Export · deliverables</Eyebrow>
-                  <div className="export-actions">
-                    <button
-                      className="export-btn export-btn--primary"
-                      onClick={() => runExport("report", exportReport)}
-                      disabled={!!exporting}
-                    >
-                      <span className="export-btn-label">Space-planning report</span>
-                      <span className="export-btn-meta">{exporting === "report" ? "Preparing…" : "PDF · 3 options"}</span>
-                    </button>
-                    <button
-                      className="export-btn"
-                      onClick={() => runExport("takeoff", () => downloadLayoutTakeoff(file!))}
-                      disabled={!!exporting}
-                    >
-                      <span className="export-btn-label">Quantity takeoff</span>
-                      <span className="export-btn-meta">{exporting === "takeoff" ? "Preparing…" : "Excel · 9 sheets"}</span>
-                    </button>
-                    <button
-                      className="export-btn"
-                      onClick={() => runExport("ifc", () => downloadIfc(file!))}
-                      disabled={!!exporting}
-                    >
-                      <span className="export-btn-label">BIM model</span>
-                      <span className="export-btn-meta">{exporting === "ifc" ? "Preparing…" : "IFC"}</span>
-                    </button>
+                {layout.source === "generated" ? (
+                  <Callout quiet>
+                    Adopted from a generated version. Deliverables (report, takeoff, BIM, CAD) export
+                    from that version in Generate mode.
+                  </Callout>
+                ) : (
+                  <div className="exports">
+                    <Eyebrow style={{ display: "block", marginBottom: 14 }}>Export · deliverables</Eyebrow>
+                    <div className="export-actions">
+                      <button
+                        className="export-btn export-btn--primary"
+                        onClick={() => runExport("report", exportReport)}
+                        disabled={!!exporting}
+                      >
+                        <span className="export-btn-label">Space-planning report</span>
+                        <span className="export-btn-meta">{exporting === "report" ? "Preparing…" : "PDF · 3 options"}</span>
+                      </button>
+                      <button
+                        className="export-btn"
+                        onClick={() => runExport("takeoff", () => downloadLayoutTakeoff(file!))}
+                        disabled={!!exporting}
+                      >
+                        <span className="export-btn-label">Quantity takeoff</span>
+                        <span className="export-btn-meta">{exporting === "takeoff" ? "Preparing…" : "Excel · 9 sheets"}</span>
+                      </button>
+                      <button
+                        className="export-btn"
+                        onClick={() => runExport("ifc", () => downloadIfc(file!))}
+                        disabled={!!exporting}
+                      >
+                        <span className="export-btn-label">BIM model</span>
+                        <span className="export-btn-meta">{exporting === "ifc" ? "Preparing…" : "IFC"}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </>
@@ -495,6 +513,24 @@ export default function Studio() {
 
             {versions && selected && (
               <>
+                <hr className="ds-rule" />
+                <div className="adopt">
+                  <Eyebrow style={{ display: "block", marginBottom: 10 }}>Layout · adopt version</Eyebrow>
+                  <p className="disclaim" style={{ marginBottom: 12 }}>
+                    Move version {selected.id} into Read layout — its rooms, partitions, and desks
+                    become a full layout you can inspect in 2D, 3D, and the inventory.
+                  </p>
+                  <button
+                    className="export-btn export-btn--primary"
+                    style={{ width: "100%" }}
+                    onClick={adoptLayout}
+                    disabled={busy}
+                  >
+                    <span className="export-btn-label">Open in Read layout</span>
+                    <span className="export-btn-meta">→ rooms · walls · inventory</span>
+                  </button>
+                </div>
+
                 <hr className="ds-rule" />
                 <div className="exports">
                   <Eyebrow style={{ display: "block", marginBottom: 14 }}>
