@@ -92,7 +92,7 @@ function SceneLighting({ size }: { size: number }) {
       <color attach="background" args={["#f4f1ea"]} />
       <fog attach="fog" args={["#ece7da", size * 1.9, size * 4.6]} />
       <Suspense fallback={null}>
-        <Environment preset="apartment" environmentIntensity={0.32} />
+        <Environment preset="apartment" environmentIntensity={0.4} />
       </Suspense>
       <ambientLight intensity={0.32} />
       <hemisphereLight args={["#fff5e8", "#cfc7b6", 0.4]} />
@@ -133,42 +133,115 @@ function WallMaterial({ wall }: { wall: (typeof WALLS)[number] }) {
   );
 }
 
+/* A real acoustic-tile face, baked once into a small repeating CanvasTexture: a light tile centre,
+   a soft inner bevel, and a darker recessed seam around each 2 ft tile. One texture + one plane =
+   one draw call for the whole ceiling, so it stays cheap over a big floor plate. The texture repeats
+   once per 2 ft tile (set via .repeat), so seams land on a true 2 ft grid regardless of room size. */
+function useCeilingTexture(width: number, depth: number) {
+  const tex = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#b9b3a4"; // recessed seam / shadow gap
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = "#e7e3da"; // tile edge
+    ctx.fillRect(4, 4, 120, 120);
+    ctx.fillStyle = "#f1eee7"; // tile face (faint inner bevel highlight)
+    ctx.fillRect(8, 8, 112, 112);
+    ctx.fillStyle = "rgba(150,144,132,0.18)"; // light acoustic fissure speckle
+    for (let i = 0; i < 70; i++) {
+      const x = 8 + Math.random() * 112;
+      const y = 8 + Math.random() * 112;
+      ctx.fillRect(x, y, 1.4, 1.4);
+    }
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(depth / 2)));
+    t.anisotropy = 4;
+    return t;
+  }, [width, depth]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  return tex;
+}
+
 /* Ceiling for Full-height view only — a plane at the top of the walls. Open = exposed (no ceiling);
-   Acoustic = a 2 ft grid; Drywall = flat warm white; Wood slat = parallel slats. It never casts
+   Acoustic = a real 2 ft drop-tile grid; Drywall = clean matte with a faint perimeter reveal;
+   Wood slat = even warm-timber slats over a dark reveal. Recessed troffer fixtures (emissive panels
+   + a small point-light each) make the interior read as a real lit room. The ceiling never casts
    shadow, so it doesn't occlude the baked key light and the interior stays lit. */
 function Ceiling({ width, depth, height, type }: {
   width: number; depth: number; height: number; type: CeilingType;
 }) {
+  const tex = useCeilingTexture(width, depth);
   const slats = useMemo(() => {
     const pitch = 2.2;
     const n = Math.max(2, Math.round(depth / pitch));
     const step = depth / n;
     const positions = Array.from({ length: n }, (_, i) => -depth / 2 + step * (i + 0.5));
-    return { positions, slatDepth: step * 0.72 };
+    return { positions, slatDepth: step * 0.8 };
   }, [depth]);
+  // A few recessed troffers on a coarse grid (≤4 fixtures ⇒ ≤4 extra non-shadow lights, bounded cost).
+  const fixtures = useMemo(() => {
+    const nx = Math.min(2, Math.max(1, Math.round(width / 14)));
+    const nz = Math.min(2, Math.max(1, Math.round(depth / 14)));
+    const pts: [number, number][] = [];
+    for (let i = 0; i < nx; i++)
+      for (let j = 0; j < nz; j++)
+        pts.push([-width / 2 + width * ((i + 0.5) / nx), -depth / 2 + depth * ((j + 0.5) / nz)]);
+    return pts;
+  }, [width, depth]);
 
   if (type === "Open") return null;
-  const baseColor = type === "Wood slat" ? "#5d4a34" : type === "Acoustic" ? "#dcd8cd" : "#efeae6";
-  const span = Math.max(width, depth);
   return (
     <group position={[0, height, 0]}>
-      <mesh rotation-x={Math.PI / 2} receiveShadow>
-        <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial
-          color={baseColor} roughness={type === "Wood slat" ? 0.7 : 0.95}
-          metalness={0} envMapIntensity={0.2} side={THREE.DoubleSide}
-        />
-      </mesh>
       {type === "Acoustic" && (
-        <gridHelper args={[span, Math.max(2, Math.round(span / 2)), "#b4ae9f", "#c6c0b2"]} position={[0, -0.02, 0]} />
+        <mesh rotation-x={Math.PI / 2} receiveShadow>
+          <planeGeometry args={[width, depth]} />
+          <meshStandardMaterial
+            map={tex} color="#ffffff" roughness={0.96} metalness={0}
+            envMapIntensity={0.22} side={THREE.DoubleSide}
+          />
+        </mesh>
       )}
-      {type === "Wood slat" &&
-        slats.positions.map((z, i) => (
-          <mesh key={i} position={[0, -0.07, z]}>
-            <boxGeometry args={[width, 0.14, slats.slatDepth]} />
-            <meshStandardMaterial color="#7a5c3a" roughness={0.62} metalness={0.03} envMapIntensity={0.3} />
+      {type === "Drywall" && (
+        <>
+          {/* full-size darker plane reads as a recessed shadow reveal where ceiling meets wall */}
+          <mesh rotation-x={Math.PI / 2} position={[0, 0.04, 0]}>
+            <planeGeometry args={[width, depth]} />
+            <meshStandardMaterial color="#bdb8ab" roughness={1} metalness={0} side={THREE.DoubleSide} />
           </mesh>
-        ))}
+          <mesh rotation-x={Math.PI / 2} receiveShadow>
+            <planeGeometry args={[width - 0.5, depth - 0.5]} />
+            <meshStandardMaterial color="#f1ede6" roughness={0.96} metalness={0} envMapIntensity={0.18} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
+      {type === "Wood slat" && (
+        <>
+          <mesh rotation-x={Math.PI / 2}>
+            <planeGeometry args={[width, depth]} />
+            <meshStandardMaterial color="#34291c" roughness={0.9} metalness={0} side={THREE.DoubleSide} />
+          </mesh>
+          {slats.positions.map((z, i) => (
+            <mesh key={i} position={[0, -0.08, z]} castShadow receiveShadow>
+              <boxGeometry args={[width, 0.16, slats.slatDepth]} />
+              <meshStandardMaterial color="#6b4f30" roughness={0.58} metalness={0.04} envMapIntensity={0.35} />
+            </mesh>
+          ))}
+        </>
+      )}
+      {fixtures.map(([x, z], i) => (
+        <group key={i}>
+          <mesh position={[x, -0.04, z]} rotation-x={Math.PI / 2}>
+            <planeGeometry args={[3.6, 1.6]} />
+            <meshStandardMaterial
+              color="#ffffff" emissive="#fff3df" emissiveIntensity={1.3}
+              roughness={0.4} side={THREE.DoubleSide} toneMapped={false}
+            />
+          </mesh>
+          <pointLight position={[x, -0.6, z]} intensity={6} distance={28} decay={2} color="#fff2db" />
+        </group>
+      ))}
     </group>
   );
 }
@@ -293,11 +366,11 @@ function Chair({ uph }: { uph: string }) {
     <group>
       <mesh position={[0, 1.45, 0]} castShadow>
         <boxGeometry args={[1.5, 0.18, 1.5]} />
-        <meshStandardMaterial color={uph} roughness={0.78} />
+        <meshStandardMaterial color={uph} roughness={0.85} envMapIntensity={0.25} />
       </mesh>
       <mesh position={[0, 2.2, -0.62]} castShadow>
         <boxGeometry args={[1.5, 1.5, 0.16]} />
-        <meshStandardMaterial color={uph} roughness={0.78} />
+        <meshStandardMaterial color={uph} roughness={0.85} envMapIntensity={0.25} />
       </mesh>
       <mesh position={[0, 0.9, 0]} castShadow>
         <cylinderGeometry args={[0.1, 0.1, 1.1, 10]} />
@@ -320,7 +393,10 @@ function Desk({ w, h }: { w: number; h: number }) {
     <group>
       <mesh position={[0, 2.4, 0]} castShadow receiveShadow>
         <boxGeometry args={[topW, 0.12, depth]} />
-        <meshStandardMaterial color={DESK_TOP} roughness={0.42} metalness={0.04} envMapIntensity={0.5} />
+        <meshPhysicalMaterial
+          color={DESK_TOP} roughness={0.38} metalness={0.04}
+          clearcoat={0.45} clearcoatRoughness={0.35} envMapIntensity={0.6}
+        />
       </mesh>
       {[-lx, lx].map((x, i) => (
         <mesh key={i} position={[x, 1.2, 0]} castShadow>
@@ -328,10 +404,21 @@ function Desk({ w, h }: { w: number; h: number }) {
           <meshStandardMaterial color={LEG} roughness={0.45} metalness={0.3} />
         </mesh>
       ))}
-      <mesh position={[0, 3.35, -depth * 0.28]} castShadow>
-        <boxGeometry args={[1.7, 1.0, 0.08]} />
-        <meshStandardMaterial color="#23211d" roughness={0.3} />
-      </mesh>
+      {/* monitor on a slim stand, screen gently lit so the workstation reads as "on" */}
+      <group position={[0, 0, -depth * 0.28]}>
+        <mesh position={[0, 2.66, 0]} castShadow>
+          <boxGeometry args={[0.12, 0.42, 0.08]} />
+          <meshStandardMaterial color={LEG} roughness={0.4} metalness={0.4} />
+        </mesh>
+        <mesh position={[0, 3.35, 0]} castShadow>
+          <boxGeometry args={[1.7, 1.0, 0.08]} />
+          <meshStandardMaterial color="#1c1b18" roughness={0.4} metalness={0.2} />
+        </mesh>
+        <mesh position={[0, 3.35, 0.05]}>
+          <boxGeometry args={[1.55, 0.86, 0.02]} />
+          <meshStandardMaterial color="#2a2f36" emissive="#3b4a57" emissiveIntensity={0.32} roughness={0.2} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -342,7 +429,7 @@ function Table({ w, h }: { w: number; h: number }) {
     <group>
       <mesh position={[0, 2.4, 0]} castShadow receiveShadow>
         <boxGeometry args={[w * 0.5, 0.16, h * 0.42]} />
-        <meshStandardMaterial color={WOOD} roughness={0.3} metalness={0.05} envMapIntensity={0.5} />
+        <meshPhysicalMaterial color={WOOD} roughness={0.32} metalness={0.05} clearcoat={0.35} clearcoatRoughness={0.4} envMapIntensity={0.6} />
       </mesh>
       <mesh position={[0, 1.2, 0]} castShadow>
         <boxGeometry args={[w * 0.18, 2.3, h * 0.12]} />
@@ -355,12 +442,15 @@ function Table({ w, h }: { w: number; h: number }) {
 /* lounge sofa: seat base + back + two arms */
 function Sofa({ color, w }: { color: string; w: number }) {
   const sw = Math.min(w * 0.5, 7);
+  const fabric = (
+    <meshPhysicalMaterial color={color} roughness={0.92} sheen={0.6} sheenRoughness={0.5} sheenColor={color} />
+  );
   return (
     <group>
-      <mesh position={[0, 0.55, 0]} castShadow><boxGeometry args={[sw, 0.8, 1.8]} /><meshStandardMaterial color={color} roughness={0.88} /></mesh>
-      <mesh position={[0, 1.25, -0.75]} castShadow><boxGeometry args={[sw, 1.1, 0.35]} /><meshStandardMaterial color={color} roughness={0.88} /></mesh>
+      <mesh position={[0, 0.55, 0]} castShadow><boxGeometry args={[sw, 0.8, 1.8]} />{fabric}</mesh>
+      <mesh position={[0, 1.25, -0.75]} castShadow><boxGeometry args={[sw, 1.1, 0.35]} />{fabric}</mesh>
       {[-sw / 2 + 0.15, sw / 2 - 0.15].map((x, i) => (
-        <mesh key={i} position={[x, 1.0, 0]} castShadow><boxGeometry args={[0.3, 0.9, 1.8]} /><meshStandardMaterial color={color} roughness={0.88} /></mesh>
+        <mesh key={i} position={[x, 1.0, 0]} castShadow><boxGeometry args={[0.3, 0.9, 1.8]} />{fabric}</mesh>
       ))}
     </group>
   );
@@ -469,17 +559,19 @@ function LowBox({ w, h }: { w: number; h: number }) {
 function CameraRig({ view, size }: { view: ViewMode; size: number }) {
   const { camera, controls } = useThree();
   useEffect(() => {
-    // Full height: sit INSIDE the footprint at eye level (~7 ft, below the 8 ft ceiling) looking
-    // across the room, so walls + ceiling read. Cutaway: the high 3/4 dollhouse view.
+    // Full height: sit INSIDE the footprint at eye level (~6.4 ft, below the 8 ft ceiling) with a
+    // wider lens so the room feels open and the lit ceiling reads. Cutaway: the high 3/4 dollhouse view.
     const pos: [number, number, number] =
       view === "full"
-        ? [size * 0.18, 7, size * 0.22]
+        ? [size * 0.18, 6.4, size * 0.22]
         : [size * 0.92, size * 0.5, size * 0.96];
-    camera.position.set(pos[0], pos[1], pos[2]);
-    camera.updateProjectionMatrix();
+    const cam = camera as THREE.PerspectiveCamera;
+    cam.fov = view === "full" ? 52 : 32;
+    cam.position.set(pos[0], pos[1], pos[2]);
+    cam.updateProjectionMatrix();
     const c = controls as unknown as { target: THREE.Vector3; update: () => void } | null;
     if (c) {
-      c.target.set(0, view === "full" ? 6 : 0, 0);
+      c.target.set(0, view === "full" ? 5.6 : 0, 0);
       c.update();
     }
   }, [view, size, camera, controls]);
@@ -622,7 +714,7 @@ function LayoutScene({ layout, floor, finish, view, wall, ceiling }: {
       {view === "full" && (
         <Ceiling width={(maxx - minx) * 1.1} depth={(maxy - miny) * 1.1} height={LAYOUT_WALL_H} type={ceiling} />
       )}
-      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.1} opacity={0.42} far={22} />
+      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.5} opacity={0.52} far={22} />
       <OrbitControls makeDefault enablePan target={[0, 0, 0]} maxPolarAngle={maxPolar} minDistance={view === "full" ? 4 : 20} />
     </>
   );
@@ -725,7 +817,7 @@ function Scene({ plan, instances, floor, finish, view, wall, ceiling }: {
       {view === "full" && (
         <Ceiling width={ceilDims.width} depth={ceilDims.depth} height={LAYOUT_WALL_H} type={ceiling} />
       )}
-      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.1} opacity={0.42} far={22} />
+      <ContactShadows frames={1} resolution={1024} position={[0, 0.02, 0]} scale={w.size * 2.4} blur={2.5} opacity={0.52} far={22} />
       <OrbitControls makeDefault enablePan target={[0, 0, 0]} maxPolarAngle={maxPolar} minDistance={view === "full" ? 4 : 20} />
     </>
   );
