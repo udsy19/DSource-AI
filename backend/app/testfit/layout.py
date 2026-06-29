@@ -282,19 +282,14 @@ def _place_workstation_field(region, spec: WorkstationSpec) -> list[FurnitureIns
 # Settings slotting: drop a real, SKU-tagged Steelcase room into a matching program room
 # ---------------------------------------------------------------------------
 
-def _pick_setting(inst: FurnitureInstance, settings: list[Setting]) -> Setting | None:
-    """Largest setting whose type matches the room and whose footprint fits the room box.
-
-    Deterministic: ties break on id. Translation-only (no rotation), so a setting is used only when
-    it fits the room in its built orientation; otherwise the room keeps the parametric box.
-    """
-    candidates = [
-        s for s in settings
-        if s.setting_type == inst.type and s.width_ft <= inst.w and s.height_ft <= inst.h
-    ]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda s: (s.sqft, s.id))
+def _fitting_settings(inst: FurnitureInstance, settings: list[Setting]) -> list[Setting]:
+    """Settings whose type matches the room and whose footprint fits the room box, largest first.
+    Translation-only (no rotation): a setting is used only if it fits in its built orientation."""
+    return sorted(
+        (s for s in settings
+         if s.setting_type == inst.type and s.width_ft <= inst.w and s.height_ft <= inst.h),
+        key=lambda s: (s.sqft, s.id), reverse=True,
+    )
 
 
 def slot_settings(
@@ -310,12 +305,16 @@ def slot_settings(
     if not settings:
         return instances
     out = list(instances)
+    used: dict[str, int] = {}  # per room-type counter -> cycle settings so adjacent rooms differ
     for inst in instances:
         if inst.type not in SLOTTABLE_TYPES:
             continue
-        setting = _pick_setting(inst, settings)
-        if setting is None:
+        candidates = _fitting_settings(inst, settings)
+        if not candidates:
             continue
+        i = used.get(inst.type, 0)
+        used[inst.type] = i + 1
+        setting = candidates[i % len(candidates)]
         out += [
             FurnitureInstance(
                 type=f.category, x=round(inst.x + f.dx, 2), y=round(inst.y + f.dy, 2),
