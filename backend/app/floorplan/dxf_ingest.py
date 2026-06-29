@@ -108,18 +108,66 @@ def ingest_cad(content: bytes, filename: str) -> PlanModel:
     return ingest_dxf(content)
 
 
+# ODA File Converter (Open Design Alliance) handles DWGs that LibreDWG mangles — notably Configura
+# CET / Steelcase exports, whose anonymous blocks LibreDWG truncates (breaking INSERT->definition
+# links). Prefer ODA when present, fall back to LibreDWG. Set ODA_FILE_CONVERTER to override the path.
+def _find_oda_converter() -> str | None:
+    import os
+    import shutil
+
+    candidates = [
+        os.environ.get("ODA_FILE_CONVERTER", ""),
+        "/Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter",
+        "/Applications/ODA File Converter.app/Contents/MacOS/ODAFileConverter",
+        shutil.which("ODAFileConverter") or "",
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+def _dwg_to_dxf_with_oda(oda: str, dwg: bytes) -> bytes:
+    """ODA batch-converts a folder, so stage the DWG in its own input dir and read the DXF back.
+    Args: in-dir, out-dir, output-version, output-type, recurse, audit, [input-filter]."""
+    import glob
+    import os
+    import subprocess
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as ind, tempfile.TemporaryDirectory() as outd:
+        with open(os.path.join(ind, "in.dwg"), "wb") as f:
+            f.write(dwg)
+        subprocess.run(
+            [oda, ind, outd, "ACAD2018", "DXF", "0", "1", "*.DWG"],
+            capture_output=True, text=True, timeout=180,
+        )
+        outs = glob.glob(os.path.join(outd, "*.dxf")) + glob.glob(os.path.join(outd, "*.DXF"))
+        if not outs or os.path.getsize(outs[0]) == 0:
+            raise RuntimeError("ODA File Converter produced no DXF.")
+        with open(outs[0], "rb") as f:
+            return f.read()
+
+
 def _dwg_to_dxf_bytes(dwg: bytes) -> bytes:
-    """Convert DWG -> DXF using LibreDWG's dwg2dxf CLI (ezdxf can't read DWG natively).
-    Install on macOS with `brew install libredwg`; on Debian/Ubuntu `apt install libredwg-tools`."""
+    """Convert DWG -> DXF (ezdxf can't read DWG natively). Prefer ODA File Converter (handles CET/
+    Steelcase exports); fall back to LibreDWG's dwg2dxf (`brew install libredwg`)."""
     import os
     import shutil
     import subprocess
     import tempfile
 
+    oda = _find_oda_converter()
+    if oda:
+        try:
+            return _dwg_to_dxf_with_oda(oda, dwg)
+        except Exception:  # noqa: BLE001 - ODA failed; try LibreDWG before giving up
+            pass
+
     if shutil.which("dwg2dxf") is None:
         raise RuntimeError(
-            "DWG files need a converter. Install LibreDWG (`brew install libredwg` on macOS) — "
-            "it provides the dwg2dxf command — then re-upload."
+            "DWG files need a converter. Install ODA File Converter, or LibreDWG "
+            "(`brew install libredwg` on macOS) which provides dwg2dxf — then re-upload."
         )
     with tempfile.TemporaryDirectory() as d:
         dwg_path, dxf_path = os.path.join(d, "in.dwg"), os.path.join(d, "out.dxf")
