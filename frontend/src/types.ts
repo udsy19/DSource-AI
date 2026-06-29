@@ -279,6 +279,8 @@ export interface ExtractedFurniture {
   w: number;
   h: number;
   rotation: number; // degrees, about the item's center
+  list_price?: number | null; // manufacturer list price where the spec carries it (CET CAPPL)
+  outline?: [number, number][][]; // world-coord polylines of the real shape (empty = footprint only)
 }
 
 export interface ExtractedLayout {

@@ -741,16 +741,38 @@ function LayoutPlan({ layout, compact }: { layout: ExtractedLayout; compact?: bo
           );
         })}
 
-        {/* furniture — recognizable top-down plan symbols, line-drawing first with a soft
-            category tint. Each symbol is drawn in local 0..w / 0..h coords inside a <g> that
-            translates to the footprint's top-left corner (world min-x / max-y) and rotates about
-            the centre. Mullions are drawn by the glass panels, not as separate footprints. */}
+        {/* furniture — the item's REAL shape where the CAD carries one (outline polylines, already
+            world coords → mapped straight to screen, no per-item transform), else a recognizable
+            top-down plan symbol drawn in local 0..w / 0..h inside a translated/rotated <g>. Closed
+            outline rings take the soft category tint; open runs are hairline ink only.
+            Mullions are drawn by the glass panels, not as separate footprints. */}
         {layout.furniture.filter((f) => f.category !== "mullion").map((f, i) => {
+          const tint = `var(${FURN[f.category] ?? "--furn-other"})`;
+          const label = `${f.category}${f.brand ? ` · ${f.brand}` : ""}${f.model ? ` ${f.model}` : ""}`;
+
+          if (f.outline?.length) {
+            return (
+              <g key={`f-${i}`} stroke="var(--furn-line)" vectorEffect="non-scaling-stroke">
+                <title>{label}</title>
+                {f.outline.map((ring, j) => {
+                  const closed =
+                    ring.length > 2 &&
+                    ring[0][0] === ring[ring.length - 1][0] &&
+                    ring[0][1] === ring[ring.length - 1][1];
+                  return closed ? (
+                    <polygon key={j} points={polyline(ring)} fill={tint} fillOpacity={0.14} vectorEffect="non-scaling-stroke" />
+                  ) : (
+                    <polyline key={j} points={polyline(ring)} fill="none" vectorEffect="non-scaling-stroke" />
+                  );
+                })}
+              </g>
+            );
+          }
+
           const ox = view.fx(f.x);
           const oy = view.fy(f.y + f.h);
           const cx = view.fx(f.x + f.w / 2);
           const cy = view.fy(f.y + f.h / 2);
-          const tint = `var(${FURN[f.category] ?? "--furn-other"})`;
           return (
             <g
               key={`f-${i}`}
@@ -758,7 +780,7 @@ function LayoutPlan({ layout, compact }: { layout: ExtractedLayout; compact?: bo
               fill={tint}
               fillOpacity={0.14}
             >
-              <title>{`${f.category}${f.brand ? ` · ${f.brand}` : ""}${f.model ? ` ${f.model}` : ""}`}</title>
+              <title>{label}</title>
               {furnitureSymbol(f.category, f.w, f.h)}
             </g>
           );

@@ -57,6 +57,9 @@ const LAYOUT_WALL_H = 8.0; // generated-fit glass partitions: ceiling-ish, so cl
 // blocks the view. Cut them at a dollhouse height so you see OVER them into the furnished space.
 const DOLLHOUSE_H = 3.6;
 const MAX_RENDER = 2500; // safety cap so a pathological plan never freezes the browser
+// Real extruded footprints cost more than a shared box, so build them for the largest N items
+// (the ones that read as "real furniture" at a glance) and fall back to boxes beyond that.
+const REAL_SHAPE_CAP = 600;
 
 type World = { cx: number; cy: number; size: number; wx: (x: number) => number; wz: (y: number) => number };
 
@@ -585,6 +588,75 @@ function clampDim(v: number): number {
   return Number.isFinite(v) ? Math.min(Math.max(Math.abs(v), 0.5), 30) : 1.5;
 }
 
+/* When the CAD carries the item's true shape (outline polylines, baked world coords), render it as
+   a low extruded solid at a per-category height instead of a procedural box — so the piece reads as
+   its real plan profile. Height + finish by category; one shared material per category keeps the
+   draw cost flat across hundreds of pieces. */
+const REAL_SPEC: Record<string, { height: number; color: string; roughness: number; metalness: number }> = {
+  chair: { height: 1.5, color: "#7c6a5a", roughness: 0.85, metalness: 0 },
+  stool: { height: 1.5, color: "#7c6a5a", roughness: 0.85, metalness: 0 },
+  sofa: { height: 1.5, color: "#7c6a5a", roughness: 0.9, metalness: 0 },
+  desk: { height: 2.4, color: DESK_TOP, roughness: 0.4, metalness: 0.04 },
+  workstation: { height: 2.4, color: DESK_TOP, roughness: 0.4, metalness: 0.04 },
+  table: { height: 2.4, color: WOOD, roughness: 0.35, metalness: 0.05 },
+  storage: { height: 3.2, color: WOOD, roughness: 0.6, metalness: 0 },
+  tv: { height: 3.2, color: "#1a1916", roughness: 0.4, metalness: 0.2 },
+  panel: { height: 3.4, color: "#aec4cc", roughness: 0.12, metalness: 0.2 },
+  planter: { height: 1.6, color: "#6f8a5e", roughness: 0.9, metalness: 0 },
+  other: { height: 1.2, color: "#b6b2a9", roughness: 0.8, metalness: 0 },
+};
+const realSpec = (category: string) => REAL_SPEC[category] ?? REAL_SPEC.other;
+
+// One material instance per category, shared across every real-shape mesh (≈11 materials total).
+const realMatCache = new Map<string, THREE.MeshStandardMaterial>();
+function realMaterial(category: string): THREE.MeshStandardMaterial {
+  let m = realMatCache.get(category);
+  if (!m) {
+    const s = realSpec(category);
+    m = new THREE.MeshStandardMaterial({
+      color: s.color, roughness: s.roughness, metalness: s.metalness,
+      envMapIntensity: 0.4, side: THREE.DoubleSide,
+    });
+    realMatCache.set(category, m);
+  }
+  return m;
+}
+
+function ringArea(ring: [number, number][]): number {
+  let a = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  }
+  return Math.abs(a) / 2;
+}
+
+/* extrude the item's largest closed outline ring into a low solid. Outline points are world (x,y)
+   feet → shape-space (wx, -wz) like Floor, then rotation-x lays the extrude depth up as height, so
+   the piece sits on the floor at its true plan position (no per-item transform). */
+function RealPiece({ f, w }: { f: ExtractedFurniture; w: World }) {
+  const geo = useMemo(() => {
+    const height = realSpec(f.category).height;
+    let best: [number, number][] | null = null;
+    let bestArea = 0;
+    for (const ring of f.outline ?? []) {
+      if (ring.length < 3) continue;
+      const area = ringArea(ring);
+      if (area > bestArea) {
+        bestArea = area;
+        best = ring;
+      }
+    }
+    if (!best) return null;
+    const shape = new THREE.Shape(best.map(([x, y]) => new THREE.Vector2(w.wx(x), -w.wz(y))));
+    return new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  }, [f, w]);
+  useEffect(() => () => geo?.dispose(), [geo]);
+  if (!geo) return null;
+  return (
+    <mesh geometry={geo} rotation-x={-Math.PI / 2} material={realMaterial(f.category)} castShadow receiveShadow />
+  );
+}
+
 function CategoryPiece({ f, finish }: { f: ExtractedFurniture; finish: string }) {
   const { category } = f;
   const w = clampDim(f.w);
@@ -702,6 +774,17 @@ function LayoutScene({ layout, floor, finish, view, wall, ceiling }: {
     () => dedupeFurniture(layout.furniture).slice(0, MAX_RENDER),
     [layout.furniture],
   );
+  // Indices that render as real extruded shapes: the largest N items that carry an outline. The
+  // rest (and all outline-less items) fall back to the procedural CategoryPiece box.
+  const realIdx = useMemo(() => {
+    const ranked = furniture
+      .map((f, i) => ({ i, area: f.w * f.h }))
+      .filter(({ i }) => furniture[i].outline?.length)
+      .sort((a, b) => b.area - a.area)
+      .slice(0, REAL_SHAPE_CAP)
+      .map(({ i }) => i);
+    return new Set(ranked);
+  }, [furniture]);
   const wallH = view === "full" ? LAYOUT_WALL_H : DOLLHOUSE_H;
   const maxPolar = view === "full" ? Math.PI / 1.85 : Math.PI / 2.05;
   return (
@@ -718,15 +801,20 @@ function LayoutScene({ layout, floor, finish, view, wall, ceiling }: {
         />
       </mesh>
       <LayoutWalls layout={layout} w={w} wall={wall} wallH={wallH} />
-      {furniture.map((f, i) => (
-        <group
-          key={i}
-          position={[w.wx(f.x + f.w / 2), 0, w.wz(f.y + f.h / 2)]}
-          rotation-y={(-f.rotation * Math.PI) / 180}
-        >
-          <CategoryPiece f={f} finish={finish.color} />
-        </group>
-      ))}
+      {furniture.map((f, i) =>
+        realIdx.has(i) ? (
+          // outline is baked world coords — built at origin, no positioning/rotation group
+          <RealPiece key={i} f={f} w={w} />
+        ) : (
+          <group
+            key={i}
+            position={[w.wx(f.x + f.w / 2), 0, w.wz(f.y + f.h / 2)]}
+            rotation-y={(-f.rotation * Math.PI) / 180}
+          >
+            <CategoryPiece f={f} finish={finish.color} />
+          </group>
+        ),
+      )}
       {view === "full" && (
         <Ceiling width={(maxx - minx) * 1.1} depth={(maxy - miny) * 1.1} height={LAYOUT_WALL_H} type={ceiling} />
       )}
