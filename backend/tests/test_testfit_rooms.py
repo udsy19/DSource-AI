@@ -23,6 +23,7 @@ from app.routers.testfit import _build_bom_and_quote
 from app.seed import seed
 from app.testfit.bom import sku_demand
 from app.testfit.layout import ProgramSpec, WorkstationSpec, generate_mixed_layout
+from app.testfit.settings import SLOTTABLE_TYPES
 
 ROOT = Path(__file__).resolve().parent.parent
 DXF = ROOT / "data" / "floorplans" / "sample_office.dxf"
@@ -70,6 +71,25 @@ def test_all_instances_geometrically_valid_and_non_overlapping():
     for i in range(len(rects)):
         for j in range(i + 1, len(rects)):
             assert rects[i].intersection(rects[j]).area < 1e-6
+
+
+def test_slotted_furniture_stays_inside_its_room_and_is_specd():
+    """No furniture spills over a wall: every slotted piece sits inside a room box. And only real,
+    SKU-tagged pieces are slotted (the un-spec'd CET sub-components that caused the tangle are
+    dropped). A no-op assertion when no Steelcase library is present (nothing slotted)."""
+    _plan, _spec, fit = _fit()
+    slotted = [i for i in fit.instances if i.slotted]
+    rooms = [
+        box(i.x, i.y, i.x + i.w, i.y + i.h)
+        for i in fit.instances if not i.slotted and i.type in SLOTTABLE_TYPES
+    ]
+    for s in slotted:
+        # only recognizable furniture is slotted — the 'other' CET sub-parts (base/bracket/seat
+        # blocks of one physical item) overlap each other and are the source of the tangle.
+        assert s.type != "other", f"un-categorized CET sub-component slotted at ({s.x},{s.y})"
+        piece = box(s.x, s.y, s.x + s.w, s.y + s.h)
+        inside = any(r.intersection(piece).area >= piece.area - 0.1 for r in rooms)
+        assert inside, f"slotted {s.type} at ({s.x},{s.y}) {s.w}x{s.h} spills outside every room"
 
 
 def test_meeting_room_size_is_reasonable():

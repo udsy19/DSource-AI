@@ -285,12 +285,22 @@ def _place_workstation_field(region, spec: WorkstationSpec) -> list[FurnitureIns
 # Settings slotting: drop a real, SKU-tagged Steelcase room into a matching program room
 # ---------------------------------------------------------------------------
 
+# Recognizable furniture worth drawing in a room. Everything else in a CET setting — the "other"
+# sub-component blocks (a chair explodes into base/bracket/seat parts that overlap), plus glass
+# panels/mullions — is dropped; slotting all of it was the source of the overlapping tangle.
+_SLOT_CATS = {"chair", "desk", "table", "sofa", "stool", "workstation", "storage", "tv", "planter"}
+_ROOM_CLEAR = 1.0  # ft kept clear between the slotted setting and the room walls
+
+
 def _fitting_settings(inst: FurnitureInstance, settings: list[Setting]) -> list[Setting]:
-    """Settings whose type matches the room and whose footprint fits the room box, largest first.
+    """Settings whose type matches the room and whose footprint fits inside the room MINUS a
+    wall-clearance margin (so the centered setting never touches the walls), largest first.
     Translation-only (no rotation): a setting is used only if it fits in its built orientation."""
+    avail_w = inst.w - 2 * _ROOM_CLEAR
+    avail_h = inst.h - 2 * _ROOM_CLEAR
     return sorted(
         (s for s in settings
-         if s.setting_type == inst.type and s.width_ft <= inst.w and s.height_ft <= inst.h),
+         if s.setting_type == inst.type and s.width_ft <= avail_w and s.height_ft <= avail_h),
         key=lambda s: (s.sqft, s.id), reverse=True,
     )
 
@@ -298,12 +308,13 @@ def _fitting_settings(inst: FurnitureInstance, settings: list[Setting]) -> list[
 def slot_settings(
     instances: list[FurnitureInstance], settings: list[Setting]
 ) -> list[FurnitureInstance]:
-    """Fill each enclosed room with a matching Steelcase setting's real, SKU-tagged furniture.
+    """Fill each enclosed room with a matching Steelcase setting's real furniture.
 
-    Additive + safe: the room box instance is KEPT (metrics + the room outline depend on it), and
-    the setting's furniture is added inside it — translated to the room origin and carrying
-    brand/model/list_price. A no-op when the library is empty or no setting matches a room, so with
-    no library the output is byte-for-byte unchanged.
+    The setting is CENTERED in the room (with a wall-clearance margin), only recognizable furniture
+    is placed (_SLOT_CATS — the un-categorized sub-component blocks that cluttered the plan are
+    dropped), and any piece that would fall outside the room is skipped, so nothing spills over a
+    wall. The room box instance is KEPT (metrics + the room outline depend on it). A no-op when the
+    library is empty, so with no library the output is byte-for-byte unchanged.
     """
     if not settings:
         return instances
@@ -318,14 +329,20 @@ def slot_settings(
         i = used.get(inst.type, 0)
         used[inst.type] = i + 1
         setting = candidates[i % len(candidates)]
-        out += [
-            FurnitureInstance(
-                type=f.category, x=round(inst.x + f.dx, 2), y=round(inst.y + f.dy, 2),
-                w=f.w, h=f.h, rotation=int(round(f.rotation)),
+        ox = inst.x + (inst.w - setting.width_ft) / 2  # centre the setting footprint in the room
+        oy = inst.y + (inst.h - setting.height_ft) / 2
+        room = box(inst.x, inst.y, inst.x + inst.w, inst.y + inst.h)
+        for f in setting.furniture:
+            if f.category not in _SLOT_CATS:
+                continue
+            x = round(ox + f.dx, 2)
+            y = round(oy + f.dy, 2)
+            if not room.contains(box(x, y, x + f.w, y + f.h)):  # would cross a wall -> skip
+                continue
+            out.append(FurnitureInstance(
+                type=f.category, x=x, y=y, w=f.w, h=f.h, rotation=int(round(f.rotation)),
                 brand=f.brand, model=f.model, list_price=f.list_price, slotted=True,
-            )
-            for f in setting.furniture
-        ]
+            ))
     return out
 
 

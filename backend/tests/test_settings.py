@@ -89,11 +89,11 @@ def test_slotting_places_setting_into_matching_room():
     skued = [i for i in out if i.model is not None]
     assert {i.model for i in skued} == {"OBBORDER05", "442A40"}
     desk = next(i for i in skued if i.model == "OBBORDER05")
-    # translated to the room origin (room.x + dx, room.y + dy)
-    assert (desk.x, desk.y) == (20.0, 30.0)
+    # centred in the room: ox = room.x + (room.w - setting.w)/2 = 20 + (10-5)/2 = 22.5; oy = 33.5
+    assert (desk.x, desk.y) == (22.5, 33.5)
     assert desk.type == "desk" and desk.brand == "Steelcase" and desk.list_price == 1200.0
     chair = next(i for i in skued if i.model == "442A40")
-    assert (chair.x, chair.y) == (21.0, 33.0)
+    assert (chair.x, chair.y) == (23.5, 36.5)
 
 
 def test_slotting_is_noop_without_library():
