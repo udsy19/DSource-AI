@@ -544,7 +544,11 @@ function FitPlan({ plan, instances, pinnedKeys, onTogglePin, compact }: FitProps
       ))}
 
       {instances.map((it, i) => {
-        const kind = FIT[it.type] ?? FIT_FALLBACK;
+        // a slotted piece is real furniture INSIDE a room — render its category symbol, never a
+        // walled room (FIT["storage"] etc. carry a `room`, which would draw a phantom STORAGE room).
+        const kind: FitKind = it.slotted
+          ? { symbol: it.type as FurnitureCategory, tint: "--furn-seat" }
+          : (FIT[it.type] ?? FIT_FALLBACK);
         // local 0..w/0..h origin at the footprint's top-left (world min-x / max-y), rotated
         // about the centre — same convention as LayoutPlan's furniture so symbols read upright.
         const ox = view.fx(it.x);
