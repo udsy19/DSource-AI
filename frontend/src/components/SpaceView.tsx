@@ -16,18 +16,15 @@ const PAPER = "#f4f1ea";
 const FLOOR: RGB = [232, 225, 211];
 const WALL: RGB = [225, 217, 201];
 const FURN: RGB = [214, 201, 176];
-const ROOM_RGB: Record<string, RGB> = {
-  workstation: [223, 214, 195], private_office: [219, 209, 188],
-  meeting_room: [222, 211, 188], collaboration: [228, 218, 198],
-};
 const INK = "#1a1813";
 const EDGE = "rgba(26,24,19,0.35)";
 
-const WALL_H = 8.5; // ft
+const WALL_H = 8.5; // ft — perimeter
+const PARTITION_H = 4.5; // ft — interior room walls, kept low (dollhouse) so furniture stays visible
+const DESK_H = 2.5; // ft — a generated workstation desk
 const HEIGHTS: Record<string, number> = {
   chair: 2.9, stool: 2.7, desk: 2.5, table: 2.5, workstation: 3.4, sofa: 2.7,
   storage: 4.2, panel: 5.2, mullion: 8.5, tv: 4.4, planter: 2.6, other: 2.5,
-  private_office: 0.5, meeting_room: 0.5, collaboration: 0.5,
 };
 
 const ISO = Math.PI / 6;
@@ -80,7 +77,8 @@ function silhouette(outline: Pt[][]): { foot: Pt[]; detail: Pt[][] } | null {
 
 // ── scene assembly ──
 type Item = { foot: Pt[]; z1: number; base: RGB; detail?: Pt[][] };
-type Scene = { floor: Pt[]; walls: { a: Pt; b: Pt }[]; items: Item[]; center: Pt };
+type Wall = { a: Pt; b: Pt; h: number };
+type Scene = { floor: Pt[]; walls: Wall[]; items: Item[]; center: Pt };
 
 function sceneFromLayout(layout: ExtractedLayout): Scene {
   const [minx, miny, maxx, maxy] = layout.bounds;
@@ -88,8 +86,9 @@ function sceneFromLayout(layout: ExtractedLayout): Scene {
   const floor: Pt[] = [[minx, miny], [maxx, miny], [maxx, maxy], [minx, maxy]];
 
   const walls = layout.walls.flatMap((w) => {
-    const segs: { a: Pt; b: Pt }[] = [];
-    for (let i = 0; i + 1 < w.points.length; i++) segs.push({ a: w.points[i], b: w.points[i + 1] });
+    const segs: Wall[] = [];
+    const h = w.type === "perimeter" || w.type === "core" ? WALL_H : PARTITION_H;
+    for (let i = 0; i + 1 < w.points.length; i++) segs.push({ a: w.points[i], b: w.points[i + 1], h });
     return segs;
   });
 
@@ -108,19 +107,30 @@ function sceneFromLayout(layout: ExtractedLayout): Scene {
   return { floor, walls, items, center };
 }
 
+const ENCLOSED = new Set(["private_office", "meeting_room", "collaboration"]);
+
 function sceneFromPlan(plan: Plan, instances: Instance[]): Scene {
   const xs = plan.boundary.map((p) => p[0]);
   const ys = plan.boundary.map((p) => p[1]);
   const center: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
-  const walls: { a: Pt; b: Pt }[] = [];
-  for (let i = 0; i < plan.boundary.length; i++)
-    walls.push({ a: plan.boundary[i] as Pt, b: plan.boundary[(i + 1) % plan.boundary.length] as Pt });
 
-  const items: Item[] = instances.map((i) => ({
-    foot: rectCorners(i.x, i.y, i.w, i.h, i.rotation),
-    z1: HEIGHTS[i.type] ?? HEIGHTS.other,
-    base: ROOM_RGB[i.type] ?? FURN,
-  }));
+  const walls: Wall[] = [];
+  for (let i = 0; i < plan.boundary.length; i++)
+    walls.push({ a: plan.boundary[i] as Pt, b: plan.boundary[(i + 1) % plan.boundary.length] as Pt, h: WALL_H });
+
+  const items: Item[] = [];
+  for (const i of instances) {
+    const corners = rectCorners(i.x, i.y, i.w, i.h, i.rotation);
+    if (i.slotted) {
+      items.push({ foot: corners, z1: HEIGHTS[i.type] ?? HEIGHTS.other, base: FURN }); // real furniture
+    } else if (ENCLOSED.has(i.type)) {
+      // an enclosed room: extrude its four edges as low partition walls so you see the furniture in it
+      for (let k = 0; k < corners.length; k++)
+        walls.push({ a: corners[k], b: corners[(k + 1) % corners.length], h: PARTITION_H });
+    } else {
+      items.push({ foot: corners, z1: DESK_H, base: FURN }); // a workstation desk
+    }
+  }
 
   return { floor: plan.boundary as Pt[], walls, items, center };
 }
@@ -141,11 +151,11 @@ function buildFaces(scene: Scene, q: number) {
     return 0.82 + 0.16 * Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1]);
   };
 
-  for (const { a, b } of scene.walls) {
+  for (const { a, b, h } of scene.walls) {
     const sa = spin(a, center, q);
     const sb = spin(b, center, q);
     faces.push({
-      pts: [iso(sa[0], sa[1], 0), iso(sb[0], sb[1], 0), iso(sb[0], sb[1], WALL_H), iso(sa[0], sa[1], WALL_H)],
+      pts: [iso(sa[0], sa[1], 0), iso(sb[0], sb[1], 0), iso(sb[0], sb[1], h), iso(sa[0], sa[1], h)],
       fill: shade(WALL, sideShade(sa, sb)),
       depth: depthOf([sa, sb]),
       order: 0,

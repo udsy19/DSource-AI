@@ -11,6 +11,7 @@ export interface Instance {
   w: number;
   h: number;
   rotation: number;
+  slotted?: boolean; // real furniture dropped inside a room (vs a structural room/desk slot)
 }
 
 export interface Plan {
