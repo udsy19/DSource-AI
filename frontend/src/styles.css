@@ -163,6 +163,10 @@ header.bar {
 .wall-legend li { display: flex; align-items: center; gap: 8px;
   font: var(--t-small); color: var(--ink-2); }
 .wall-legend .swatch { width: 14px; height: 3px; border-radius: var(--r1); flex: none; }
+/* room-family colour key — sits top-left (clear of the bottom-left wall key + centre controls).
+   The room fills are faint washes, so the swatch is a bordered square so the tint stays legible. */
+.room-legend { bottom: auto; top: 84px; }
+.room-legend .swatch { width: 12px; height: 12px; border: 1px solid var(--line-2); border-radius: 3px; }
 
 /* 3D space — axonometric "paper model" (pure SVG, no WebGL) */
 .axon { position: absolute; inset: 0; padding: 40px 40px 84px; animation: fade 0.5s ease both; }
@@ -472,6 +476,22 @@ header.bar {
 .layout-metric-value { font: var(--t-numeral); font-size: 22px; color: var(--ink); }
 .layout-metric-label {
   font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+}
+
+/* live program tally in the Detailed editor */
+.program-summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+  margin-bottom: 16px; padding: 10px 14px;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r1);
+}
+.program-summary-total { font: var(--t-numeral); font-size: 20px; color: var(--ink); }
+.program-summary-unit {
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  margin-right: auto;
+}
+.program-summary-fam {
+  font-size: 11px; color: var(--ink-2); text-transform: capitalize;
+  padding: 2px 8px; background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px;
 }
 
 /* procurement */

@@ -1304,9 +1304,31 @@ function DetailedForm({
       rooms: program.rooms.map((r) => (r.type === type ? { ...r, placement } : r)),
     });
 
+  // Live tally of the requested program — the enclosed-room count per family, updating as the
+  // steppers change (qbiq's Program Summary, pre-generation). Density/headcount need the plate
+  // area, so they surface per-version after generation (VersionList metrics), not here.
+  const familyTally = ROOM_CATALOG.map(({ family, rooms }) => ({
+    family,
+    count: rooms.reduce(
+      (n, rc) => n + (program.rooms.find((r) => r.type === rc.type)?.count ?? 0),
+      0,
+    ),
+  })).filter((f) => f.count > 0);
+  const totalRooms = familyTally.reduce((n, f) => n + f.count, 0);
+
   return (
     <div className="brief">
       <Eyebrow style={{ display: "block", marginBottom: 12 }}>Program · rooms</Eyebrow>
+
+      <div className="program-summary" role="group" aria-label="Requested program">
+        <span className="program-summary-total">{totalRooms}</span>
+        <span className="program-summary-unit">enclosed room{totalRooms === 1 ? "" : "s"}</span>
+        {familyTally.map((f) => (
+          <span className="program-summary-fam" key={f.family}>
+            {f.family} · {f.count}
+          </span>
+        ))}
+      </div>
 
       {ROOM_CATALOG.map(({ family, rooms }) => (
         <div className="room-family" key={family}>

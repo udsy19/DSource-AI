@@ -48,6 +48,12 @@ const FAMILY_FILL: Record<RoomFamily, string> = {
   collab: "--room-collab",
   amenity: "--room-amenity",
 };
+const FAMILY_LABEL: Record<RoomFamily, string> = {
+  office: "Office",
+  meeting: "Meeting",
+  collab: "Open / collab",
+  amenity: "Amenity",
+};
 
 type FitKind = { symbol: FurnitureCategory; tint: string; room?: string; family?: RoomFamily };
 const FIT: Record<string, FitKind> = {
@@ -729,6 +735,16 @@ function LayoutPlan({
     () => new Set(layout.walls.map((w) => w.type)),
     [layout.walls],
   );
+  // Room families actually present, for the colour legend — resolved from each room's type (the
+  // same mapping roomFill uses), so the legend matches the fills on the plan.
+  const roomFamilies = useMemo(() => {
+    const fams = new Set<RoomFamily>();
+    for (const r of layout.rooms) {
+      const fam = ROOM_TYPE_FAMILY[r.type];
+      if (fam) fams.add(fam);
+    }
+    return fams;
+  }, [layout.rooms]);
 
   // De-conflict room labels: place the largest rooms first and drop any whose (padded) label box
   // would collide with one already placed, so dense office/conference clusters never smear. Rooms
@@ -764,17 +780,31 @@ function LayoutPlan({
       kind="EXTRACTED LAYOUT"
       compact={compact}
       overlay={
-        // wall-type legend — only the types actually present
-        <ul className="wall-legend" aria-label="Wall types">
-          {(Object.keys(WALL) as WallType[])
-            .filter((t) => usedTypes.has(t))
-            .map((t) => (
-              <li key={t}>
-                <span className="swatch" style={{ background: `var(${WALL[t].token})` }} aria-hidden="true" />
-                {WALL[t].label}
-              </li>
-            ))}
-        </ul>
+        // legends — the room-family colour key and the wall-type key, each showing only what's present
+        <>
+          {roomFamilies.size > 0 && (
+            <ul className="wall-legend room-legend" aria-label="Room types">
+              {(Object.keys(FAMILY_FILL) as RoomFamily[])
+                .filter((f) => roomFamilies.has(f))
+                .map((f) => (
+                  <li key={f}>
+                    <span className="swatch" style={{ background: `var(${FAMILY_FILL[f]})` }} aria-hidden="true" />
+                    {FAMILY_LABEL[f]}
+                  </li>
+                ))}
+            </ul>
+          )}
+          <ul className="wall-legend" aria-label="Wall types">
+            {(Object.keys(WALL) as WallType[])
+              .filter((t) => usedTypes.has(t))
+              .map((t) => (
+                <li key={t}>
+                  <span className="swatch" style={{ background: `var(${WALL[t].token})` }} aria-hidden="true" />
+                  {WALL[t].label}
+                </li>
+              ))}
+          </ul>
+        </>
       }
       draw={(api) => (
       <>
