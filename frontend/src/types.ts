@@ -283,6 +283,10 @@ export interface ExtractedRoom {
   polygon: [number, number][];
   center?: [number, number] | null;
   type: string;
+  // how the boundary was derived + its trust (see backend schema.Room); the plan draws a
+  // low-confidence boundary as dashed so it reads as best-effort, never a hard boundary.
+  boundary_basis?: string;
+  confidence?: number;
 }
 
 export interface ExtractedFurniture {

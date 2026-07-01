@@ -17,8 +17,7 @@ import re
 from collections import Counter
 
 import ezdxf.bbox
-from shapely.geometry import LineString, Point, Polygon, box
-from shapely.ops import unary_union
+from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from shapely.strtree import STRtree
 
 from ..floorplan.dxf_ingest import (
@@ -27,6 +26,7 @@ from ..floorplan.dxf_ingest import (
     _dwg_to_dxf_bytes,
     _read_dxf_doc,
 )
+from .room_segment import segment_regions
 from .schema import Door, ExtractedLayout, FurnitureItem, Room, Wall
 
 # Block-name keyword -> furniture category. Order matters: first match wins, so more specific
@@ -85,9 +85,7 @@ _ROOM_TYPE_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
 
 _WALL_ENTITY_TYPES = ("LINE", "LWPOLYLINE", "POLYLINE")
 _AREA_RE = re.compile(r"(\d+(?:\.\d+)?)\s*SF", re.IGNORECASE)
-# Drop polygonize products that are too small to be a room or so large they're the whole sheet.
-_MIN_ROOM_SF = 20.0
-_MAX_ROOM_SF = 20_000.0
+_MIN_ROOM_SF = 20.0  # a region smaller than this isn't a usable room
 
 
 def read_cad(content: bytes, filename: str, extract_outline: bool = True) -> ExtractedLayout:
@@ -118,9 +116,8 @@ def read_cad(content: bytes, filename: str, extract_outline: bool = True) -> Ext
     # `walls` (not `wall_lines`); without it the open plate edge leaks and every perimeter-adjacent
     # room drops to label-only. Seal it into the room boundaries.
     room_lines = wall_lines + [LineString(w.points) for w in walls if w.type == "perimeter"]
-    rooms, room_note = _read_rooms(room_lines, panels, doors, bounds, msp, lf)
+    rooms, room_note = _read_rooms(room_lines, panels, doors, bounds, msp, lf, furniture)
     _assign_rooms(furniture, rooms)
-    _infer_room_types(rooms, furniture)
     if room_note:
         notes.append(room_note)
 
@@ -436,9 +433,6 @@ def _union_len(intervals: list[tuple[float, float]]) -> float:
     return total + (cur_end - cur_start)
 
 
-_WALL_BUF = 0.6  # ft — half-thickness to thicken boundaries into a solid mask (bridges double lines)
-
-
 def _seg(cx: float, cy: float, length: float, ang: float) -> LineString:
     dx, dy = math.cos(ang) * length / 2, math.sin(ang) * length / 2
     return LineString([(cx - dx, cy - dy), (cx + dx, cy + dy)])
@@ -454,10 +448,6 @@ def _panel_segment(p: FurnitureItem) -> LineString:
 def _door_segment(d: Door) -> LineString:
     """A plug across a door opening, so rooms don't leak through doorways."""
     return _seg(d.x, d.y, max(d.width, 2.0), math.radians(d.rotation))
-
-
-def _ring(poly: Polygon) -> list[tuple[float, float]]:
-    return [(round(x, 2), round(y, 2)) for x, y in poly.exterior.coords]
 
 
 _GAP_HEAL_FT = 4.0  # extend a wall end up to this far to meet a nearby wall (close partition gaps)
@@ -510,83 +500,94 @@ def _heal_wall_gaps(lines: list[LineString], reach_ft: float = _GAP_HEAL_FT) -> 
             for i, s in enumerate(segs)]
 
 
+# Trust for each boundary_basis — how the room's polygon was derived (see schema.Room).
+_BASIS_CONF = {"walls_closed": 0.9, "label_seeded": 0.6, "furniture_hull": 0.35, "label_only": 0.0}
+_HULL_REACH_FT = 13.0  # a label-only room borrows the hull of furniture within this of its label
+
+
 def _read_rooms(
     wall_lines: list[LineString], panels: list[FurnitureItem], doors: list[Door],
-    bounds: tuple[float, float, float, float], msp, lf: float,
+    bounds: tuple[float, float, float, float], msp, lf: float, furniture: list[FurnitureItem],
 ) -> tuple[list[Room], str | None]:
+    """Label-seeded room detection (see room_segment). Boundaries = healed walls + glass partitions
+    + door plugs; each room label is a seed. Every returned room records how its boundary was
+    derived (boundary_basis + confidence), so a shaky boundary is shown as shaky, never faked."""
     labels = _read_room_labels(msp, lf)
     boundaries = list(_heal_wall_gaps(wall_lines))  # bridge near-miss junctions so rooms separate
     boundaries += [_panel_segment(p) for p in panels]  # glass-walled rooms close on the partitions
-    boundaries += [_door_segment(d) for d in doors]  # plug doorways
+    boundaries += [_door_segment(d) for d in doors]  # plug doorways so rooms don't leak through them
     boundaries = [b for b in boundaries if b.length > 0.1]
 
-    cells: list[Polygon] = []
-    if boundaries:
-        # CAD walls are double lines, so polygonizing them finds wall cavities, not rooms. Instead
-        # thicken every boundary into a solid mask and subtract from the plate — the negative space
-        # IS the rooms. This bridges the double lines and (with door plugs) separates partitioned
-        # rooms. Far more robust than polygonize() on gappy real-world linework.
-        minx, miny, maxx, maxy = bounds
-        plate = box(minx, miny, maxx, maxy)
-        mask = unary_union([b.buffer(_WALL_BUF, cap_style=2) for b in boundaries])
-        region = plate.difference(mask)
-        raw = list(region.geoms) if region.geom_type == "MultiPolygon" else [region]
-        edge = plate.exterior
-        cells = [
-            c for c in raw
-            if not c.is_empty and _MIN_ROOM_SF <= c.area <= _MAX_ROOM_SF
-            and not c.exterior.intersects(edge)  # the exterior gap touches the plate edge
-        ]
+    seed_points = [(lx, ly) for (lx, ly, _n, _a) in labels]
+    regions = segment_regions(boundaries, seed_points, bounds) if boundaries else []
 
+    centers = [(f, Point(f.x + f.w / 2, f.y + f.h / 2)) for f in furniture]
     rooms: list[Room] = []
-    used: set[int] = set()
+    claimed: set[int] = set()
     nid = 1
-    for (lx, ly, label, area_sf) in labels:
-        pt = Point(lx, ly)
-        # A label claims the cell it sits in only if the cell's size roughly matches its stated area
-        # — else a label dropped in open space (e.g. "PHONE RM · 50 SF") would grab the whole 3000sf
-        # field. Mismatches stay label-only; the cell is picked up as an unlabeled room below.
-        idx = next(
-            (i for i, c in enumerate(cells)
-             if i not in used and c.contains(pt)
-             and (not area_sf or 0.4 * area_sf <= c.area <= 2.5 * area_sf)),
-            None,
-        )
-        if idx is not None:
-            used.add(idx)
-            c = cells[idx]
+    for reg in regions:
+        poly = Polygon(reg.polygon)
+        inside = [f for f, c in centers if poly.contains(c)]
+        if reg.seed_index is not None:
+            _lx, _ly, name, area_sf = labels[reg.seed_index]
+            claimed.add(reg.seed_index)
+            rtype = _classify_room(name)
+            if rtype == "unknown" and inside:
+                rtype = _room_type_from_furniture(inside)
+            label, room_area = name, (area_sf or reg.area_sf)
+        else:
+            label, room_area = None, reg.area_sf
+            rtype = _room_type_from_furniture(inside) if inside else ("open" if reg.area_sf > 400 else "unknown")
+        rooms.append(Room(
+            id=f"R-{nid}", label=label, area_sf=round(room_area, 1), polygon=reg.polygon,
+            center=(round(poly.centroid.x, 2), round(poly.centroid.y, 2)),
+            type=rtype, boundary_basis=reg.basis, confidence=_BASIS_CONF[reg.basis],
+        ))
+        nid += 1
+
+    # labels the segmenter couldn't bound → furniture-hull fallback (flagged low), else label-only
+    for i, (lx, ly, name, area_sf) in enumerate(labels):
+        if i in claimed:
+            continue
+        hull = _furniture_hull(lx, ly, centers)
+        if hull is not None:
+            htype = _classify_room(name)
+            if htype == "unknown":
+                htype = _room_type_from_furniture([f for f, _c in centers if hull.contains(_c)])
             rooms.append(Room(
-                id=f"R-{nid}", label=label, area_sf=area_sf or round(c.area, 1),
-                polygon=_ring(c), center=(round(c.centroid.x, 2), round(c.centroid.y, 2)),
-                type=_classify_room(label),
+                id=f"R-{nid}", label=name, area_sf=area_sf or round(hull.area, 1),
+                polygon=[(round(x, 2), round(y, 2)) for x, y in hull.exterior.coords],
+                center=(round(hull.centroid.x, 2), round(hull.centroid.y, 2)),
+                type=htype, boundary_basis="furniture_hull", confidence=_BASIS_CONF["furniture_hull"],
             ))
         else:
             rooms.append(Room(
-                id=f"R-{nid}", label=label, area_sf=area_sf, polygon=[],
-                center=(round(lx, 2), round(ly, 2)), type=_classify_room(label),
+                id=f"R-{nid}", label=name, area_sf=area_sf, polygon=[],
+                center=(round(lx, 2), round(ly, 2)), type=_classify_room(name),
+                boundary_basis="label_only", confidence=0.0,
             ))
         nid += 1
 
-    # enclosed cells with no label that are clearly rooms (e.g. unlabeled offices)
-    for i, c in enumerate(cells):
-        if i not in used and c.area >= 60:
-            rooms.append(Room(
-                id=f"R-{nid}", label=None, area_sf=round(c.area, 1),
-                polygon=_ring(c), center=(round(c.centroid.x, 2), round(c.centroid.y, 2)),
-                type="unknown",
-            ))
-            nid += 1
-
-    labeled = sum(1 for r in rooms if r.label)
-    closed = sum(1 for r in rooms if r.polygon)
+    labeled = len(labels)
+    closed = sum(1 for r in rooms if r.label and r.polygon and r.boundary_basis != "furniture_hull")
     note = None
     if labeled and closed < labeled:
         note = (
-            f"Recovered {closed} closed room boundary(ies); {labeled - closed} labeled room(s) "
-            "stayed open (gappy partitions) — kept as label-only. Furniture is assigned to the "
-            "nearest room. Confirm boundaries before fabrication."
+            f"Closed {closed} of {labeled} labeled rooms from the walls; the rest are shown by "
+            "furniture extent or label-only where the walls don't fully enclose them. Each room "
+            "carries how its boundary was derived — confirm low-confidence rooms before fabrication."
         )
     return rooms, note
+
+
+def _furniture_hull(lx: float, ly: float, centers: list[tuple[FurnitureItem, Point]]) -> Polygon | None:
+    """Convex hull (padded) of the furniture clustered around a label point — a low-confidence zone
+    for a room whose walls never closed, so it still reads on the plan instead of vanishing."""
+    near = [c for _f, c in centers if (c.x - lx) ** 2 + (c.y - ly) ** 2 <= _HULL_REACH_FT ** 2]
+    if len(near) < 3:
+        return None
+    hull = MultiPoint(near).convex_hull.buffer(1.5)
+    return hull if hull.geom_type == "Polygon" and hull.area >= _MIN_ROOM_SF else None
 
 
 def _room_type_from_furniture(items: list[FurnitureItem]) -> str:
@@ -609,23 +610,6 @@ def _room_type_from_furniture(items: list[FurnitureItem]) -> str:
     if desks >= 1:
         return "office"
     return "collab"
-
-
-def _infer_room_types(rooms: list[Room], furniture: list[FurnitureItem]) -> None:
-    """Give each still-unknown room a functional type from the furniture GEOMETRICALLY inside its
-    boundary, so a label-less (or generically-labeled) plan still colour-codes: open field vs
-    meeting vs office vs collaboration. Uses polygon containment, not the room_id assignment — that
-    falls back to nearest-centre and can dump a whole floor of desks into one small room, which
-    would mis-type everything. Rooms already typed from a text label are left untouched; an empty
-    enclosed cell stays unknown (drawn neutral) rather than being guessed."""
-    centers = [(f, Point(f.x + f.w / 2, f.y + f.h / 2)) for f in furniture]
-    for r in rooms:
-        if r.type != "unknown" or len(r.polygon) < 3:
-            continue
-        poly = Polygon(r.polygon)
-        items = [f for f, c in centers if poly.contains(c)]
-        if items:
-            r.type = _room_type_from_furniture(items)
 
 
 def _assign_rooms(furniture: list[FurnitureItem], rooms: list[Room]) -> None:

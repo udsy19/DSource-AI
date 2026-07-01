@@ -859,8 +859,10 @@ function LayoutPlan({
                     className="room-shape"
                     points={polyline(r.polygon)}
                     fill={`var(${roomFill(r)})`}
+                    fillOpacity={r.confidence != null && r.confidence < 0.9 ? 0.45 + 0.5 * r.confidence : 1}
                     stroke="var(--room-line)"
                     strokeWidth={1}
+                    strokeDasharray={r.boundary_basis === "furniture_hull" ? "4 3" : undefined}
                     vectorEffect="non-scaling-stroke"
                   />
                 </>

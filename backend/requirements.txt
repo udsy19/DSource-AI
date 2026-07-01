@@ -13,8 +13,11 @@ pdfplumber==0.11.4
 beautifulsoup4==4.15.0
 playwright==1.49.1
 # Phase 1 floor-plate ingestion: ezdxf = DXF parsing, shapely = boundary/area geometry.
+# scikit-image = label-seeded room segmentation (rasterize walls → watershed from label seeds →
+# contour), robust to gappy/curved partitions where wall-tracing alone fails.
 ezdxf==1.4.4
 shapely==2.1.2
+scikit-image==0.26.0
 # Qbiq deliverables: reportlab = styled multi-page space-planning PDF report (openpyxl above
 # drives the quantity-takeoff Excel export); ifcopenshell = IFC4/BIM authoring (the open-standard
 # "editable Revit" deliverable); opencv = classical-CV raster/PDF floor-plate ingestion.

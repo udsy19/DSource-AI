@@ -28,7 +28,15 @@ class Room(BaseModel):
     area_sf: float | None
     polygon: list[tuple[float, float]]  # closed boundary in feet (may be empty if walls don't close)
     center: tuple[float, float] | None = None  # anchor for the label — polygon centroid or label point
-    type: str  # office | meeting | open | collab | huddle | reception | core | circulation | unknown
+    type: str  # office | meeting | open | collab | huddle | reception | kitchen | storage | core | circulation | unknown
+    # How the boundary was derived, so the UI shows shaky boundaries as shaky (never silently wrong):
+    #   walls_closed  — the room sits in its own wall-bounded region (highest trust)
+    #   label_seeded  — a merged region split between labels by nearest-seed watershed (medium)
+    #   furniture_hull— no walls closed; boundary is the hull of the room's furniture (low)
+    #   label_only    — only a label point is known; no boundary (none)
+    #   open          — unlabeled open/circulation field
+    boundary_basis: str = "label_only"
+    confidence: float = 0.0  # 0..1, paired with boundary_basis
 
 
 class FurnitureItem(BaseModel):

@@ -294,9 +294,14 @@ def test_real_dwg_inventory():
         layout = read_cad(f.read(), os.path.basename(REAL_DWG))
     assert layout.units == "ft"
     assert layout.inventory.get("chair", 0) > 50
-    # Perimeter-seal + gap-healing: many more labeled rooms close (was 1 before either fix).
-    closed = [r for r in layout.rooms if r.polygon]
-    assert len(closed) >= 9, f"expected gap-healing to close many rooms, only {len(closed)} did"
+    # Label-seeded segmentation: essentially every labeled room closes (was 1 with wall-tracing).
+    labeled_closed = [r for r in layout.rooms if r.label and r.polygon]
+    assert len(labeled_closed) >= 15, f"expected most labeled rooms to close, only {len(labeled_closed)} did"
+    # Every closed room reports how its boundary was derived, with a matching confidence.
+    for r in layout.rooms:
+        if r.polygon:
+            assert r.boundary_basis in ("walls_closed", "label_seeded", "furniture_hull")
+            assert 0.0 < r.confidence <= 1.0
     assert layout.inventory.get("workstation", 0) > 50
 
 
