@@ -15,6 +15,7 @@ import ezdxf
 import pytest
 
 from app.ingestion.cad_reader import read_cad
+from app.ingestion.schema import Door
 
 REAL_DWG = "/Users/udsy/Downloads/0414-Sheet - 500 - FURNITURE PLAN.dxf.dwg"
 
@@ -159,6 +160,14 @@ def test_doors_extracted():
     layout = read_cad(_synthetic_dxf(), "synthetic.dxf")
     assert len(layout.doors) == 1
     assert layout.inventory.get("door") == 1
+
+
+def test_door_flip_defaults_false_and_round_trips():
+    # The editor's swing-side toggle rides on Door.flip; it must default off (back-compatible with
+    # every layout produced before the field existed) and survive a JSON round-trip.
+    assert Door(x=1, y=2, width=3, rotation=90).flip is False
+    flipped = Door.model_validate(Door(x=1, y=2, width=3, rotation=90, flip=True).model_dump())
+    assert flipped.flip is True
 
 
 def test_inventory_counts():

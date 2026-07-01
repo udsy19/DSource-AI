@@ -32,10 +32,14 @@ type LayoutProps = {
   // instead of selecting it for a swap; every id in `mergeSelection` shows the terracotta ring.
   mergeSelection?: string[];
   onToggleMergeRoom?: (r: ExtractedRoom) => void;
-  // Editable canvas: drag a piece to a new position (x, y = its new bbox min-corner, feet), or
-  // remove it. When omitted the plan is read-only (viewer / thumbnail).
+  // Editable canvas: drag a piece to a new position (x, y = its new bbox min-corner, feet), rotate
+  // it about its centre (degrees), or remove it. When omitted the plan is read-only (viewer).
   onMoveFurniture?: (key: string, x: number, y: number) => void;
+  onRotateFurniture?: (key: string, rotation: number) => void;
   onDeleteFurniture?: (key: string) => void;
+  // Doors are selectable for the door property panel (flip swing, nudge along the wall).
+  selectedDoorIndex?: number | null;
+  onSelectDoor?: (index: number) => void;
   // Room markers the user has dropped (feet) + place mode: a click on the plan drops one.
   markers?: { type: string; label: string; x: number; y: number }[];
   placing?: boolean;
@@ -118,6 +122,25 @@ export const instanceKey = (it: Instance): string =>
 // Stable identity for a placed furniture item — used to select/replace the right one on swap.
 export const furnitureKey = (f: ExtractedFurniture): string =>
   `${f.category}:${f.x.toFixed(2)}:${f.y.toFixed(2)}`;
+
+// The quarter-circle swing path for a door leaf of `width` ft, in the door's local frame (hinge at
+// origin, leaf along +x). `flip` mirrors the arc to the other side of the leaf (in vs out swing).
+export const doorSwingPath = (width: number, flip = false): string =>
+  `M ${width} 0 A ${width} ${width} 0 0 ${flip ? 0 : 1} 0 ${flip ? -width : width}`;
+
+// Rotation (degrees, world CCW, normalized 0..360) that points a piece's north edge at the pointer:
+// the angle from the piece centre to the pointer, less the grip's 90° rest offset. Snaps to 15°.
+export const rotationToPointer = (
+  cx: number,
+  cy: number,
+  px: number,
+  py: number,
+  snap = false,
+): number => {
+  let deg = (Math.atan2(py - cy, px - cx) * 180) / Math.PI - 90;
+  if (snap) deg = Math.round(deg / 15) * 15;
+  return ((deg % 360) + 360) % 360;
+};
 
 // wall poché per type — fill token (the solid cut band), legend-swatch token, label, and
 // the assumed cut THICKNESS in feet (weight hierarchy: perimeter/core heaviest, glass thinnest).
@@ -433,6 +456,9 @@ type PlanApi = {
     from: { x: number; y: number },
     to: { x: number; y: number },
   ) => { dx: number; dy: number };
+  // Convert a client-pixel point into world feet (+y up), honouring the current pan/zoom. Used by
+  // the rotate grip to read the pointer's angle about a piece centre. {0,0} before first paint.
+  worldPoint: (client: { x: number; y: number }) => { x: number; y: number };
   bindRoom: (name: string, area: number) => {
     onPointerEnter: (e: React.PointerEvent) => void;
     onPointerMove: (e: React.PointerEvent) => void;
@@ -454,6 +480,7 @@ const NOOP_ROOM = {
 const STATIC_API: PlanApi = {
   didDrag: () => false,
   worldDelta: () => ({ dx: 0, dy: 0 }),
+  worldPoint: () => ({ x: 0, y: 0 }),
   bindRoom: () => NOOP_ROOM,
 };
 
@@ -519,6 +546,12 @@ function PlanStage({
       const a = new DOMPoint(from.x, from.y).matrixTransform(inv);
       const b = new DOMPoint(to.x, to.y).matrixTransform(inv);
       return { dx: b.x - a.x, dy: -(b.y - a.y) };
+    },
+    worldPoint: (client) => {
+      const ctm = contentRef.current?.getScreenCTM();
+      if (!ctm) return { x: 0, y: 0 };
+      const p = new DOMPoint(client.x, client.y).matrixTransform(ctm.inverse());
+      return { x: p.x - view.fx(0), y: view.fy(0) - p.y };
     },
     bindRoom: (name, area) => ({
       onPointerEnter: (e) => showTag(name, area, e.clientX, e.clientY),
@@ -750,7 +783,10 @@ function LayoutPlan({
   mergeSelection,
   onToggleMergeRoom,
   onMoveFurniture,
+  onRotateFurniture,
   onDeleteFurniture,
+  selectedDoorIndex,
+  onSelectDoor,
   markers,
   placing,
   onPlacePoint,
@@ -762,6 +798,9 @@ function LayoutPlan({
   const [drag, setDrag] = useState<{ key: string; dx: number; dy: number } | null>(null);
   const dragStart = useRef<{ x: number; y: number; key: string; moved: boolean } | null>(null);
   const MOVE_MIN_FT = 0.25;
+  // Live rotation of the selected piece via its grip: the previewed degrees, committed on pointer-up.
+  const [rotating, setRotating] = useState<{ key: string; deg: number } | null>(null);
+  const rotateStart = useRef<{ key: string } | null>(null);
   const usedTypes = useMemo(
     () => new Set(layout.walls.map((w) => w.type)),
     [layout.walls],
@@ -937,6 +976,11 @@ function LayoutPlan({
           const dragging = drag?.key === k;
           // live preview: shift by the world delta, expressed in view units (world dy is up → view -dy)
           const previewT = dragging ? `translate(${drag!.dx} ${-drag!.dy}) ` : "";
+          // the piece's live orientation (grip preview overrides the committed rotation) + its screen
+          // centre — the pivot for the footprint symbol and the outline's rotation delta.
+          const rot = rotating?.key === k ? rotating.deg : f.rotation;
+          const csx = view.fx(f.x + f.w / 2);
+          const csy = view.fy(f.y + f.h / 2);
           const swap: Record<string, unknown> = selectable
             ? {
                 className:
@@ -955,6 +999,9 @@ function LayoutPlan({
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     onSelectFurniture!(f);
+                  } else if (onRotateFurniture && (e.key === "[" || e.key === "]")) {
+                    e.preventDefault();
+                    onRotateFurniture(k, (((f.rotation + (e.key === "]" ? 15 : -15)) % 360) + 360) % 360);
                   } else if (onDeleteFurniture && (e.key === "Delete" || e.key === "Backspace")) {
                     e.preventDefault();
                     onDeleteFurniture(k);
@@ -985,8 +1032,13 @@ function LayoutPlan({
             : {};
 
           if (f.outline?.length) {
+            // the outline is baked at f.rotation, so preview only the delta about the screen centre;
+            // on commit the delta is folded back into the polylines (see rotateFurniture).
+            const outlineT =
+              `${previewT}${rot !== f.rotation ? `rotate(${-(rot - f.rotation)} ${csx} ${csy}) ` : ""}`.trim() ||
+              undefined;
             return (
-              <g key={`f-${i}`} transform={previewT || undefined} stroke="var(--furn-line)" vectorEffect="non-scaling-stroke" {...swap}>
+              <g key={`f-${i}`} transform={outlineT} stroke="var(--furn-line)" vectorEffect="non-scaling-stroke" {...swap}>
                 <title>{label}</title>
                 {f.outline.map((ring, j) => {
                   const closed =
@@ -1005,12 +1057,10 @@ function LayoutPlan({
 
           const ox = view.fx(f.x);
           const oy = view.fy(f.y + f.h);
-          const cx = view.fx(f.x + f.w / 2);
-          const cy = view.fy(f.y + f.h / 2);
           return (
             <g
               key={`f-${i}`}
-              transform={`${previewT}translate(${ox} ${oy}) rotate(${-f.rotation} ${cx - ox} ${cy - oy})`}
+              transform={`${previewT}rotate(${-rot} ${csx} ${csy}) translate(${ox} ${oy})`}
               fill={tint}
               fillOpacity={0.14}
               {...swap}
@@ -1021,22 +1071,97 @@ function LayoutPlan({
           );
         })}
 
+        {/* rotate grip — a handle just outside the selected piece's bbox; drag it to spin the piece
+            about its centre (live preview), or use ←/→ · [ ] for 15° steps. Attached at the piece's
+            north edge so it tracks the current orientation. */}
+        {onRotateFurniture && selectedFurnitureKey && (() => {
+          const f = layout.furniture.find((g) => furnitureKey(g) === selectedFurnitureKey);
+          if (!f) return null;
+          const k = selectedFurnitureKey;
+          const rot = rotating?.key === k ? rotating.deg : f.rotation;
+          const wcx = f.x + f.w / 2;
+          const wcy = f.y + f.h / 2;
+          const reach = Math.max(f.w, f.h) / 2 + 2.4; // just clear of the footprint
+          const ang = ((90 + rot) * Math.PI) / 180; // grip rides the piece's north edge
+          const gx = view.fx(wcx + reach * Math.cos(ang));
+          const gy = view.fy(wcy + reach * Math.sin(ang));
+          const cx = view.fx(wcx);
+          const cy = view.fy(wcy);
+          const step = (delta: number) =>
+            onRotateFurniture(k, (((f.rotation + delta) % 360) + 360) % 360);
+          return (
+            <g className="rotate-grip">
+              <line x1={cx} y1={cy} x2={gx} y2={gy} stroke="var(--accent)" strokeOpacity={0.5} vectorEffect="non-scaling-stroke" />
+              <circle
+                cx={gx}
+                cy={gy}
+                r={1.3}
+                fill="var(--accent)"
+                role="slider"
+                tabIndex={0}
+                aria-label={`Rotate ${f.category}`}
+                aria-valuenow={Math.round(rot)}
+                aria-valuemin={0}
+                aria-valuemax={360}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowLeft" || e.key === "[") { e.preventDefault(); step(-15); }
+                  else if (e.key === "ArrowRight" || e.key === "]") { e.preventDefault(); step(15); }
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation(); // rotate, not a canvas pan or piece move
+                  (e.currentTarget as Element).setPointerCapture(e.pointerId);
+                  rotateStart.current = { key: k };
+                }}
+                onPointerMove={(e) => {
+                  if (rotateStart.current?.key !== k) return;
+                  const p = api.worldPoint({ x: e.clientX, y: e.clientY });
+                  setRotating({ key: k, deg: rotationToPointer(wcx, wcy, p.x, p.y, e.shiftKey) });
+                }}
+                onPointerUp={() => {
+                  if (rotateStart.current?.key === k && rotating?.key === k) {
+                    onRotateFurniture(k, rotating.deg);
+                  }
+                  rotateStart.current = null;
+                  setRotating(null);
+                }}
+              />
+            </g>
+          );
+        })()}
+
         {/* doors — a proper architectural swing: the leaf line + a quarter-circle arc.
-            (x,y) is the hinge/threshold; rotation orients the opening. */}
+            (x,y) is the hinge/threshold; rotation orients the opening; flip mirrors the swing side.
+            Selectable for the door property panel when onSelectDoor is supplied. */}
         {layout.doors.map((d, i) => {
           const hx = view.fx(d.x);
           const hy = view.fy(d.y);
+          const selectable = !!onSelectDoor;
+          const selected = selectable && selectedDoorIndex === i;
+          const pick: Record<string, unknown> = selectable
+            ? {
+                className: `layout-door${selected ? " is-selected" : ""}`,
+                role: "button",
+                tabIndex: 0,
+                "aria-pressed": selected,
+                "aria-label": `Edit door, ${(d.width * 12).toFixed(0)} inch leaf`,
+                onClick: () => { if (!api.didDrag()) onSelectDoor!(i); },
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectDoor!(i); }
+                },
+              }
+            : {};
           return (
             <g
               key={`d-${i}`}
               transform={`translate(${hx} ${hy}) rotate(${-d.rotation})`}
-              stroke="var(--wall-door)"
+              stroke={selected ? "var(--accent)" : "var(--wall-door)"}
               vectorEffect="non-scaling-stroke"
               fill="none"
+              {...pick}
             >
               <line x1={0} y1={0} x2={d.width} y2={0} vectorEffect="non-scaling-stroke" />
               <path
-                d={`M ${d.width} 0 A ${d.width} ${d.width} 0 0 1 0 ${d.width}`}
+                d={doorSwingPath(d.width, d.flip)}
                 strokeOpacity={0.5}
                 vectorEffect="non-scaling-stroke"
               />

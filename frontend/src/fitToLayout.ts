@@ -37,8 +37,8 @@ const closeRing = (pts: [number, number][]): [number, number][] => {
 };
 
 // rotate a point about a centre by `deg` degrees (engine convention — shared by corners,
-// in-room furniture, and door placement so the trig lives in one place)
-const rotatePoint = (
+// in-room furniture, door placement, and the editor's outline rotation so the trig lives in one place)
+export const rotatePoint = (
   x: number,
   y: number,
   cx: number,

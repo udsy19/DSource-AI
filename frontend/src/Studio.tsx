@@ -28,13 +28,14 @@ import PlanCanvas, { furnitureKey, instanceKey } from "./components/PlanCanvas";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented } from "./design/ui";
 import WizardStepper, { type WizardStep } from "./components/WizardStepper";
-import { layoutFromFit } from "./fitToLayout";
+import { layoutFromFit, rotatePoint } from "./fitToLayout";
 import { type ProjectStatus, type WorkflowProject } from "./workflowProjects";
 import type {
   Alternative,
   CatalogSetting,
   ConceptProgram,
   DetailedProgram,
+  ExtractedDoor,
   ExtractedFurniture,
   ExtractedLayout,
   ExtractedRoom,
@@ -378,6 +379,7 @@ export default function Studio({
   // Swap state — the selected furniture item OR room, and the fetched alternatives for it.
   const [swapFurniture, setSwapFurniture] = useState<ExtractedFurniture | null>(null);
   const [swapRoom, setSwapRoom] = useState<ExtractedRoom | null>(null);
+  const [selectedDoor, setSelectedDoor] = useState<number | null>(null);
   const [swapProducts, setSwapProducts] = useState<Product[] | null>(null);
   const [swapSettings, setSwapSettings] = useState<CatalogSetting[] | null>(null);
   const [swapBusy, setSwapBusy] = useState(false);
@@ -475,6 +477,28 @@ export default function Studio({
     });
   };
 
+  // Rotate a piece to a new absolute orientation (degrees). Footprint pieces read their angle from
+  // `rotation` alone; a real-outline piece has the angle baked into its polylines, so fold the delta
+  // into the outline (about the piece centre) as we update rotation, keeping the two in step.
+  const rotateFurniture = (key: string, rotation: number) => {
+    setLayout((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        furniture: prev.furniture.map((f) => {
+          if (furnitureKey(f) !== key) return f;
+          if (!f.outline?.length) return { ...f, rotation };
+          const cx = f.x + f.w / 2;
+          const cy = f.y + f.h / 2;
+          const outline = f.outline.map((ring) =>
+            ring.map(([x, y]) => rotatePoint(x, y, cx, cy, rotation - f.rotation)),
+          );
+          return { ...f, rotation, outline };
+        }),
+      };
+    });
+  };
+
   // Delete a piece and recount the inventory so the elements grid + metrics stay in sync.
   const deleteFurniture = (key: string) => {
     setLayout((prev) => {
@@ -559,15 +583,45 @@ export default function Studio({
 
   const selectFurniture = (f: ExtractedFurniture) => {
     setSwapRoom(null);
+    setSelectedDoor(null);
     setSwapFurniture(f);
   };
   const selectRoom = (r: ExtractedRoom) => {
     setSwapFurniture(null);
+    setSelectedDoor(null);
     setSwapRoom(r);
+  };
+  const selectDoor = (index: number) => {
+    setSwapFurniture(null);
+    setSwapRoom(null);
+    setSelectedDoor(index);
   };
   const dismissSwap = () => {
     setSwapFurniture(null);
     setSwapRoom(null);
+    setSelectedDoor(null);
+  };
+
+  // Edit the selected door in place — flip its swing side, flip the swing direction (rotate the
+  // opening 180°), or nudge it along its own wall (the leaf direction). Fully back-compatible: an
+  // unset `flip` reads as false.
+  const editDoor = (index: number, patch: Partial<ExtractedDoor>) => {
+    setLayout((prev) =>
+      prev ? { ...prev, doors: prev.doors.map((d, i) => (i === index ? { ...d, ...patch } : d)) } : prev,
+    );
+  };
+  const nudgeDoorAlongWall = (index: number, feet: number) => {
+    setLayout((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        doors: prev.doors.map((d, i) => {
+          if (i !== index) return d;
+          const rad = (d.rotation * Math.PI) / 180;
+          return { ...d, x: d.x + feet * Math.cos(rad), y: d.y + feet * Math.sin(rad) };
+        }),
+      };
+    });
   };
 
   // Merge mode is exclusive with the swap panels — entering it dismisses any open swap + suggestion,
@@ -857,7 +911,10 @@ export default function Studio({
           mergeSelection={mergeMode ? mergeSelection : undefined}
           onToggleMergeRoom={mergeMode ? toggleMergeRoom : undefined}
           onMoveFurniture={moveFurniture}
+          onRotateFurniture={rotateFurniture}
           onDeleteFurniture={deleteFurniture}
+          selectedDoorIndex={selectedDoor}
+          onSelectDoor={selectDoor}
           markers={step === "space" ? markers : undefined}
           placing={step === "space" && !!pendingMarker}
           onPlacePoint={step === "space" ? placeMarker : undefined}
@@ -1030,6 +1087,37 @@ export default function Studio({
           ))}
         </SwapPanel>
       )}
+      {selectedDoor != null && layout.doors[selectedDoor] && (() => {
+        const idx = selectedDoor;
+        const d = layout.doors[idx];
+        return (
+          <SwapPanel title="Door" busy={false} empty={false} onDismiss={dismissSwap}>
+            <div className="room-props">
+              <div className="prop-recap">
+                <div className="prop-row"><span className="prop-k">Leaf</span><span className="prop-v">{(d.width * 12).toFixed(0)}″</span></div>
+                <div className="prop-row"><span className="prop-k">Angle</span><span className="prop-v">{Math.round(((d.rotation % 360) + 360) % 360)}°</span></div>
+              </div>
+              <Eyebrow style={{ display: "block", margin: "16px 0 8px" }}>Swing</Eyebrow>
+            </div>
+            <button type="button" className="export-btn" onClick={() => editDoor(idx, { flip: !d.flip })}>
+              <span className="export-btn-label">Flip swing side</span>
+              <span className="export-btn-meta">mirror the arc</span>
+            </button>
+            <button type="button" className="export-btn" onClick={() => editDoor(idx, { rotation: (((d.rotation + 180) % 360) + 360) % 360 })}>
+              <span className="export-btn-label">Flip swing direction</span>
+              <span className="export-btn-meta">in / out</span>
+            </button>
+            <button type="button" className="export-btn" onClick={() => nudgeDoorAlongWall(idx, -0.5)}>
+              <span className="export-btn-label">Nudge along wall</span>
+              <span className="export-btn-meta">−6″</span>
+            </button>
+            <button type="button" className="export-btn" onClick={() => nudgeDoorAlongWall(idx, 0.5)}>
+              <span className="export-btn-label">Nudge along wall</span>
+              <span className="export-btn-meta">+6″</span>
+            </button>
+          </SwapPanel>
+        );
+      })()}
       <div>
         <Eyebrow style={{ display: "block", marginBottom: 14 }}>Elements · bill of components</Eyebrow>
         <div className="el-grid">

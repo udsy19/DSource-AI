@@ -258,6 +258,7 @@ export interface ExtractedDoor {
   y: number;
   width: number;
   rotation: number;
+  flip?: boolean; // mirror the swing arc to the other side of the leaf (default: as-drawn)
 }
 
 export interface ExtractedRoom {

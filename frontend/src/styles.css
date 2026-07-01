@@ -112,6 +112,16 @@ header.bar {
   :is(rect, circle, path, line, polyline, polygon) { stroke: var(--accent); }
 .layout-furn.is-selected polygon { fill: var(--accent-soft); }
 
+/* selectable door — hover/focus/selected shifts the swing to the accent, like furniture */
+.layout-door { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+.layout-door:focus, .layout-door:focus-visible { outline: none; }
+.layout-door:is(:hover, :focus-visible, .is-selected) :is(line, path) { stroke: var(--accent); }
+
+/* rotate grip — the accent handle just outside a selected piece; drag it to spin the piece */
+.rotate-grip circle { cursor: grab; outline: none; }
+.rotate-grip circle:active { cursor: grabbing; }
+.rotate-grip circle:focus-visible { stroke: var(--ink); stroke-width: 0.4; }
+
 /* floating room tag — name + area near the cursor / focused room */
 .room-tag { position: absolute; z-index: 7; transform: translate(-50%, calc(-100% - 10px));
   pointer-events: none; display: flex; flex-direction: column; gap: 1px;

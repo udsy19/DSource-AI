@@ -20,6 +20,7 @@ class Door(BaseModel):
     y: float
     width: float  # door-length, feet
     rotation: float  # degrees
+    flip: bool = False  # swing arc mirrored to the other side of the leaf (editor toggle)
 
 
 class Room(BaseModel):
