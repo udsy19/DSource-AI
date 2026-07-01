@@ -29,6 +29,7 @@ import PlanCanvas, { furnitureKey, instanceKey } from "./components/PlanCanvas";
 import SpaceView from "./components/SpaceView";
 import { Callout, Eyebrow, Segmented } from "./design/ui";
 import { layoutFromFit } from "./fitToLayout";
+import { type ProjectStatus, type WorkflowProject } from "./workflowProjects";
 import type {
   Alternative,
   CatalogSetting,
@@ -285,7 +286,13 @@ function recountInventory(
   return inv;
 }
 
-export default function Studio() {
+export default function Studio({
+  project,
+  onStatus,
+}: {
+  project?: WorkflowProject | null;
+  onStatus?: (s: ProjectStatus) => void;
+}) {
   const [studioMode, setStudioMode] = useState<"read" | "generate">("read");
 
   // Read-layout state (the existing flow).
@@ -601,6 +608,7 @@ export default function Studio() {
     setPinned([]);
     setAdoptedFit(null);
     setFile(f);
+    onStatus?.("processing");
     try {
       // Generate scored test-fit versions from the plate + the program (Concept brief or the
       // explicit Detailed counts), then compare them side by side and open one in 2D / 3D.
@@ -612,6 +620,8 @@ export default function Studio() {
       setSelectedId(res.alternatives[0]?.id ?? null);
       if (res.alternatives.length === 0) {
         setErr("No test-fit versions could be generated for this plate + program. Try adjusting the program.");
+      } else {
+        onStatus?.("ready");
       }
     } catch (e) {
       setErr(String(e instanceof Error ? e.message : e));
@@ -674,7 +684,12 @@ export default function Studio() {
     if (!file) return;
     const alts = await generateAlternatives(file);
     await downloadReport({
-      project: { client: "", building: file.name.replace(/\.(dxf|dwg)$/i, ""), style: "Modern", floor: "" },
+      project: {
+        client: project?.address ?? "",
+        building: project?.name ?? file.name.replace(/\.(dxf|dwg)$/i, ""),
+        style: "Modern",
+        floor: project?.floor ?? "",
+      },
       plan: alts.plan,
       alternatives: alts.alternatives,
     });
