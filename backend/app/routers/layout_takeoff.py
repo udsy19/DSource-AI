@@ -12,6 +12,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from ..ingestion.cad_reader import read_cad
+from ..ingestion.layout_metrics import compute_layout_metrics
 from ..ingestion.schema import ExtractedLayout
 from ..takeoff.bom import build_bom
 from ..takeoff.layout_takeoff import build_layout_takeoff
@@ -58,3 +59,9 @@ async def adopted_layout_to_takeoff(layout: ExtractedLayout):
 async def layout_bom(layout: ExtractedLayout):
     """Priced bill of materials from a layout's furniture (real SKUs + list prices where present)."""
     return build_bom(layout)
+
+
+@router.post("/api/layout/metrics")
+async def layout_metrics(layout: ExtractedLayout):
+    """Live seat/density metrics for the editable canvas — re-scored after each edit (delete/swap)."""
+    return compute_layout_metrics(layout)
