@@ -19,6 +19,7 @@ from collections import Counter
 import ezdxf.bbox
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import unary_union
+from shapely.strtree import STRtree
 
 from ..floorplan.dxf_ingest import (
     _INSUNITS_TO_FEET,
@@ -455,12 +456,62 @@ def _ring(poly: Polygon) -> list[tuple[float, float]]:
     return [(round(x, 2), round(y, 2)) for x, y in poly.exterior.coords]
 
 
+_GAP_HEAL_FT = 4.0  # extend a wall end up to this far to meet a nearby wall (close partition gaps)
+
+
+def _heal_wall_gaps(lines: list[LineString], reach_ft: float = _GAP_HEAL_FT) -> list[LineString]:
+    """Bridge near-miss wall junctions so gappy partitions actually separate rooms.
+
+    Real CAD partitions often stop a foot or two short of the wall they should meet, leaving a gap
+    that lets two rooms merge into one region. For every DANGLING segment end (not already touching
+    another wall), extend it along its own direction up to reach_ft to the nearest wall it would
+    meet. Ends that already connect are left alone, so nothing over-extends into open-plan space.
+    Polylines are split to 2-point segments so each end extends independently."""
+    segs: list[LineString] = []
+    for ln in lines:
+        cs = list(ln.coords)
+        for a, b in zip(cs, cs[1:]):
+            if a != b:
+                segs.append(LineString([a, b]))
+    if not segs:
+        return list(lines)
+    tree = STRtree(segs)
+
+    def extend(i: int, tip: tuple[float, float], inner: tuple[float, float]) -> tuple[float, float]:
+        dx, dy = tip[0] - inner[0], tip[1] - inner[1]
+        length = math.hypot(dx, dy)
+        if length == 0:
+            return tip
+        ux, uy = dx / length, dy / length
+        # Extend outward only until we MEET another wall (never a stub into empty space): cast a ray
+        # up to reach_ft and snap to the nearest wall it crosses. A gap of a foot or two at a
+        # partition junction closes; an end already sitting on a wall finds it immediately and
+        # doesn't move meaningfully. Spurious splits are dropped later by the room area/label filters.
+        ray = LineString([tip, (tip[0] + ux * reach_ft, tip[1] + uy * reach_ft)])
+        best, best_d = tip, reach_ft + 1.0
+        for j in tree.query(ray):
+            if j == i:
+                continue
+            hit = ray.intersection(segs[j])
+            if hit.is_empty:
+                continue
+            pts = [hit] if hit.geom_type == "Point" else [g for g in getattr(hit, "geoms", []) if g.geom_type == "Point"]
+            for pt in pts:
+                d = math.hypot(pt.x - tip[0], pt.y - tip[1])
+                if 0.05 < d < best_d:
+                    best, best_d = (pt.x, pt.y), d
+        return best
+
+    return [LineString([extend(i, s.coords[0], s.coords[1]), extend(i, s.coords[1], s.coords[0])])
+            for i, s in enumerate(segs)]
+
+
 def _read_rooms(
     wall_lines: list[LineString], panels: list[FurnitureItem], doors: list[Door],
     bounds: tuple[float, float, float, float], msp, lf: float,
 ) -> tuple[list[Room], str | None]:
     labels = _read_room_labels(msp, lf)
-    boundaries = list(wall_lines)
+    boundaries = list(_heal_wall_gaps(wall_lines))  # bridge near-miss junctions so rooms separate
     boundaries += [_panel_segment(p) for p in panels]  # glass-walled rooms close on the partitions
     boundaries += [_door_segment(d) for d in doors]  # plug doorways
     boundaries = [b for b in boundaries if b.length > 0.1]

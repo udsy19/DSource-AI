@@ -254,15 +254,46 @@ def test_perimeter_seal_closes_rooms_behind_open_edge():
     )
 
 
+def _gapped_partition_dxf() -> bytes:
+    """A closed 40x30ft building split by a partition that stops 2ft SHORT of the top wall. Without
+    healing the 2ft gap lets both sides merge into one region; the gap-healer extends the dangling
+    partition end to the wall so the two rooms separate and close."""
+    doc = ezdxf.new(setup=True)
+    doc.header["$INSUNITS"] = 1  # inches
+    msp = doc.modelspace()
+
+    perim = [(0, 0), (480, 0), (480, 360), (0, 360), (0, 0)]  # 40ft x 30ft, closed
+    for a, b in zip(perim, perim[1:]):
+        msp.add_line(a, b, dxfattribs={"layer": "A-WALL"})
+    # partition rises from the bottom wall but stops 24in (2ft) below the top wall — a real gap.
+    msp.add_line((240, 0), (240, 336), dxfattribs={"layer": "A-WALL"})
+
+    for name, x in (("OFFICE A", 120), ("OFFICE B", 360)):
+        msp.add_text(name, dxfattribs={"layer": "A-AREA-IDEN"}).set_placement((x, 180))
+        msp.add_text("100 SF", dxfattribs={"layer": "A-AREA-IDEN"}).set_placement((x, 156))
+
+    text = io.StringIO()
+    doc.write(text)
+    return text.getvalue().encode("utf-8")
+
+
+def test_gap_healing_separates_rooms_across_a_broken_partition():
+    layout = read_cad(_gapped_partition_dxf(), "gapped.dxf")
+    closed = {r.label for r in layout.rooms if r.polygon and r.label}
+    assert "OFFICE A" in closed and "OFFICE B" in closed, (
+        f"the 2ft partition gap should be healed so both rooms close; closed labels were {closed}"
+    )
+
+
 @pytest.mark.skipif(not os.path.exists(REAL_DWG), reason="real DWG not present")
 def test_real_dwg_inventory():
     with open(REAL_DWG, "rb") as f:
         layout = read_cad(f.read(), os.path.basename(REAL_DWG))
     assert layout.units == "ft"
     assert layout.inventory.get("chair", 0) > 50
-    # Perimeter-seal fix: the labeled rooms must actually close, not drop to label-only.
+    # Perimeter-seal + gap-healing: many more labeled rooms close (was 1 before either fix).
     closed = [r for r in layout.rooms if r.polygon]
-    assert len(closed) >= 5, f"expected the labeled rooms to close, only {len(closed)} did"
+    assert len(closed) >= 9, f"expected gap-healing to close many rooms, only {len(closed)} did"
     assert layout.inventory.get("workstation", 0) > 50
 
 
