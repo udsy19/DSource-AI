@@ -28,7 +28,7 @@ class Room(BaseModel):
     area_sf: float | None
     polygon: list[tuple[float, float]]  # closed boundary in feet (may be empty if walls don't close)
     center: tuple[float, float] | None = None  # anchor for the label — polygon centroid or label point
-    type: str  # office | meeting | open | huddle | reception | core | circulation | unknown
+    type: str  # office | meeting | open | collab | huddle | reception | core | circulation | unknown
 
 
 class FurnitureItem(BaseModel):

@@ -36,7 +36,7 @@ type Props = FitProps | LayoutProps;
 // and the category tint. Unknown types fall back to an open low box.
 // Program family → the quiet floor tint that distinguishes office / meeting / collaboration /
 // amenity rooms within the warm-paper palette. Shared by both renderers (FitPlan carries the
-// family explicitly; LayoutPlan infers it from the room label via roomFamilyFill).
+// family explicitly; LayoutPlan resolves it from the room's type via roomFill).
 type RoomFamily = "office" | "meeting" | "collab" | "amenity";
 const FAMILY_FILL: Record<RoomFamily, string> = {
   office: "--room-office",
@@ -67,6 +67,28 @@ function roomFamilyFill(label: string): string {
   if (/(meet|conf|board|huddle|discuss|interview)/.test(s)) return FAMILY_FILL.meeting;
   if (/(collab|lounge|breakout|break|cafe|caf|waiting|reception|open)/.test(s)) return FAMILY_FILL.collab;
   return FAMILY_FILL.amenity;
+}
+
+// Backend Room.type → floor tint. The reader now types every room (from its label or, for a
+// label-less plan, its furniture mix), so colour by type first; fall back to label inference,
+// then a neutral fill for circulation/core/genuinely-unknown space.
+const ROOM_TYPE_FAMILY: Record<string, RoomFamily> = {
+  office: "office",
+  meeting: "meeting",
+  huddle: "meeting",
+  open: "collab",
+  collab: "collab",
+  reception: "collab",
+  kitchen: "amenity",
+  wellness: "amenity",
+  storage: "amenity",
+  copy_print: "amenity",
+};
+function roomFill(r: ExtractedRoom): string {
+  const fam = ROOM_TYPE_FAMILY[r.type];
+  if (fam) return FAMILY_FILL[fam];
+  if (r.label) return roomFamilyFill(r.label);
+  return "--room-fill";
 }
 
 // Stable identity for a placed instance — used to pin/unpin rooms across regenerations.
@@ -771,7 +793,7 @@ function LayoutPlan({
                   <polygon
                     className="room-shape"
                     points={polyline(r.polygon)}
-                    fill={`var(${r.label ? roomFamilyFill(r.label) : "--room-fill"})`}
+                    fill={`var(${roomFill(r)})`}
                     stroke="var(--room-line)"
                     strokeWidth={1}
                     vectorEffect="non-scaling-stroke"

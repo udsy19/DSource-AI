@@ -177,6 +177,50 @@ def test_room_recovered_with_label():
     assert office.area_sf == pytest.approx(120.0)
 
 
+def _unlabeled_rooms_dxf() -> bytes:
+    """A plate split by an interior wall into two UNLABELED rooms (no A-AREA-IDEN text): the left
+    holds two benching workstations (reads as an open field), the right a lounge sofa (reads as
+    collaboration). Exercises furniture-mix room-type inference for rooms with no text label."""
+    doc = ezdxf.new(setup=True)
+    doc.header["$INSUNITS"] = 1  # inches
+    msp = doc.modelspace()
+
+    for block_name, w_in in (
+        ("WORKSTATIONS_BENCH- SINGLE - 5 X 2 FT-1-Level 06 - Furniture", 24),
+        ("Lounge Sofa - Two Seat-2-Level 06 - Furniture", 48),
+    ):
+        block = doc.blocks.new(name=block_name)
+        block.add_lwpolyline([(0, 0), (w_in, 0), (w_in, w_in), (0, w_in)], close=True)
+
+    # Left room (0..240 in) gets two workstations; right room (240..480 in) gets a sofa.
+    msp.add_blockref("WORKSTATIONS_BENCH- SINGLE - 5 X 2 FT-1-Level 06 - Furniture",
+                     (60, 100), dxfattribs={"layer": "I-FURN"})
+    msp.add_blockref("WORKSTATIONS_BENCH- SINGLE - 5 X 2 FT-1-Level 06 - Furniture",
+                     (150, 100), dxfattribs={"layer": "I-FURN"})
+    msp.add_blockref("Lounge Sofa - Two Seat-2-Level 06 - Furniture",
+                     (330, 100), dxfattribs={"layer": "I-FURN"})
+
+    # Perimeter (40ft x 20ft in inches) + an interior divider at x=240 — no room label text.
+    perim = [(0, 0), (480, 0), (480, 240), (0, 240), (0, 0)]
+    for a, b in zip(perim, perim[1:]):
+        msp.add_line(a, b, dxfattribs={"layer": "A-WALL"})
+    msp.add_line((240, 0), (240, 240), dxfattribs={"layer": "A-WALL"})
+
+    text = io.StringIO()
+    doc.write(text)
+    return text.getvalue().encode("utf-8")
+
+
+def test_unlabeled_room_type_inferred_from_furniture():
+    layout = read_cad(_unlabeled_rooms_dxf(), "unlabeled.dxf")
+    unlabeled = [r for r in layout.rooms if not r.label and r.polygon]
+    assert len(unlabeled) >= 2, f"expected two detected unlabeled rooms, got {len(unlabeled)}"
+    types = {r.type for r in unlabeled}
+    # No text labels, so type MUST come from the furniture mix — not left at "unknown".
+    assert "open" in types, f"two workstations should read as an open field; got {types}"
+    assert "collab" in types, f"a sofa should read as collaboration; got {types}"
+
+
 @pytest.mark.skipif(not os.path.exists(REAL_DWG), reason="real DWG not present")
 def test_real_dwg_inventory():
     with open(REAL_DWG, "rb") as f:

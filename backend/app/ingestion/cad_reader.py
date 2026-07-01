@@ -111,6 +111,7 @@ def read_cad(content: bytes, filename: str, extract_outline: bool = True) -> Ext
     panels = [f for f in furniture if f.category in ("panel", "mullion")]
     rooms, room_note = _read_rooms(wall_lines, panels, doors, bounds, msp, lf)
     _assign_rooms(furniture, rooms)
+    _infer_room_types(rooms, furniture)
     if room_note:
         notes.append(room_note)
 
@@ -519,6 +520,34 @@ def _read_rooms(
             "nearest room. Confirm boundaries before fabrication."
         )
     return rooms, note
+
+
+# Setting-type vocabulary (furniture-mix heuristic) -> Room.type vocabulary.
+_SETTING_TO_ROOM_TYPE = {
+    "private_office": "office",
+    "meeting_room": "meeting",
+    "open": "open",
+    "collaboration": "collab",
+}
+
+
+def _infer_room_types(rooms: list[Room], furniture: list[FurnitureItem]) -> None:
+    """Give each still-unknown room a functional type from the furniture assigned to it, so a
+    label-less plan still colour-codes (open field vs meeting vs office vs collaboration). Reuses
+    the settings library's furniture-mix heuristic, mapped to the Room vocabulary. Rooms that
+    already carry a type from their text label are left untouched."""
+    from ..testfit.settings import infer_setting_type
+
+    by_room: dict[str, list[FurnitureItem]] = {}
+    for f in furniture:
+        if f.room_id:
+            by_room.setdefault(f.room_id, []).append(f)
+    for r in rooms:
+        if r.type != "unknown":
+            continue
+        items = by_room.get(r.id)
+        if items:
+            r.type = _SETTING_TO_ROOM_TYPE[infer_setting_type(items, r.area_sf or 0.0)]
 
 
 def _assign_rooms(furniture: list[FurnitureItem], rooms: list[Room]) -> None:
