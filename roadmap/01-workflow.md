@@ -155,6 +155,16 @@ material sets (ceiling/floor/wall/partition/door) and the theme gallery, and wir
 frontend `FinishesPanel` + `renderView` (exists, extend to full material sets + per-room preview +
 theme presets). `config.py` holds swappable model names.
 
+**Model split (decided).** Two render capabilities, both behind the provider-agnostic interface:
+1. **Full-scene render** — the room render from the plan/3D. `flux-canny-dev` (ControlNet, layout-
+   faithful) via Replicate, or Gemini 2.5 Flash Image. (`render_model`, exists.)
+2. **Targeted material/finish swap** — **`black-forest-labs/flux-kontext-pro`** (`config.render_edit_model`).
+   Instruction-based edit: given a rendered room + "replace the accent wall with walnut / this floor
+   with polished concrete", it changes ONLY that part and leaves the rest intact. This is the
+   per-part finishes path — each swatch in Select Finishes becomes a kontext edit instruction on the
+   current room render, so the user sees just that surface change. (User-confirmed this model works
+   well for exactly this.) Wire in Phase D as a `render_edit(image, instruction)` alongside `render`.
+
 **Design.** Theme/finish swatches on paper; selected = terracotta ring. Render preview framed like a
 gallery print. Keep it tasteful, not the dense qbiq grid.
 

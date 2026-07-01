@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     render_model: str = "gemini-2.5-flash-image"
     render_api_url: str = ""          # only for provider="generic"
     replicate_api_token: str = ""     # for provider="replicate" (ControlNet, layout-faithful)
+    # Instruction-based TARGETED edit model (Replicate): given a rendered room + a prompt like
+    # "replace the accent wall with walnut", it changes ONLY that part, leaving the rest intact.
+    # This is the material/finish-swap path for the Visualization step (Phase D), distinct from the
+    # full-scene render above. Wire behind the same provider-agnostic interface as render_model.
+    render_edit_model: str = "black-forest-labs/flux-kontext-pro"
 
     # Catalog image/text embeddings (Phase 1). Product-tuned, text+image in one shared space.
     # Swappable like render_model (e.g. SigLIP2 / marqo-ecommerce-L) without touching callers.
