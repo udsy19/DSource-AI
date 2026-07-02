@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from app.routers.render import build_edit_instruction, build_render_prompt
+from app.routers.render import build_edit_instruction, build_kontext_input, build_render_prompt
 
 
 def test_empty_finishes_returns_layout_preserving_base():
@@ -51,3 +51,15 @@ def test_edit_instruction_rejects_unknown_field():
     with pytest.raises(HTTPException) as e:
         build_edit_instruction("ceiling", "oak")
     assert e.value.status_code == 422
+
+
+def test_kontext_input_matches_published_schema():
+    # Locks the flux-kontext-pro input contract (verified against its OpenAPI schema): the source
+    # image goes in `input_image` (which accepts a data URI), output_format must be an allowed enum
+    # value, and safety_tolerance <= 2 — the model's documented max when an input image is supplied.
+    inp = build_kontext_input("data:image/jpeg;base64,AAAA", "Change the walls to navy")
+    assert inp["input_image"] == "data:image/jpeg;base64,AAAA"
+    assert inp["prompt"] == "Change the walls to navy"
+    assert inp["output_format"] in ("jpg", "png")
+    assert 0 <= inp["safety_tolerance"] <= 2
+    assert "aspect_ratio" not in inp  # omitted -> defaults to match_input_image (layout preserved)

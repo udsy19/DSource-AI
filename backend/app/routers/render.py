@@ -193,12 +193,19 @@ async def _render_replicate(image_data_url: str, prompt: str) -> str:
     return await _replicate_run(model, inp)
 
 
+def build_kontext_input(image_data_url: str, instruction: str) -> dict:
+    """The flux-kontext-pro prediction input, per its published OpenAPI schema. `input_image` accepts
+    a base64 data URI as well as a hosted URL. aspect_ratio is omitted so it defaults to
+    match_input_image (the layout must not be reframed); safety_tolerance is pinned at 2, the model's
+    documented maximum whenever an input image is supplied."""
+    return {"prompt": instruction, "input_image": image_data_url,
+            "output_format": "jpg", "safety_tolerance": 2}
+
+
 async def _render_kontext(image_data_url: str, instruction: str) -> str:
     """flux-kontext-pro — a TARGETED edit: changes only what `instruction` names, leaving the rest
     of the render intact. This is the per-surface finish swap, distinct from the full-scene render."""
-    inp = {"prompt": instruction, "input_image": image_data_url,
-           "output_format": "jpg", "safety_tolerance": 2}
-    return await _replicate_run(settings.render_edit_model, inp)
+    return await _replicate_run(settings.render_edit_model, build_kontext_input(image_data_url, instruction))
 
 
 @router.post("")
