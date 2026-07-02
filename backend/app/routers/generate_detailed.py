@@ -19,10 +19,17 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field, ValidationError
 
 from ..floorplan.dxf_ingest import ingest_cad
+from ..jobs import jobs
 from ..testfit.detailed import DetailedProgram, generate_from_detailed
 from ..testfit.payloads import plan_from_payload
 
 router = APIRouter(prefix="/api", tags=["generate"])
+
+
+def run_detailed(content: bytes, filename: str, detailed: DetailedProgram):
+    """Ingest the plate and place the requested rooms — the slow work, run inside a background job."""
+    plan = ingest_cad(content, filename)
+    return generate_from_detailed(plan, detailed)
 
 
 @router.post("/generate/detailed")
@@ -30,6 +37,8 @@ async def generate_detailed(
     file: UploadFile = File(...),
     program: str = Form(...),
 ):
+    """Submit a detailed generation as a background job (poll /api/generate/jobs/{job_id}). Fast
+    input validation is synchronous; ingest + placement run off-thread."""
     if not (file.filename or "").lower().endswith((".dxf", ".dwg")):
         raise HTTPException(status_code=422, detail="Expected a .dxf or .dwg vector floor plate.")
     content = await file.read()
@@ -41,12 +50,9 @@ async def generate_detailed(
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=f"Invalid detailed program: {exc}") from exc
 
-    try:
-        plan = ingest_cad(content, file.filename or "")
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=422, detail=f"Could not parse CAD file: {exc}") from exc
-
-    return generate_from_detailed(plan, detailed)
+    filename = file.filename or ""
+    job_id = jobs.submit(lambda: run_detailed(content, filename, detailed))
+    return {"job_id": job_id, "status": "processing"}
 
 
 class IterateRequest(BaseModel):

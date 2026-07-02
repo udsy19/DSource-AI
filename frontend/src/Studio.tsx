@@ -12,8 +12,9 @@ import {
   fetchLayoutMetrics,
   fetchProducts,
   fetchSettings,
-  generateDetailed,
-  generateFromConcept,
+  fetchGenerateJob,
+  submitGenerateDetailed,
+  submitGenerateFromConcept,
   ingestCad,
   iterateDetailed,
   mergeRooms,
@@ -900,21 +901,32 @@ export default function Studio({
     setFile(f);
     onStatus?.("processing");
     try {
-      // Generate scored test-fit versions from the plate + the program (Concept brief or the
-      // explicit Detailed counts), then compare them side by side and open one in 2D / 3D.
-      const res =
+      // Generation runs as a background job (Processing → Ready): submit the plate + program
+      // (Concept brief or explicit Detailed counts), then poll until the versions are ready.
+      const { job_id } =
         genMode === "detailed"
-          ? await generateDetailed(f, detailed)
-          : await generateFromConcept(f, concept);
+          ? await submitGenerateDetailed(f, detailed)
+          : await submitGenerateFromConcept(f, concept);
+      let job = await fetchGenerateJob(job_id);
+      for (let tries = 0; job.status === "processing" && tries < 120; tries++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        job = await fetchGenerateJob(job_id);
+      }
+      if (job.status !== "ready" || !job.result) {
+        throw new Error(job.error || (job.status === "processing" ? "Generation timed out." : "Generation failed."));
+      }
+      const res = job.result;
       setVersions(res);
       setSelectedId(res.alternatives[0]?.id ?? null);
       if (res.alternatives.length === 0) {
+        onStatus?.("draft");
         setErr("No test-fit versions could be generated for this plate + program. Try adjusting the program.");
       } else {
         onStatus?.("ready");
         setStep("review");
       }
     } catch (e) {
+      onStatus?.("draft");
       setErr(String(e instanceof Error ? e.message : e));
     } finally {
       setBusy(false);

@@ -106,11 +106,19 @@ async function downloadBlob(res: Response, filename: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-// Concept mode: generate scored test-fit VERSIONS from a plate + a simple brief.
-export async function generateFromConcept(
+// Generation runs as a background JOB: submit returns a job id immediately (the plate can take
+// seconds to ingest + place), then the caller polls fetchGenerateJob until it's ready/failed.
+export interface GenerateJob {
+  status: "processing" | "ready" | "failed";
+  result: import("./types").AlternativesResponse | null;
+  error: string | null;
+}
+
+// Concept mode: submit a generation from a plate + a simple brief. Returns the job id to poll.
+export async function submitGenerateFromConcept(
   file: File,
   concept: import("./types").ConceptProgram,
-): Promise<import("./types").AlternativesResponse> {
+): Promise<{ job_id: string }> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("planning_style", concept.planning_style);
@@ -123,16 +131,22 @@ export async function generateFromConcept(
   return res.json();
 }
 
-// Detailed mode: explicit room-type counts + placement per type drive the layout.
-// Same response shape as generateFromConcept; program is sent as a JSON string.
-export async function generateDetailed(
+// Detailed mode: submit a generation from explicit room-type counts + placement. Returns the job id.
+export async function submitGenerateDetailed(
   file: File,
   program: import("./types").DetailedProgram,
-): Promise<import("./types").AlternativesResponse> {
+): Promise<{ job_id: string }> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("program", JSON.stringify(program));
   const res = await fetch("/api/generate/detailed", { method: "POST", body: fd });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
+  return res.json();
+}
+
+// Poll a generation job. `result` carries the versions once ready; `error` the message if it failed.
+export async function fetchGenerateJob(jobId: string): Promise<GenerateJob> {
+  const res = await fetch(`/api/generate/jobs/${encodeURIComponent(jobId)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText);
   return res.json();
 }
