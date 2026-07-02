@@ -50,7 +50,30 @@ def test_merge_collapses_two_rooms_into_one():
     assert merged.id == "R-a"           # survivor keeps room_a's id
     assert merged.boundary_basis == "merged"
     assert merged.confidence == 0.6     # weaker of the two inputs
-    assert abs(merged.area_sf - Polygon(merged.polygon).area) < 0.5
+    # Area is the honest sum of the two authored room areas, not the bridged-polygon geometry
+    # (the +eps/-eps round-trip counts the shared-wall gap, over-stating the merged room).
+    assert merged.area_sf == 200.0
+
+
+def _undersized_layout() -> ExtractedLayout:
+    # Mirrors the real DWG (0414 FURNITURE PLAN, OFFICE 1 + OFFICE 2): two "120 SF" offices whose
+    # label-seeded segmentation polygons undersize the authored label (74 sf and 102 sf) and sit
+    # ~1.4 ft apart across the shared wall. The bridged union polygon is only ~188 sf, but the
+    # honest combined area is the two authored labels: 240 sf.
+    a = Room(id="R-a", label="OFFICE 1", area_sf=120.0, type="office", confidence=0.6,
+             polygon=[(0, 0), (8, 0), (8, 9.2), (0, 9.2)], center=(4, 4.6))
+    b = Room(id="R-b", label="OFFICE 2", area_sf=120.0, type="office", confidence=0.6,
+             polygon=[(9.4, 0), (17.4, 0), (17.4, 12.7), (9.4, 12.7)], center=(13.4, 6.35))
+    return ExtractedLayout(source="cad", units="ft", bounds=(0, 0, 17.4, 12.7),
+                           rooms=[a, b], furniture=[], walls=[])
+
+
+def test_merge_sums_authored_areas_not_undersized_polygons():
+    layout = merge_rooms(_undersized_layout(), "R-a", "R-b")
+    merged = layout.rooms[0]
+    assert merged.area_sf == 240.0
+    # the honest combined area, not the ~188 sf bridged union of the under-sized polygons
+    assert merged.area_sf > Polygon(merged.polygon).area
 
 
 def test_merge_rehomes_furniture_onto_survivor():

@@ -71,13 +71,18 @@ def merge_rooms(layout: ExtractedLayout, room_a: str, room_b: str) -> ExtractedL
 
     ring = union_room_polygon(a.polygon, b.polygon)
     merged_poly = Polygon(ring)
-    area_sf = round(merged_poly.area, 1)
+    # Area is the sum of the two rooms' authored areas, NOT the union-polygon geometry. For CAD
+    # rooms area_sf is the label-authored SF, which the label-seeded segmentation polygon routinely
+    # undersizes (two "120 SF" offices whose polygons read 74 + 102 sf) — deriving area from the
+    # bridged union would silently report ~188 sf for a real 240 sf pair. The rooms are disjoint,
+    # so summing is honest; a room with no authored area falls back to its own polygon area.
+    area_sf = round(_room_area(a) + _room_area(b), 1)
     centroid = merged_poly.centroid
 
     # The survivor keeps room_a's id (so callers can find the merged room). Label/type come from the
     # larger contributor — the dominant space wins — and confidence is the weaker of the two (a merge
     # is no more trustworthy than its shakiest input; the bridged seam makes it best-effort).
-    larger = a if (a.area_sf or 0.0) >= (b.area_sf or 0.0) else b
+    larger = a if _room_area(a) >= _room_area(b) else b
     merged_room = Room(
         id=a.id,
         label=larger.label,
@@ -100,6 +105,15 @@ def merge_rooms(layout: ExtractedLayout, room_a: str, room_b: str) -> ExtractedL
     walls = [w for w in layout.walls if not _is_interior_partition(w, merged_poly)]
 
     return layout.model_copy(update={"rooms": rooms, "furniture": furniture, "walls": walls})
+
+
+def _room_area(room: Room) -> float:
+    """A room's authoritative area in sf — its recorded area_sf, falling back to the polygon area
+    when unset. For CAD rooms area_sf is the label-authored SF, more trustworthy than the
+    (often under-sized) segmentation polygon."""
+    if room.area_sf:
+        return room.area_sf
+    return Polygon(room.polygon).area if len(room.polygon) >= 3 else 0.0
 
 
 def _is_interior_partition(wall: Wall, merged_poly: Polygon) -> bool:
