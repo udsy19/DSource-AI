@@ -13,7 +13,8 @@ from app.testfit.detailed import DetailedProgram, RoomRequest, generate_from_det
 
 _METRIC_KEYS = {
     "usf", "seats", "open_space_seats", "offices", "conf_rooms",
-    "density_sf_per_person", "daylight_pct", "privacy_pct", "efficiency_pct",
+    "density_sf_per_person", "daylight_pct", "privacy_pct", "privacy_basis",
+    "efficiency_pct",
 }
 
 
@@ -43,8 +44,10 @@ def test_returns_three_scored_variants():
     for alt in result["alternatives"]:
         assert set(alt["metrics"]) == _METRIC_KEYS
         assert "instances" in alt["testfit"]
-        for v in alt["metrics"].values():
-            assert v >= 0.0
+        assert alt["metrics"]["privacy_basis"] == "estimated"
+        for k, v in alt["metrics"].items():
+            if k != "privacy_basis":
+                assert v >= 0.0
     metrics = [tuple(sorted(a["metrics"].items())) for a in result["alternatives"]]
     assert len(set(metrics)) == 3, "the three variants must differ in their metrics"
 

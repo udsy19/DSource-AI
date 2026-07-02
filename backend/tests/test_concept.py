@@ -10,7 +10,8 @@ from app.testfit.concept import ConceptProgram, generate_from_concept
 
 _METRIC_KEYS = {
     "usf", "seats", "open_space_seats", "offices", "conf_rooms",
-    "density_sf_per_person", "daylight_pct", "privacy_pct", "efficiency_pct",
+    "density_sf_per_person", "daylight_pct", "privacy_pct", "privacy_basis",
+    "efficiency_pct",
 }
 
 

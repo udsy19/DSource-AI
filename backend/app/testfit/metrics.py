@@ -10,18 +10,16 @@ layers agree on what "daylit" means instead of each picking its own threshold.
 
 from __future__ import annotations
 
-from shapely.geometry import Point, Polygon, box
+from shapely.geometry import Point, Polygon
 
 from ..floorplan.dxf_ingest import PlanModel
 from ..wellbeing.score import DAYLIGHT_REACH_FT
-from .layout import TestFit
+from .layout import SEATS_PER_MEETING_ROOM, TestFit
 
 # A "seat" is a person-position: an open-plan workstation or a single-occupant private office.
 # Meeting rooms hold seats too, but the report's `seats` figure counts only assignable desks
 # (workstations + offices), matching the contract, so meeting seats are excluded from the count.
 _SEAT_TYPES = ("workstation", "private_office")
-# Enclosed footprints a seat can sit inside to count as "private".
-_ENCLOSED_TYPES = ("private_office", "meeting_room")
 
 
 def compute_metrics(plan: PlanModel, fit: TestFit) -> dict:
@@ -37,32 +35,29 @@ def compute_metrics(plan: PlanModel, fit: TestFit) -> dict:
       * daylight_pct           = (# seat-centroids within DAYLIGHT_REACH_FT of the boundary
                                   polygon's edge) / seats. Reuses the wellbeing daylight band
                                   (25 ft) so "daylit" means the same thing everywhere.
-      * privacy_pct            = (# seat-centroids that fall inside an enclosed room footprint
-                                  — private_office or meeting_room) / seats. Open-field
-                                  workstations are never inside a room, so this resolves to the
-                                  enclosed share of seats (offices), measured geometrically.
+      * privacy_pct            = enclosed_occupants / all_occupants — the share of people in an
+                                  acoustically enclosed space (private offices + meeting rooms)
+                                  rather than the open field. Offices are one occupant each;
+                                  meeting rooms use SEATS_PER_MEETING_ROOM, so this is DERIVED, not
+                                  measured (privacy_basis = "estimated"). Counting only office
+                                  desks against the whole open field collapsed this to ~1%.
       * efficiency_pct         = placeable_area_sf / usable_area_sf — the fraction of usable
                                   area that survives perimeter setback + core + column clearance
                                   and can actually carry furniture (0 when usable == 0).
     """
     boundary = Polygon(plan.boundary)
     seat_instances = [i for i in fit.instances if i.type in _SEAT_TYPES]
-    enclosed_polys = [
-        box(i.x, i.y, i.x + i.w, i.y + i.h)
-        for i in fit.instances
-        if i.type in _ENCLOSED_TYPES
-    ]
 
     seats = fit.workstation_count + fit.office_count
 
     daylit = 0
-    private = 0
     for i in seat_instances:
         centroid = Point(i.x + i.w / 2, i.y + i.h / 2)
         if boundary.exterior.distance(centroid) <= DAYLIGHT_REACH_FT:
             daylit += 1
-        if any(poly.contains(centroid) for poly in enclosed_polys):
-            private += 1
+
+    enclosed_occupants = fit.office_count + fit.meeting_count * SEATS_PER_MEETING_ROOM
+    all_occupants = enclosed_occupants + fit.workstation_count
 
     usf = plan.usable_area_sf
     return {
@@ -73,6 +68,7 @@ def compute_metrics(plan: PlanModel, fit: TestFit) -> dict:
         "conf_rooms": fit.meeting_count,
         "density_sf_per_person": round(usf / seats, 1) if seats else 0.0,
         "daylight_pct": round(daylit / seats, 3) if seats else 0.0,
-        "privacy_pct": round(private / seats, 3) if seats else 0.0,
+        "privacy_pct": round(enclosed_occupants / all_occupants, 3) if all_occupants else 0.0,
+        "privacy_basis": "estimated",
         "efficiency_pct": round(fit.placeable_area_sf / usf, 3) if usf else 0.0,
     }

@@ -47,6 +47,9 @@ from .zones import COLLAB_SIZE_FT, place_collaboration_zones, place_interior_roo
 
 
 _CM_PER_FT = 30.48
+# Planning heuristic: ~6 people per enclosed meeting room. Derived, not measured — it sizes the
+# meeting-room target and, downstream, the enclosed-occupant share behind the privacy metric.
+SEATS_PER_MEETING_ROOM = 6
 # Access/chair depth BEHIND the desk worktop. A 70 cm worktop is not a workstation — the seated
 # occupant + chair pull-out needs this much again, so the footprint that gets placed/counted is the
 # worktop depth plus this zone. Without it desks pack ~2x too dense and read as a barcode.
@@ -172,9 +175,9 @@ def derive_program(plan: PlanModel, program: ProgramSpec) -> dict:
         headcount = max(1, int(plan.usable_area_sf / max(program.density_rsf_per_person, 1.0)))
 
     target_offices = max(0, round(headcount * program.private_office_ratio))
-    # ~6 seats per meeting room -> meeting ROOMS, not seats
+    # meeting SEATS -> meeting ROOMS (not seats), at the standard per-room occupancy.
     meeting_seats = headcount * program.meeting_ratio
-    target_meetings = max(0, round(meeting_seats / 6.0))
+    target_meetings = max(0, round(meeting_seats / SEATS_PER_MEETING_ROOM))
     # ~6 people per collaboration lounge cluster
     collab_seats = headcount * program.collaboration_ratio
     target_collab = max(0, round(collab_seats / 6.0))

@@ -4,14 +4,17 @@ Builds a PlanModel directly from a rectangular boundary (the floorplan layer is 
 so nothing here touches ingest_cad, the catalog, or embeddings.
 """
 
+import pytest
+
 from app.floorplan.dxf_ingest import PlanModel
 from app.testfit.alternatives import generate_alternatives
-from app.testfit.layout import ProgramSpec, WorkstationSpec, generate_mixed_layout
+from app.testfit.layout import ProgramSpec, TestFit as Fit, WorkstationSpec, generate_mixed_layout
 from app.testfit.metrics import compute_metrics
 
 _METRIC_KEYS = {
     "usf", "seats", "open_space_seats", "offices", "conf_rooms",
-    "density_sf_per_person", "daylight_pct", "privacy_pct", "efficiency_pct",
+    "density_sf_per_person", "daylight_pct", "privacy_pct", "privacy_basis",
+    "efficiency_pct",
 }
 
 
@@ -61,6 +64,27 @@ def test_metrics_zero_when_no_seats():
     assert m["density_sf_per_person"] == 0.0
     assert m["daylight_pct"] == 0.0
     assert m["privacy_pct"] == 0.0
+
+
+def test_privacy_counts_enclosed_occupants_not_just_office_desks():
+    """Regression (B2): privacy divided a handful of private-office desks by hundreds of open
+    desks, ignoring meeting-room occupants — so it collapsed to ~1-4% and read flat across A/B/C.
+    It must be the enclosed-occupant share (offices + meeting-room seats) over all occupants."""
+    plan = _plan()
+    fit = Fit(workstation_count=100, office_count=5, meeting_count=3, collab_count=0)
+    m = compute_metrics(plan, fit)
+
+    # enclosed = 5 offices + 3 meeting rooms * 6 seats = 23; open = 100; total = 123.
+    assert m["privacy_pct"] == pytest.approx(23 / 123, abs=0.001)
+    assert m["privacy_pct"] > 5 / 105  # strictly more than the old office/seats ratio
+    assert m["privacy_basis"] == "estimated"  # meeting-room occupancy is a derived heuristic
+
+
+def test_privacy_rises_with_enclosure():
+    plan = _plan()
+    open_plan = Fit(workstation_count=200, office_count=2, meeting_count=1)
+    enclosed = Fit(workstation_count=120, office_count=20, meeting_count=6)
+    assert compute_metrics(plan, enclosed)["privacy_pct"] > compute_metrics(plan, open_plan)["privacy_pct"]
 
 
 def test_generate_alternatives_returns_three_distinct():
