@@ -2,22 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { requireVendor } from "@/utils/api-auth";
-
-const sanitizeString = (value) => {
-  if (value === undefined || value === null) return null;
-  const trimmed = String(value).trim();
-  return trimmed.length ? trimmed : null;
-};
-
-const parseArrayField = (value) => {
-  const raw = sanitizeString(value);
-  if (!raw) return null;
-  const entries = raw
-    .split(/[,|]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  return entries.length ? entries : null;
-};
+import { sanitizeString, parseArrayField } from "@/utils/product-normalize";
 
 export async function POST(request) {
   try {
