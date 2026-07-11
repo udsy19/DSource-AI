@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import VendorAuthPanel from "@/components/vendor/VendorAuthPanel";
 import VendorDashboard from "@/components/vendor/VendorDashboard";
-import { createClient } from "../../../utils/supabase/server";
-import { getUserRoleFromUser } from "../../utils/api-auth";
-import { ROLES } from "../../utils/roles";
+import { createClient } from "@/utils/supabase/server";
+import { getUserRoleFromUser } from "@/utils/api-auth";
+import { ROLES } from "@/utils/roles";
 
 export const metadata = {
   title: "Vendor Dashboard | DSource",

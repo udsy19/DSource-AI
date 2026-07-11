@@ -114,9 +114,8 @@ dsource-client/
 ├── middleware.js            # Supabase session handling + route protection
 ├── next.config.mjs          # Remote image host allowlist
 ├── biome.json               # Lint/format configuration
+├── jsconfig.json            # `@/*` path alias → ./src/*
 ├── public/                  # Static assets (images, icons)
-├── utils/
-│   └── supabase/            # Supabase client factories (server-side)
 └── src/
     ├── app/
     │   ├── page.js                  # Landing page
@@ -131,14 +130,17 @@ dsource-client/
     │       ├── analyze-image/       # Gemini: detect elements in a room photo
     │       ├── generate-image/      # Gemini: generate material-swapped images
     │       ├── get-products/        # Match detected categories to products
-    │       ├── products/ · products-list/ · get-products/  # Catalog queries
+    │       ├── products/ · products-list/  # Catalog queries (list, CRUD)
     │       ├── images/[...path]/    # Serve images from /public
     │       └── vendor/upload/       # CSV bulk upload (vendor-only)
-    ├── components/          # Shared UI (header, footer, landing page, auth, vendor)
+    ├── components/          # Shared UI (header, footer, landing page, vendor)
     ├── contexts/            # AuthContext, SpecContext, PathnameContext
-    ├── hooks/               # useAuthorization
-    └── utils/               # api-auth, authorization, roles helpers
+    └── utils/
+        ├── supabase/        # Supabase client factories (browser + server)
+        └── *.js             # api-auth, authorization, roles helpers
 ```
+
+All internal modules are imported through the `@/*` alias (e.g. `@/utils/supabase/server`), so paths stay stable regardless of a file's depth.
 
 ## Authentication & Route Protection
 

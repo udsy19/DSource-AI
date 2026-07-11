@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "../../utils/supabase/client";
-import { getUserRole, isVendor, isUser, canAccessVendorRoutes, canAccessUserRoutes } from "../utils/authorization";
-import { ROLES } from "../utils/roles";
+import { createClient } from "@/utils/supabase/client";
+import { getUserRole, isVendor, isUser, canAccessVendorRoutes, canAccessUserRoutes } from "@/utils/authorization";
+import { ROLES } from "@/utils/roles";
 
 const AuthContext = createContext(undefined);
 

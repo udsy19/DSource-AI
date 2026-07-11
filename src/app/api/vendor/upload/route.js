@@ -1,8 +1,8 @@
 import { parse } from "csv-parse/sync";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createClient } from "../../../../../utils/supabase/server";
-import { requireVendor } from "../../../../utils/api-auth";
+import { createClient } from "@/utils/supabase/server";
+import { requireVendor } from "@/utils/api-auth";
 
 const REQUIRED_COLUMNS = [
   "product_id",

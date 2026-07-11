@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "../../../../utils/supabase/server";
-import { requireVendor } from "../../../utils/api-auth";
+import { createClient } from "@/utils/supabase/server";
+import { requireVendor } from "@/utils/api-auth";
 
 const sanitizeString = (value) => {
   if (value === undefined || value === null) return null;

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
-import { createClient } from "../../../utils/supabase/server";
-import { getUserRoleFromUser } from "../../utils/api-auth";
-import { ROLES } from "../../utils/roles";
+import { createClient } from "@/utils/supabase/server";
+import { getUserRoleFromUser } from "@/utils/api-auth";
+import { ROLES } from "@/utils/roles";
 import VendorSidebar from "@/components/vendor/VendorSidebar";
 import VendorHeader from "@/components/vendor/VendorHeader";
 import VendorRouteGuard from "@/components/vendor/VendorRouteGuard";
