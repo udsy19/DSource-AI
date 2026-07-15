@@ -17,6 +17,11 @@ import {
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
 } from "@/utils/visualizer/images";
+import {
+  describeCropForSearch,
+  isMaterialBankConfigured,
+  searchMaterialBank,
+} from "@/utils/visualizer/material-bank";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY });
 
@@ -37,20 +42,29 @@ const parseImageData = (imageData) => {
 };
 
 /**
- * Gemini re-rank of the embedding candidates: sees the query crop plus each
- * candidate's catalog photo and orders/vetoes them. Fail-open — on any
- * failure the embedding order stands.
+ * Gemini re-rank of the candidates: sees the query crop plus each candidate's
+ * catalog photo and orders/vetoes them. Fail-open — on any failure the
+ * original order stands.
+ *
+ * `trustHosts`: candidate URLs from the material-bank API are server-sourced
+ * (not client input), so they may be fetched without the client-image host
+ * whitelist. Supabase-catalog candidates keep the whitelist.
  */
-const rerankCandidates = async (cropDataUri, label, candidates) => {
+const rerankCandidates = async (
+  cropDataUri,
+  label,
+  candidates,
+  { trustHosts = false } = {},
+) => {
   try {
     const candidateParts = [];
     const usable = [];
     for (const candidate of candidates) {
-      if (!candidate.image_url || !isAllowedImageHost(candidate.image_url)) {
-        continue;
-      }
+      const imageUrl = candidate.image_url ?? candidate.imageUrl;
+      if (!imageUrl) continue;
+      if (!trustHosts && !isAllowedImageHost(imageUrl)) continue;
       try {
-        const res = await fetch(candidate.image_url);
+        const res = await fetch(imageUrl);
         if (!res.ok) continue;
         const buffer = Buffer.from(await res.arrayBuffer());
         candidateParts.push({
@@ -94,9 +108,7 @@ Respond with pure JSON (no markdown fencing):
 
     const parsed = extractJsonResponse(await getResponseText(response));
     const ranking = Array.isArray(parsed?.ranking) ? parsed.ranking : [];
-    const ordered = ranking
-      .map((n) => usable[Number(n) - 1])
-      .filter(Boolean);
+    const ordered = ranking.map((n) => usable[Number(n) - 1]).filter(Boolean);
 
     if (ordered.length === 0) {
       return { candidates, reranked: false };
@@ -110,6 +122,65 @@ Respond with pure JSON (no markdown fencing):
     console.error("Re-ranking skipped:", error.message);
     return { candidates, reranked: false };
   }
+};
+
+/**
+ * Fallback matcher: the user's own Supabase catalog via CLIP + pgvector.
+ * Used when MATERIAL_BANK_API_URL is not configured.
+ */
+const matchViaSupabase = async (crop, category) => {
+  if (!process.env.REPLICATE_API_TOKEN) {
+    return {
+      error: "Reverse search is not configured. Please contact support.",
+      status: 500,
+    };
+  }
+  const embedding = await embedImage(crop);
+
+  const cookieStore = await cookies();
+  const supabase = await createClient(cookieStore);
+  const { data: rows, error: rpcError } = await supabase.rpc("match_products", {
+    query_embedding: embedding,
+    match_count: CANDIDATE_COUNT,
+    filter_category: category,
+  });
+
+  if (rpcError) {
+    console.error("match_products RPC failed:", rpcError.message);
+    return {
+      error:
+        "The search index isn't ready yet — apply the embeddings migration and run the backfill script.",
+      status: 503,
+    };
+  }
+
+  let candidates = rows ?? [];
+  // If a category filter produced nothing, retry unfiltered rather than
+  // showing an empty result for a mislabeled catalog.
+  if (candidates.length === 0 && category) {
+    const { data: fallbackRows } = await supabase.rpc("match_products", {
+      query_embedding: embedding,
+      match_count: CANDIDATE_COUNT,
+      filter_category: null,
+    });
+    candidates = fallbackRows ?? [];
+  }
+
+  return {
+    candidates: candidates.map((row) => ({
+      id: row.id,
+      name: row.product_name,
+      brand: row.brand_name,
+      category: row.category_name,
+      color: row.color,
+      colorFamily: row.color_family,
+      series: row.series_name,
+      imageUrl: row.image_url,
+      image_url: row.image_url,
+      similarity: typeof row.similarity === "number" ? row.similarity : null,
+      link: `/marketplace/products/${row.product_id ?? row.id}`,
+    })),
+  };
 };
 
 export async function POST(request) {
@@ -152,7 +223,10 @@ export async function POST(request) {
   }
   if (!isValidBox(body.box)) {
     return NextResponse.json(
-      { error: "Invalid region — box must be [ymin, xmin, ymax, xmax] in 0-1000." },
+      {
+        error:
+          "Invalid region — box must be [ymin, xmin, ymax, xmax] in 0-1000.",
+      },
       { status: 400 },
     );
   }
@@ -171,85 +245,61 @@ export async function POST(request) {
     // 1. Crop the selected component out of the render.
     const crop = await cropBoxToDataUri(normalized.image, body.box);
 
-    // 2. Embed the crop (same CLIP space as the catalog backfill).
-    if (!process.env.REPLICATE_API_TOKEN) {
-      return NextResponse.json(
-        { error: "Reverse search is not configured. Please contact support." },
-        { status: 500 },
-      );
-    }
-    const embedding = await embedImage(crop);
-
-    // 3. Nearest neighbors from the user's own catalog (pgvector RPC).
-    const cookieStore = await cookies();
-    const supabase = await createClient(cookieStore);
-    const { data: rows, error: rpcError } = await supabase.rpc(
-      "match_products",
-      {
-        query_embedding: embedding,
-        match_count: CANDIDATE_COUNT,
-        filter_category: category,
-      },
-    );
-
-    if (rpcError) {
-      console.error("match_products RPC failed:", rpcError.message);
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "The search index isn't ready yet — apply the embeddings migration and run the backfill script.",
-        },
-        { status: 503 },
-      );
-    }
-
-    let candidates = rows ?? [];
-    // If a category filter produced nothing, retry unfiltered rather than
-    // showing an empty result for a mislabeled catalog.
-    if (candidates.length === 0 && category) {
-      const { data: fallbackRows } = await supabase.rpc("match_products", {
-        query_embedding: embedding,
-        match_count: CANDIDATE_COUNT,
-        filter_category: null,
-      });
-      candidates = fallbackRows ?? [];
+    // 2. Find candidates — material bank API when configured, else the
+    //    user's own Supabase catalog (CLIP + pgvector).
+    let candidates;
+    let searchQuery = null;
+    if (isMaterialBankConfigured()) {
+      const described = await describeCropForSearch(ai, crop, label);
+      searchQuery = described.query;
+      candidates = await searchMaterialBank(searchQuery, CANDIDATE_COUNT);
+      if (candidates.length === 0 && label && searchQuery !== label) {
+        candidates = await searchMaterialBank(label, CANDIDATE_COUNT);
+      }
+      if (candidates.length === 0) {
+        return NextResponse.json({
+          success: true,
+          matches: [],
+          croppedImage: crop,
+          searchQuery,
+          notice: "No matches found in the material bank for this component.",
+        });
+      }
+    } else {
+      const result = await matchViaSupabase(crop, category);
+      if (result.error) {
+        return NextResponse.json(
+          { success: false, error: result.error },
+          { status: result.status },
+        );
+      }
+      candidates = result.candidates;
+      if (candidates.length === 0) {
+        return NextResponse.json({
+          success: true,
+          matches: [],
+          croppedImage: crop,
+          notice:
+            "No indexed products yet — run the embeddings backfill on your catalog.",
+        });
+      }
     }
 
-    if (candidates.length === 0) {
-      return NextResponse.json({
-        success: true,
-        matches: [],
-        croppedImage: crop,
-        notice:
-          "No indexed products yet — run the embeddings backfill on your catalog.",
-      });
-    }
+    // 3. Re-rank with Gemini vision (fail-open to original order).
+    const rerank = await rerankCandidates(crop, label, candidates, {
+      trustHosts: isMaterialBankConfigured(),
+    });
 
-    // 4. Re-rank with Gemini vision (fail-open to embedding order).
-    let rerank = { candidates, reranked: false };
-    if (!DEV_BYPASS) {
-      rerank = await rerankCandidates(crop, label, candidates);
-    }
-
-    const matches = rerank.candidates.slice(0, RESULT_COUNT).map((row) => ({
-      id: row.id,
-      productId: row.product_id,
-      name: row.product_name,
-      brand: row.brand_name,
-      category: row.category_name,
-      color: row.color,
-      colorFamily: row.color_family,
-      series: row.series_name,
-      imageUrl: row.image_url,
-      similarity: typeof row.similarity === "number" ? row.similarity : null,
-      link: `/marketplace/products/${row.product_id ?? row.id}`,
-    }));
+    const matches = rerank.candidates
+      .slice(0, RESULT_COUNT)
+      // Drop the internal snake_case duplicate before responding.
+      .map(({ image_url: _imageUrl, ...match }) => match);
 
     return NextResponse.json({
       success: true,
       matches,
       croppedImage: crop,
+      searchQuery,
       reranked: rerank.reranked,
       rerankReason: rerank.reason ?? null,
     });

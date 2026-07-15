@@ -137,6 +137,7 @@ export default function RenderTab() {
         reranked: Boolean(data.reranked),
         rerankReason: data.rerankReason ?? null,
         notice: data.notice ?? null,
+        searchQuery: data.searchQuery ?? null,
       });
     } catch {
       setFindError("Reverse search failed. Please try again.");
@@ -165,13 +166,13 @@ export default function RenderTab() {
           canReset={tab.canResetToOriginal}
           emptyHint="Drag & drop or choose a room photo to upload."
           overlay={
-            components.length > 0 ? (
-              <HotspotOverlay
-                components={components}
-                searchingLabel={searchingLabel}
-                onPick={handleHotspotPick}
-              />
-            ) : null
+            components.length > 0
+              ? <HotspotOverlay
+                  components={components}
+                  searchingLabel={searchingLabel}
+                  onPick={handleHotspotPick}
+                />
+              : null
           }
         />
 
