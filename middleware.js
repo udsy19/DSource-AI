@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedRoutes = ["/spec-builder", "/ai-material-finder"];
+const protectedRoutes = ["/spec-builder", "/ai-material-finder", "/account"];
 
 // Routes that require vendor role
 const vendorRoutes = ["/vendor"];
@@ -10,10 +10,13 @@ const vendorRoutes = ["/vendor"];
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Skip middleware for static files, API routes, and public assets
+  // Skip middleware for static files, API routes, auth callback routes, and
+  // public assets. /auth/* must pass through untouched so code-exchange can
+  // establish the session before any gating runs.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
+    pathname.startsWith("/auth") ||
     pathname.startsWith("/static") ||
     pathname.match(/\.(ico|png|jpg|jpeg|svg|webp|avif)$/)
   ) {
@@ -36,18 +39,18 @@ export async function middleware(request) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          );
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
         },
       },
-    }
+    },
   );
 
   // Get the verified user (getUser revalidates with the Auth server; getSession
@@ -76,7 +79,10 @@ export async function middleware(request) {
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = "/";
+      url.pathname = "/login";
+      url.search = "";
+      // Preserve where the user was headed so we can return them after login.
+      url.searchParams.set("redirect", pathname);
       return NextResponse.redirect(url);
     }
   }
@@ -95,4 +101,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
-
