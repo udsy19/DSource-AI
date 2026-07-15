@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Reveal from "@/components/Reveal";
@@ -330,11 +329,14 @@ const SpecBuilder = () => {
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-start gap-4">
                         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-[var(--viz-line)] sm:h-24 sm:w-24">
-                          <Image
+                          {/* Spec products can come from any of the material
+                              bank's ~49 supplier CDNs — next/image would
+                              throw on unconfigured hosts. */}
+                          {/* biome-ignore lint/performance/noImgElement: arbitrary supplier hosts cannot use next/image */}
+                          <img
                             src={product.image}
                             alt={product.name}
-                            fill
-                            className="object-cover"
+                            className="absolute inset-0 h-full w-full object-cover"
                           />
                         </div>
                         <div className="min-w-0">
