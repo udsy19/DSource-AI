@@ -1,10 +1,20 @@
-import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { extractJsonResponse, getResponseText } from "@/utils/gemini";
+import { NextResponse } from "next/server";
+import { requireAuth } from "@/utils/api-auth";
+import {
+  AiResponseError,
+  assertNotBlocked,
+  generateContentWithResilience,
+  getResponseText,
+  parseModelJsonObject,
+} from "@/utils/gemini";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB, matches client limit
+const MAX_PROMPT_LENGTH = 2000;
 
 // Helper function to convert base64 data URL to base64 string and extract mime type
 const parseImageData = (imageData) => {
@@ -30,13 +40,22 @@ const parseImageData = (imageData) => {
 
 export async function POST(request) {
   try {
+    await requireAuth();
+
     const body = await request.json();
     const { prompt, spaceType, style, lighting, colorPalette, image } = body;
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return NextResponse.json(
         { error: "Prompt is required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Prompt must be ${MAX_PROMPT_LENGTH} characters or fewer.` },
+        { status: 400 },
       );
     }
 
@@ -55,16 +74,20 @@ export async function POST(request) {
     }
     `;
 
-    const validationResponse = await ai.models.generateContent({
+    const validationResponse = await generateContentWithResilience(ai, {
       model: "gemini-2.5-flash",
       contents: [{ text: validationPrompt }],
     });
 
-    const validationResult = extractJsonResponse(
-      await getResponseText(validationResponse)
+    assertNotBlocked(
+      validationResponse,
+      "Your request couldn't be processed. Please rephrase and try again.",
     );
 
-    console.log("Validation result:", validationResult);
+    const validationResult = parseModelJsonObject(
+      await getResponseText(validationResponse),
+      "We couldn't interpret your request. Please rephrase and try again.",
+    );
 
     if (!validationResult.isValid || validationResult.confidence < 0.5) {
       return NextResponse.json(
@@ -72,9 +95,8 @@ export async function POST(request) {
           success: false,
           error:
             "Your request must be about interior redesign, architecture, or home improvement. Please provide a prompt related to these topics.",
-          details: validationResult,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -100,8 +122,6 @@ export async function POST(request) {
     // Add quality modifiers for better results
     enhancedPrompt = `High-quality architectural visualization: ${enhancedPrompt}. Professional interior design rendering, photorealistic, detailed, 4K quality.`;
 
-    console.log("Enhanced prompt:", enhancedPrompt);
-
     // Step 3: Prepare contents for image generation
     const contents = [];
 
@@ -109,6 +129,12 @@ export async function POST(request) {
     if (image) {
       const imageData = parseImageData(image);
       if (imageData) {
+        if (Buffer.from(imageData.data, "base64").length > MAX_IMAGE_BYTES) {
+          return NextResponse.json(
+            { error: "Image is too large. Maximum size is 10 MB." },
+            { status: 413 },
+          );
+        }
         contents.push({
           inlineData: {
             data: imageData.data,
@@ -124,11 +150,15 @@ export async function POST(request) {
     contents.push({ text: enhancedPrompt });
 
     // Step 4: Generate image using Gemini 2.5 Flash Image model
-    console.log("Generating image with model: gemini-2.5-flash-image");
-    const imageResponse = await ai.models.generateContent({
+    const imageResponse = await generateContentWithResilience(ai, {
       model: "gemini-2.5-flash-image",
       contents: contents,
     });
+
+    assertNotBlocked(
+      imageResponse,
+      "This content couldn't be processed. Please adjust your request and try again.",
+    );
 
     // Step 5: Extract generated image from response
     const images = [];
@@ -168,39 +198,43 @@ export async function POST(request) {
     }
 
     if (images.length === 0) {
-      console.error("No images generated in response:", imageResponse);
+      console.error("No images generated in generate-image response");
       return NextResponse.json(
         {
           success: false,
           error:
             "No image was generated. Please try again with a different prompt.",
-          details: responseText || "Unknown error",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
-
-    console.log(`Successfully generated ${images.length} image(s)`);
 
     return NextResponse.json(
       {
         success: true,
         images: images,
         text: responseText,
-        validationDetails: validationResult,
         enhancedPrompt,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
+    if (error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error instanceof AiResponseError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Error in generate-image endpoint:", error);
     return NextResponse.json(
       {
         success: false,
         error: "Failed to process image generation request",
-        details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
