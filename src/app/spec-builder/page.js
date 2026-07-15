@@ -1,7 +1,20 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import Reveal from "@/components/Reveal";
 import { useSpec } from "../../contexts/SpecContext";
+
+/** One mono spec cell: label over value, TitleBlock vernacular. */
+const SpecCell = ({ label, children, grow = 1 }) => (
+  <div
+    className="min-w-28 bg-[var(--viz-paper)] px-3 py-2"
+    style={{ flex: `${grow} 1 0%` }}
+  >
+    <div className="viz-label">{label}</div>
+    <div className="viz-mono mt-0.5 text-xs uppercase">{children}</div>
+  </div>
+);
 
 const SpecBuilder = () => {
   const { specProducts, projectName, setProjectName } = useSpec();
@@ -103,102 +116,37 @@ const SpecBuilder = () => {
     }
   }, [categories]);
 
-  // Calculate totals
-  const totals = categories.reduce(
-    (acc, category) => {
-      category.products.forEach((product) => {
-        const subtotal = product.price * product.quantity;
-        acc.totalClientPrice += subtotal;
-        acc.totalTax += subtotal * 0.08;
-        acc.totalProfit += subtotal * 0.25;
-      });
-      return acc;
-    },
-    {
-      totalClientPrice: 0,
-      totalTax: 0,
-      totalProfit: 0,
-    }
+  // Real numbers only: the subtotal of what's actually specified.
+  const subtotal = specProducts.reduce(
+    (sum, product) => sum + (product.price || 0) * (product.quantity || 1),
+    0,
   );
 
-  const totalTradePrice = totals.totalClientPrice - totals.totalProfit;
-  const totalClientSavings = 10;
-  const totalTradeDiscount = 15;
-
-  const renderStatusIndicator = (productId) => {
+  /** Client sign-off cell: cycles draft → approved → rejected on click. */
+  const renderStatusControl = (productId) => {
     const status = productStatuses[productId] || "draft";
-
     const statusConfig = {
       approved: {
-        icon: (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-5 h-5 text-green-600"
-          >
-            <path
-              fillRule="evenodd"
-              d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-              clipRule="evenodd"
-            />
-          </svg>
-        ),
-        text: "Approved",
-        bgColor: "bg-green-100",
-        textColor: "text-green-700",
+        text: "Approved ✓",
+        className: "font-bold text-[var(--viz-blue)]",
       },
-      rejected: {
-        icon: (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-5 h-5 text-red-600"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z"
-              clipRule="evenodd"
-            />
-          </svg>
-        ),
-        text: "Rejected",
-        bgColor: "bg-red-100",
-        textColor: "text-red-700",
-      },
-      draft: {
-        icon: (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            className="w-5 h-5 text-gray-400"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 3v18h18M9 9h6M9 12h6M9 15h6"
-            />
-          </svg>
-        ),
-        text: "Draft",
-        bgColor: "bg-gray-100",
-        textColor: "text-gray-600",
-      },
+      rejected: { text: "Rejected ✕", className: "text-red-700" },
+      draft: { text: "Draft", className: "text-[var(--viz-muted)]" },
     };
-
     const config = statusConfig[status];
 
     return (
       <button
+        type="button"
         onClick={() => toggleStatus(productId)}
-        className={`flex items-center gap-2 ${config.bgColor} ${config.textColor} px-3 py-1 rounded-full text-sm font-semibold hover:opacity-80 transition-opacity`}
+        className="cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-left transition-colors duration-200 hover:bg-[var(--viz-ground)]"
       >
-        {config.icon}
-        <span>{config.text}</span>
+        <span className="viz-label">Client</span>
+        <span
+          className={`viz-mono mt-0.5 block text-xs uppercase ${config.className}`}
+        >
+          {config.text}
+        </span>
       </button>
     );
   };
@@ -221,315 +169,237 @@ const SpecBuilder = () => {
     };
 
     return (
-      <div className="flex items-center gap-2">
-        <div
-          className="w-4 h-4 rounded-full border border-gray-300"
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="h-3 w-3 shrink-0 rounded-full border border-[var(--viz-line)]"
           style={{ backgroundColor: getColorValue(color) }}
-        ></div>
-        <span className="text-sm text-gray-600">{color || "N/A"}</span>
-      </div>
+          aria-hidden="true"
+        />
+        {color || "N/A"}
+      </span>
     );
   };
 
   return (
-    <div className="w-full mb-12 sm:mb-16 md:mb-24">
-      <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Specification Sheet</h1>
+    <div className="viz-scope w-full pb-16 sm:pb-24">
+      <div className="pt-24 sm:pt-32 px-4 sm:px-6 md:px-8 lg:px-12">
+        {/* Masthead folio: mono meta pair over the ink rule; serif title and
+            deck below, halftone drifting off the rule's right end. */}
+        <header>
+          <Reveal>
+            <div className="flex items-baseline justify-between gap-4 pb-2">
+              <p className="viz-label">DSource Studio</p>
+              <Link
+                href="/marketplace/products"
+                className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
+              >
+                Continue sourcing →
+              </Link>
+            </div>
+            <div className="relative pt-5">
+              <span
+                className="viz-rule absolute top-0 left-0 h-0.5 w-full bg-[var(--viz-ink)]"
+                aria-hidden="true"
+              />
+              <span className="viz-dots-rule" aria-hidden="true" />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+                <h1 className="viz-serif text-4xl leading-none sm:text-5xl md:text-[3.6rem]">
+                  Spec sheet
+                </h1>
+                <p className="viz-serif max-w-md pb-1 text-base italic text-[var(--viz-muted)] sm:text-lg lg:text-right">
+                  Everything you&rsquo;ve chosen, set down as one document you
+                  can hand to anyone.
+                </p>
+              </div>
+            </div>
+          </Reveal>
+        </header>
+
+        {/* Sheet header: project meta as a plate label. */}
+        <div className="mt-8 flex flex-wrap gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
+          <SpecCell label="Sheet">SP-01</SpecCell>
+          <div
+            className="min-w-52 bg-[var(--viz-paper)] px-3 py-2"
+            style={{ flex: "3 1 0%" }}
+          >
+            <label className="viz-label" htmlFor="spec-project-name">
+              Project
+            </label>
+            <input
+              id="spec-project-name"
+              type="text"
+              value={projectName}
+              maxLength={80}
+              onChange={(e) => setProjectName(e.target.value)}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) setProjectName("Untitled Project");
+              }}
+              className="viz-mono mt-0.5 w-full border-b border-transparent bg-transparent text-xs uppercase outline-none transition-colors focus:border-[var(--viz-ink)]"
+              aria-label="Project name"
+            />
+          </div>
+          <SpecCell label="Items">
+            <span className="font-bold text-[var(--viz-blue)]">
+              {String(specProducts.length).padStart(2, "0")}
+            </span>
+          </SpecCell>
         </div>
 
-        <div className="px-0 sm:px-4 md:px-8 lg:px-12">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8 md:mb-12">
-            <label className="flex items-center gap-2 text-xl sm:text-2xl font-bold">
-              <span>Project:</span>
-              <input
-                type="text"
-                value={projectName}
-                maxLength={80}
-                onChange={(e) => setProjectName(e.target.value)}
-                onBlur={(e) => {
-                  if (!e.target.value.trim()) setProjectName("Untitled Project");
-                }}
-                className="min-w-0 flex-1 border-b-2 border-transparent bg-transparent font-bold outline-none transition-colors focus:border-black sm:max-w-md"
-                aria-label="Project name"
-              />
-            </label>
-            <div className="flex flex-col items-start gap-1 sm:items-end">
+        {/* Action row: the one ink pill, errors beside it. */}
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          {downloadError && (
+            <p className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-700">
+              {downloadError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!specProducts.length || downloading}
+            className={`rounded-full px-6 py-2.5 text-sm transition-colors duration-200 ${
+              !specProducts.length || downloading
+                ? "cursor-not-allowed bg-[var(--viz-line)] text-[var(--viz-muted)]"
+                : "cursor-pointer bg-[var(--viz-ink)] text-[var(--viz-paper)] hover:bg-[var(--viz-well)]"
+            }`}
+          >
+            {downloading ? "Preparing PDF…" : "Download spec sheet"}
+          </button>
+        </div>
+
+        {/* Totals: one strip of mono cells, the document's tally line.
+            Real numbers only — no invented tax/profit/discount figures. */}
+        {categories.length > 0 && (
+          <div className="mt-6 flex flex-wrap gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
+            <SpecCell label="Sections">
+              {String(categories.length).padStart(2, "0")}
+            </SpecCell>
+            <SpecCell label="Subtotal" grow={2}>
+              ${subtotal.toFixed(2)}
+            </SpecCell>
+          </div>
+        )}
+
+        {/* Empty state: one mono sentence, an invitation — never ghost boxes. */}
+        {categories.length === 0 && (
+          <p className="viz-mono mt-10 text-sm text-[var(--viz-muted)]">
+            Nothing specified yet — pull materials from the{" "}
+            <Link
+              href="/marketplace/products"
+              className="text-[var(--viz-ink)] underline underline-offset-4 hover:text-[var(--viz-blue)]"
+            >
+              product library
+            </Link>{" "}
+            or{" "}
+            <Link
+              href="/ai-visualizer"
+              className="text-[var(--viz-ink)] underline underline-offset-4 hover:text-[var(--viz-blue)]"
+            >
+              render a room
+            </Link>{" "}
+            and add what you find.
+          </p>
+        )}
+
+        {/* Category sections: serif head, indigo count, hairline-divided rows. */}
+        {categories.map((category) => (
+          <section key={category.name} className="mt-10">
+            <div className="flex items-baseline justify-between gap-4 border-b border-[var(--viz-line)] pb-2">
+              <h2 className="viz-serif text-xl sm:text-2xl">
+                {category.name}
+                <span className="viz-mono ml-3 align-middle text-xs font-bold text-[var(--viz-blue)]">
+                  {String(category.count).padStart(2, "0")}
+                </span>
+              </h2>
               <button
                 type="button"
-                onClick={handleDownload}
-                disabled={!specProducts.length || downloading}
-                className={`flex items-center gap-2 rounded-xl px-6 py-2 text-sm sm:px-8 sm:py-3 sm:text-base ${
-                  !specProducts.length || downloading
-                    ? "cursor-not-allowed bg-gray-300 text-gray-500"
-                    : "cursor-pointer bg-black text-white hover:bg-gray-800"
-                }`}
+                onClick={() => toggleCategory(category.name)}
+                aria-expanded={!!expandedCategories[category.name]}
+                className="viz-label shrink-0 cursor-pointer transition-colors duration-200 hover:text-[var(--viz-ink)]"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className="w-4 h-4 mr-1"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-                <span>{downloading ? "Preparing PDF..." : "Download"}</span>
+                {expandedCategories[category.name] ? "Fold ↑" : "Unfold ↓"}
               </button>
-              {downloadError && (
-                <span className="text-xs text-red-600">{downloadError}</span>
-              )}
             </div>
-          </div>
-          {/* Totals Header */}
-          {categories.length > 0 && (
-            <div className="bg-gray-200 rounded-lg px-4 sm:px-6 md:px-8 py-4 sm:py-6 mb-6 sm:mb-8 overflow-x-auto">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-2 md:gap-4 min-w-max sm:min-w-0">
-              <h2 className="text-lg sm:text-xl font-bold">Totals</h2>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">
-                  ${totals.totalClientPrice.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-600">TOTAL CLIENT PRICE</div>
-              </div>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">
-                  ${totals.totalTax.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-600">TOTAL TAX</div>
-              </div>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">
-                  ${totals.totalProfit.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-600">TOTAL PROFIT</div>
-              </div>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">{totalClientSavings}%</div>
-                <div className="text-xs text-gray-600">
-                  TOTAL CLIENT SAVINGS
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">
-                  ${totalTradePrice.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-600">TOTAL TRADE PRICE</div>
-              </div>
-              <div className="text-center">
-                <div className="text-base sm:text-lg font-bold">{totalTradeDiscount}%</div>
-                <div className="text-xs text-gray-600">
-                  TOTAL TRADE DISCOUNT
-                </div>
-              </div>
-            </div>
-            </div>
-          )}
 
-          {/* Empty State */}
-          {categories.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-xl text-gray-500 mb-4">
-                No products in your spec yet.
-              </p>
-              <p className="text-gray-400">
-                Go to{" "}
-                <a
-                  href="/ai-material-finder/find"
-                  className="text-black underline font-semibold"
-                >
-                  AI Material Finder
-                </a>{" "}
-                to add products to your spec.
-              </p>
-            </div>
-          )}
-
-          {/* Category Sections */}
-          {categories.map((category, categoryIndex) => (
-            <div key={categoryIndex} className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold">{category.name}</h2>
-                <div className="flex items-center gap-4">
-                  <div className="bg-gray-200 rounded-full px-4 py-1">
-                    <span className="text-sm font-semibold">
-                      {category.count}
-                    </span>
-                  </div>
-                  <button onClick={() => toggleCategory(category.name)}>
-                    {expandedCategories[category.name] ? (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={2}
-                        stroke="currentColor"
-                        className="w-6 h-6"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={2}
-                        stroke="currentColor"
-                        className="w-6 h-6"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {expandedCategories[category.name] && (
-                <div>
-                  <div className="space-y-4">
-                    {category.products.map((product, productIndex) => (
-                      <div
-                        key={productIndex}
-                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 flex flex-col lg:flex-row gap-4 sm:gap-6"
-                      >
-                        {/* Left Side - Image and Basic Details */}
-                        <div className="w-full lg:w-32 flex-shrink-0 lg:flex-1">
-                          <div className="relative w-full h-48 sm:h-64 lg:h-32 rounded-lg overflow-hidden mb-2 sm:mb-4 bg-gray-100">
-                            <Image
-                              src={product.image}
-                              alt={product.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
+            {expandedCategories[category.name] && (
+              <div className="mt-4 flex flex-col gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
+                {category.products.map((product) => (
+                  <article
+                    key={product.id}
+                    className="bg-[var(--viz-paper)] p-4 sm:p-5"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-4">
+                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-[var(--viz-line)] sm:h-24 sm:w-24">
+                          <Image
+                            src={product.image}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                          />
                         </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div>
-                            <h3 className="text-base sm:text-lg font-bold">
-                              {product.name}
-                            </h3>
-                            <p className="text-xs sm:text-sm text-gray-600">
-                              <span className="mr-1">Brand:</span>
-                              <span className="font-semibold">
-                                {product.brand}
-                              </span>
-                            </p>
-                          </div>
-                          <div className="mt-2 sm:mt-4">
-                            <p className="text-xs sm:text-sm text-gray-600">
-                              <span className="mr-1">Material:</span>
-                              <span className="font-semibold">
-                                {product.material}
-                              </span>
-                            </p>
-                            <p className="text-xs sm:text-sm text-gray-600">
-                              <span className="mr-1">Finish:</span>
-                              <span className="font-semibold">
-                                {product.finish}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex-1 flex flex-col gap-2 min-w-0">
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            <span className="mr-1">Dimensions:</span>
-                            <span className="font-semibold">
-                              {product.dimensions}
-                            </span>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-medium sm:text-base">
+                            {product.name}
+                          </h3>
+                          <p className="viz-mono mt-1 text-xs uppercase text-[var(--viz-muted)]">
+                            {product.brand}
                           </p>
-                          <div>{renderColorSwatch(product.color)}</div>
-                        </div>
-
-                        <div className="flex-1 flex flex-col gap-4 sm:gap-8 items-start sm:items-center">
-                          <div>
-                            <p className="text-xs text-gray-500">Product ID</p>
-                            <p className="text-xs sm:text-sm font-semibold">
-                              {product.id}
-                            </p>
-                          </div>
-
                           {product.inStock && (
-                            <div className="inline-flex items-center bg-black text-white rounded-full px-3 py-1 text-xs font-semibold w-fit">
-                              In Stock
-                            </div>
+                            <p className="viz-mono mt-2 text-xs font-bold uppercase text-[var(--viz-blue)]">
+                              In stock
+                            </p>
                           )}
                         </div>
-
-                        <div className="flex-1 flex flex-col gap-2 sm:gap-3">
-                          <div className="flex gap-2 items-center">
-                            <p className="text-xs text-gray-500">Price</p>
-                            <p className="text-xs sm:text-sm font-semibold">
-                              ${product.price.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="flex gap-2 items-center">
-                            <p className="text-xs text-gray-500">Qty</p>
-                            <p className="text-xs sm:text-sm font-semibold">
-                              {product.quantity}
-                            </p>
-                          </div>
-                          <div className="flex gap-2 items-center">
-                            <p className="text-xs text-gray-500">Timeline</p>
-                            <p className="text-xs sm:text-sm font-semibold">
-                              {product.timeline}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-row lg:flex-col gap-2 flex-1">
-                          <button className="flex gap-2 justify-center w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={2}
-                              stroke="currentColor"
-                              className="w-4 h-4"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                              />
-                            </svg>
-                            <span className="hidden sm:inline">Vendor</span>
-                          </button>
-                          <button className="w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
-                            Details
-                          </button>
-                          <button className="w-full px-3 sm:px-4 py-2 border-2 border-black rounded-lg hover:bg-gray-100 transition-colors text-xs sm:text-sm font-semibold">
-                            Quote
-                          </button>
-                        </div>
-                        <div className="flex-1 flex flex-col items-start sm:items-center justify-center">
-                          <p className="text-xs text-gray-500 mb-2 text-center">
-                            Client
-                          </p>
-                          {renderStatusIndicator(product.id)}
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+
+                      <div className="flex shrink-0 flex-wrap items-start gap-2">
+                        {renderStatusControl(product.id)}
+                        <button
+                          type="button"
+                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                        >
+                          Vendor ↗
+                        </button>
+                        <button
+                          type="button"
+                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                        >
+                          Details
+                        </button>
+                        <button
+                          type="button"
+                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                        >
+                          Quote
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* The item's own plate label: every fact in a mono cell. */}
+                    <div className="mt-4 flex flex-wrap gap-px overflow-hidden rounded-md border border-[var(--viz-line)] bg-[var(--viz-line)]">
+                      <SpecCell label="Material">{product.material}</SpecCell>
+                      <SpecCell label="Finish">{product.finish}</SpecCell>
+                      <SpecCell label="Dimensions" grow={2}>
+                        {product.dimensions}
+                      </SpecCell>
+                      <SpecCell label="Colour">
+                        {renderColorSwatch(product.color)}
+                      </SpecCell>
+                      <SpecCell label="ID" grow={2}>
+                        {product.id}
+                      </SpecCell>
+                      <SpecCell label="Price">
+                        ${product.price.toFixed(2)}
+                      </SpecCell>
+                      <SpecCell label="Qty">{product.quantity}</SpecCell>
+                      <SpecCell label="Timeline">{product.timeline}</SpecCell>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
       </div>
     </div>
   );

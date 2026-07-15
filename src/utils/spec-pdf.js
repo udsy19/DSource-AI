@@ -1,26 +1,34 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 /**
- * Spec-sheet PDF generation — replaces the old canned public/specsheet.pdf.
+ * Spec-sheet PDF generation, set in the atelier design system (design.md):
+ * warm paper ground, token palette (no pure black/white), Libre Caslon Text
+ * for the promise voice (title/deck/section heads), mono as the spec-sheet
+ * voice (labels, values, prices), hairline title-block cells, registration
+ * crop marks, and the halftone field dissolving off the masthead rule.
+ * Indigo appears exactly where design.md allows it: the counts.
  *
  * buildSpecPdf is pure layout (products in, bytes out; images arrive as
- * pre-fetched JPEG buffers) so it is unit-testable without network. The API
- * route owns fetching/sanitizing.
- *
- * Aesthetic mirrors the app's drawing-set identity: serif headings
- * (Times Roman ~ Caslon), mono labels (Courier), warm ink, a title-block
- * strip under the header.
+ * pre-fetched JPEG buffers) so it is unit-testable without network.
  */
 
 // A4 portrait
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN = 48;
+const MARGIN = 52;
 
-const INK = rgb(0.16, 0.15, 0.13); // warm ink
-const MUTED = rgb(0.45, 0.43, 0.4);
-const LINE = rgb(0.8, 0.78, 0.74);
-const PAPER_WELL = rgb(0.95, 0.94, 0.92);
+// Exact design.md tokens.
+const INK = rgb(0x26 / 255, 0x22 / 255, 0x1a / 255); // --viz-ink
+const MUTED = rgb(0x77 / 255, 0x70 / 255, 0x5f / 255); // --viz-muted
+const LINE = rgb(0xd9 / 255, 0xd2 / 255, 0xc2 / 255); // --viz-line
+const PAPER = rgb(0xfb / 255, 0xf9 / 255, 0xf4 / 255); // --viz-paper
+const GROUND = rgb(0xee / 255, 0xeb / 255, 0xe2 / 255); // --viz-ground
+const INDIGO = rgb(0x35 / 255, 0x41 / 255, 0x8c / 255); // --viz-blue
+
+const FONT_DIR = path.join(process.cwd(), "src", "assets", "fonts");
 
 const money = (n) =>
   `$${Number(n).toLocaleString("en-US", {
@@ -28,10 +36,15 @@ const money = (n) =>
     maximumFractionDigits: 2,
   })}`;
 
+const pad2 = (n) => String(n).padStart(2, "0");
+
 const truncate = (font, text, size, maxWidth) => {
   let value = String(text ?? "");
   if (font.widthOfTextAtSize(value, size) <= maxWidth) return value;
-  while (value.length > 1 && font.widthOfTextAtSize(`${value}…`, size) > maxWidth) {
+  while (
+    value.length > 1 &&
+    font.widthOfTextAtSize(`${value}…`, size) > maxWidth
+  ) {
     value = value.slice(0, -1);
   }
   return `${value}…`;
@@ -46,16 +59,27 @@ const truncate = (font, text, size, maxWidth) => {
  */
 export const buildSpecPdf = async ({ projectName, products }) => {
   const doc = await PDFDocument.create();
-  const serif = await doc.embedFont(StandardFonts.TimesRomanBold);
-  const serifItalic = await doc.embedFont(StandardFonts.TimesRomanItalic);
+  doc.registerFontkit(fontkit);
+
+  // The promise voice — real Libre Caslon Text (vendored, OFL).
+  const [caslonBoldBytes, caslonItalicBytes] = await Promise.all([
+    readFile(path.join(FONT_DIR, "LibreCaslonText-Bold.ttf")),
+    readFile(path.join(FONT_DIR, "LibreCaslonText-Italic.ttf")),
+  ]);
+  const caslonBold = await doc.embedFont(caslonBoldBytes, { subset: true });
+  const caslonItalic = await doc.embedFont(caslonItalicBytes, {
+    subset: true,
+  });
+  // Interface + instrument stand-ins (Geist/Geist Mono have no static print
+  // faces; grotesque + mono standard fonts carry the same roles).
   const body = await doc.embedFont(StandardFonts.Helvetica);
   const bodyBold = await doc.embedFont(StandardFonts.HelveticaBold);
   const mono = await doc.embedFont(StandardFonts.Courier);
+  const monoBold = await doc.embedFont(StandardFonts.CourierBold);
 
-  doc.setTitle(`${projectName} — Specification Sheet`);
+  doc.setTitle(`${projectName} — Spec sheet`);
   doc.setProducer("DSource.AI");
 
-  // Group by category, preserving insertion order.
   const categories = new Map();
   for (const product of products) {
     const key = product.category || "Uncategorized";
@@ -72,48 +96,134 @@ export const buildSpecPdf = async ({ projectName, products }) => {
   let y = 0;
   const pages = [];
 
-  const label = (pg, text, x, yy) =>
+  // .viz-label: mono, uppercase, tracked, muted.
+  const label = (pg, text, x, yy, color = MUTED) =>
     pg.drawText(text.toUpperCase(), {
       x,
       y: yy,
       size: 6.5,
       font: mono,
-      color: MUTED,
-      characterSpacing: 1.2,
+      color,
+      characterSpacing: 1.1,
+    });
+
+  // Registration corners (.viz-crop) — the sheet is the artwork.
+  const cropMarks = (pg) => {
+    const len = 12;
+    const inset = 22;
+    const corners = [
+      [inset, PAGE_H - inset, 1, -1],
+      [PAGE_W - inset, PAGE_H - inset, -1, -1],
+      [inset, inset, 1, 1],
+      [PAGE_W - inset, inset, -1, 1],
+    ];
+    for (const [cx, cy, dx, dy] of corners) {
+      pg.drawLine({
+        start: { x: cx, y: cy },
+        end: { x: cx + len * dx, y: cy },
+        color: INK,
+        thickness: 1.2,
+        opacity: 0.5,
+      });
+      pg.drawLine({
+        start: { x: cx, y: cy },
+        end: { x: cx, y: cy + len * dy },
+        color: INK,
+        thickness: 1.2,
+        opacity: 0.5,
+      });
+    }
+  };
+
+  // Halftone field dissolving off the masthead rule's right end
+  // (.viz-dots-rule): densest at the rule, dissolving down-left.
+  const dotsField = (pg, ruleY) => {
+    const cell = 6;
+    const cols = 24;
+    const rows = 5;
+    const startX = PAGE_W - MARGIN - cols * cell;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const density = (c / cols) * (1 - r / rows);
+        if (density < 0.18) continue;
+        pg.drawCircle({
+          x: startX + c * cell,
+          y: ruleY - 4 - r * cell,
+          size: 0.9,
+          color: INK,
+          opacity: Math.min(0.32, density * 0.45),
+        });
+      }
+    }
+  };
+
+  const paperGround = (pg) =>
+    pg.drawRectangle({
+      x: 0,
+      y: 0,
+      width: PAGE_W,
+      height: PAGE_H,
+      color: PAPER,
     });
 
   const newPage = () => {
     page = doc.addPage([PAGE_W, PAGE_H]);
     pages.push(page);
+    paperGround(page);
+    cropMarks(page);
     y = PAGE_H - MARGIN;
 
     if (pages.length === 1) {
-      // --- Header: project title + wordmark ---
-      label(page, "Specification sheet", MARGIN, y - 8);
-      page.drawText("DSource.AI", {
-        x: PAGE_W - MARGIN - serif.widthOfTextAtSize("DSource.AI", 12),
-        y: y - 10,
-        size: 12,
-        font: serif,
+      // --- Masthead folio: label pair over the ink rule ---
+      label(page, "DSource Studio", MARGIN, y);
+      const right = "Specification sheet";
+      label(
+        page,
+        right,
+        PAGE_W -
+          MARGIN -
+          mono.widthOfTextAtSize(right.toUpperCase(), 6.5) -
+          right.length * 1.1,
+        y,
+      );
+      y -= 8;
+      page.drawLine({
+        start: { x: MARGIN, y },
+        end: { x: PAGE_W - MARGIN, y },
         color: INK,
+        thickness: 1.6,
       });
-      y -= 30;
-      page.drawText(truncate(serif, projectName, 24, PAGE_W - MARGIN * 2), {
+      dotsField(page, y);
+      y -= 34;
+
+      // --- Serif title + italic deck (the promise voice) ---
+      page.drawText(
+        truncate(caslonBold, projectName, 26, PAGE_W - MARGIN * 2),
+        {
+          x: MARGIN,
+          y,
+          size: 26,
+          font: caslonBold,
+          color: INK,
+        },
+      );
+      y -= 18;
+      page.drawText("Everything you've chosen, set down as one document.", {
         x: MARGIN,
         y,
-        size: 24,
-        font: serif,
-        color: INK,
+        size: 10.5,
+        font: caslonItalic,
+        color: MUTED,
       });
-      y -= 18;
+      y -= 22;
 
-      // --- Title-block strip ---
+      // --- Title-block strip (plate label) ---
       const cells = [
-        ["Sheet", "S-01"],
-        ["Date", date],
-        ["Items", String(products.length)],
-        ["Sections", String(categories.size)],
-        ["Subtotal", money(subtotal)],
+        ["Sheet", "SP-01", INK, mono],
+        ["Date", date, INK, mono],
+        ["Items", pad2(products.length), INDIGO, monoBold],
+        ["Sections", pad2(categories.size), INK, mono],
+        ["Subtotal", money(subtotal), INK, mono],
       ];
       const stripH = 30;
       const cellW = (PAGE_W - MARGIN * 2) / cells.length;
@@ -123,74 +233,82 @@ export const buildSpecPdf = async ({ projectName, products }) => {
         y,
         width: PAGE_W - MARGIN * 2,
         height: stripH,
+        color: PAPER,
         borderColor: LINE,
-        borderWidth: 0.75,
+        borderWidth: 0.9,
       });
-      cells.forEach(([k, v], i) => {
+      cells.forEach(([k, v, color, font], i) => {
         const x = MARGIN + i * cellW;
         if (i > 0) {
           page.drawLine({
             start: { x, y },
             end: { x, y: y + stripH },
             color: LINE,
-            thickness: 0.75,
+            thickness: 0.9,
           });
         }
         label(page, k, x + 6, y + stripH - 10);
-        page.drawText(truncate(mono, v, 8.5, cellW - 12), {
+        page.drawText(truncate(font, v, 8.5, cellW - 12), {
           x: x + 6,
           y: y + 6,
           size: 8.5,
-          font: mono,
-          color: INK,
+          font,
+          color,
         });
       });
-      y -= 24;
+      y -= 26;
     } else {
-      // Continuation header
-      page.drawText(truncate(serifItalic, projectName, 11, 300), {
+      page.drawText(truncate(caslonItalic, projectName, 11, 300), {
         x: MARGIN,
         y: y - 4,
         size: 11,
-        font: serifItalic,
+        font: caslonItalic,
         color: MUTED,
       });
-      label(page, "Specification sheet · continued", PAGE_W - MARGIN - 160, y - 2);
-      y -= 24;
+      label(page, "Spec sheet · continued", PAGE_W - MARGIN - 150, y - 2);
+      y -= 14;
+      page.drawLine({
+        start: { x: MARGIN, y },
+        end: { x: PAGE_W - MARGIN, y },
+        color: LINE,
+        thickness: 0.9,
+      });
+      y -= 16;
     }
   };
 
   const ensureRoom = (needed) => {
-    if (y - needed < MARGIN + 30) newPage();
+    if (y - needed < MARGIN + 26) newPage();
   };
 
   newPage();
 
-  // --- Categories & rows ---
+  // --- Category sections: serif head + indigo count, hairline rows ---
   const ROW_H = 52;
   for (const [categoryName, items] of categories) {
-    ensureRoom(34 + ROW_H);
-    page.drawText(truncate(serif, categoryName, 14, 380), {
+    ensureRoom(36 + ROW_H);
+    const headSize = 15;
+    const headText = truncate(caslonBold, categoryName, headSize, 380);
+    page.drawText(headText, {
       x: MARGIN,
       y: y - 12,
-      size: 14,
-      font: serif,
+      size: headSize,
+      font: caslonBold,
       color: INK,
     });
-    const countText = `${items.length} item${items.length === 1 ? "" : "s"}`;
-    page.drawText(countText, {
-      x: PAGE_W - MARGIN - mono.widthOfTextAtSize(countText, 8),
+    page.drawText(pad2(items.length), {
+      x: MARGIN + caslonBold.widthOfTextAtSize(headText, headSize) + 8,
       y: y - 11,
       size: 8,
-      font: mono,
-      color: MUTED,
+      font: monoBold,
+      color: INDIGO,
     });
-    y -= 18;
+    y -= 19;
     page.drawLine({
       start: { x: MARGIN, y },
       end: { x: PAGE_W - MARGIN, y },
-      color: INK,
-      thickness: 1,
+      color: LINE,
+      thickness: 0.9,
     });
     y -= 8;
 
@@ -198,13 +316,12 @@ export const buildSpecPdf = async ({ projectName, products }) => {
       ensureRoom(ROW_H);
       const rowTop = y;
 
-      // Thumbnail (or placeholder well)
+      // Thumbnail, or a ground-toned well (never a gray void).
       const thumbW = 56;
       const thumbH = 42;
       if (item.imageJpeg) {
         try {
           const jpg = await doc.embedJpg(item.imageJpeg);
-          // Cover-fit into the thumb box
           const scale = Math.max(thumbW / jpg.width, thumbH / jpg.height);
           const w = jpg.width * scale;
           const h = jpg.height * scale;
@@ -224,23 +341,26 @@ export const buildSpecPdf = async ({ projectName, products }) => {
           y: rowTop - thumbH,
           width: thumbW,
           height: thumbH,
-          color: PAPER_WELL,
+          color: GROUND,
           borderColor: LINE,
-          borderWidth: 0.5,
+          borderWidth: 0.6,
         });
       }
 
       const textX = MARGIN + thumbW + 12;
-      const priceColW = 110;
+      const priceColW = 112;
       const nameW = PAGE_W - MARGIN - textX - priceColW;
 
-      page.drawText(truncate(bodyBold, item.name || "Untitled product", 10, nameW), {
-        x: textX,
-        y: rowTop - 12,
-        size: 10,
-        font: bodyBold,
-        color: INK,
-      });
+      page.drawText(
+        truncate(bodyBold, item.name || "Untitled product", 10, nameW),
+        {
+          x: textX,
+          y: rowTop - 12,
+          size: 10,
+          font: bodyBold,
+          color: INK,
+        },
+      );
       const metaLine = [item.brand, item.color, item.dimensions]
         .filter(Boolean)
         .join("  ·  ");
@@ -255,22 +375,22 @@ export const buildSpecPdf = async ({ projectName, products }) => {
       }
       label(page, `Qty ${item.quantity || 1}`, textX, rowTop - 38);
 
-      // Price column (right-aligned)
+      // Prices are facts → mono voice, right-aligned.
       const lineTotal = money((item.price || 0) * (item.quantity || 1));
       page.drawText(lineTotal, {
-        x: PAGE_W - MARGIN - bodyBold.widthOfTextAtSize(lineTotal, 10),
+        x: PAGE_W - MARGIN - monoBold.widthOfTextAtSize(lineTotal, 9.5),
         y: rowTop - 12,
-        size: 10,
-        font: bodyBold,
+        size: 9.5,
+        font: monoBold,
         color: INK,
       });
       if ((item.quantity || 1) > 1) {
         const unit = `${money(item.price || 0)} each`;
         page.drawText(unit, {
-          x: PAGE_W - MARGIN - body.widthOfTextAtSize(unit, 7.5),
+          x: PAGE_W - MARGIN - mono.widthOfTextAtSize(unit, 7.5),
           y: rowTop - 24,
           size: 7.5,
-          font: body,
+          font: mono,
           color: MUTED,
         });
       }
@@ -280,39 +400,40 @@ export const buildSpecPdf = async ({ projectName, products }) => {
         start: { x: MARGIN, y: y + 6 },
         end: { x: PAGE_W - MARGIN, y: y + 6 },
         color: LINE,
-        thickness: 0.5,
+        thickness: 0.6,
       });
     }
     y -= 10;
   }
 
-  // --- Totals ---
-  ensureRoom(56);
+  // --- Tally line ---
+  ensureRoom(54);
   y -= 8;
   page.drawLine({
     start: { x: MARGIN, y },
     end: { x: PAGE_W - MARGIN, y },
     color: INK,
-    thickness: 1.5,
+    thickness: 1.6,
   });
-  y -= 22;
-  label(page, "Subtotal", PAGE_W - MARGIN - 180, y + 2);
+  y -= 20;
   const totalText = money(subtotal);
+  const totalW = monoBold.widthOfTextAtSize(totalText, 14);
+  label(page, "Subtotal", PAGE_W - MARGIN - totalW - 74, y + 2);
   page.drawText(totalText, {
-    x: PAGE_W - MARGIN - serif.widthOfTextAtSize(totalText, 16),
-    y: y - 4,
-    size: 16,
-    font: serif,
+    x: PAGE_W - MARGIN - totalW,
+    y: y - 2,
+    size: 14,
+    font: monoBold,
     color: INK,
   });
 
   // --- Footer on every page ---
   pages.forEach((pg, i) => {
-    label(pg, `Generated by DSource.AI · ${date}`, MARGIN, MARGIN - 18);
+    label(pg, `Generated by DSource.AI · ${date}`, MARGIN, MARGIN - 22);
     const pageText = `${i + 1} / ${pages.length}`;
     pg.drawText(pageText, {
       x: PAGE_W - MARGIN - mono.widthOfTextAtSize(pageText, 7),
-      y: MARGIN - 18,
+      y: MARGIN - 22,
       size: 7,
       font: mono,
       color: MUTED,
