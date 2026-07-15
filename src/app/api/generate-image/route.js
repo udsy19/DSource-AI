@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import Replicate from "replicate";
 import { requireAuth } from "@/utils/api-auth";
@@ -9,6 +10,17 @@ import {
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
 import { DEFAULT_MODEL, getModel } from "@/utils/replicate-models";
+import { createClient } from "@/utils/supabase/server";
+import {
+  hasDirectiveParams,
+  validateRenderParams,
+} from "@/utils/visualizer/params";
+import {
+  composeRenderPrompt,
+  strengthenPrompt,
+} from "@/utils/visualizer/prompt-composer";
+import { saveRender } from "@/utils/visualizer/persist";
+import { verifyAdherence } from "@/utils/visualizer/verify";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -55,6 +67,37 @@ const parseImageData = (imageData) => {
   return { data: imageData, mimeType: "image/png" };
 };
 
+/**
+ * Normalizes the edit-base image to a data URI. Accepts data URIs / raw
+ * base64 as-is; https URLs are downloaded server-side ONLY when they point at
+ * our own Supabase storage (history items use short-lived signed URLs) —
+ * anything else is rejected to prevent SSRF.
+ */
+const normalizeBaseImage = async (image) => {
+  if (!image.startsWith("http")) {
+    return { image, error: null };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl || !image.startsWith(`${supabaseUrl}/storage/`)) {
+    return {
+      image: null,
+      error: "Image URLs are not accepted — upload the photo directly.",
+    };
+  }
+
+  const res = await fetch(image);
+  if (!res.ok) {
+    return {
+      image: null,
+      error: "That render is no longer available — please re-select or re-upload it.",
+    };
+  }
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const mime = res.headers.get("content-type") || "image/png";
+  return { image: `data:${mime};base64,${buffer.toString("base64")}`, error: null };
+};
+
 // Normalize the many shapes replicate.run() can return into a single URL string.
 const toImageUrl = (output) => {
   const first = Array.isArray(output) ? output[0] : output;
@@ -63,21 +106,6 @@ const toImageUrl = (output) => {
   if (typeof first.url === "string") return first.url;
   if (typeof first.url === "function") return String(first.url());
   return null;
-};
-
-// Build the descriptive prompt shared by every model.
-const buildEnhancedPrompt = (
-  prompt,
-  { spaceType, style, lighting, colorPalette },
-) => {
-  let enhanced = prompt;
-  if (spaceType) enhanced = `${spaceType} space: ${enhanced}`;
-  if (style) enhanced = `${enhanced}, ${style} style`;
-  if (lighting) enhanced = `${enhanced}, with ${lighting} lighting`;
-  if (colorPalette) {
-    enhanced = `${enhanced}, using ${colorPalette} color palette`;
-  }
-  return `High-quality architectural visualization: ${enhanced}. Professional interior design rendering, photorealistic, detailed, 4K quality.`;
 };
 
 // Translate a generation/runtime failure into a user-safe response.
@@ -131,48 +159,40 @@ const mapGenerationError = (error) => {
 
 // --- Generation backends ---------------------------------------------------
 
-const generateWithGemini = async (enhancedPrompt, image) => {
-  const contents = [];
-  let prompt = enhancedPrompt;
-
-  if (image) {
-    const imageData = parseImageData(image);
-    if (imageData) {
-      contents.push({
-        inlineData: { data: imageData.data, mimeType: imageData.mimeType },
-      });
-      prompt = `Edit this image: ${enhancedPrompt}`;
-    }
-  }
-  contents.push({ text: prompt });
+const generateWithGemini = async (instruction, image, seed) => {
+  const imageData = parseImageData(image);
+  const contents = [
+    { inlineData: { data: imageData.data, mimeType: imageData.mimeType } },
+    { text: instruction },
+  ];
 
   const imageResponse = await callWithRetry(
     () =>
       ai.models.generateContent({
         model: "gemini-2.5-flash-image",
         contents,
+        ...(seed !== undefined ? { config: { seed } } : {}),
       }),
     { label: "Image generation", timeoutMs: 60_000 },
   );
 
-  const images = [];
   const candidateParts =
     imageResponse?.candidates?.[0]?.content?.parts ??
     imageResponse?.parts ??
     [];
   for (const part of candidateParts) {
     if (part.inlineData) {
-      images.push({
+      return {
         image: part.inlineData.data,
         mimeType: part.inlineData.mimeType || "image/png",
-      });
+      };
     }
   }
-  return images;
+  return null;
 };
 
-const generateWithReplicate = async (modelConfig, enhancedPrompt, image) => {
-  const input = modelConfig.buildInput(enhancedPrompt, image);
+const generateWithReplicate = async (modelConfig, instruction, image, seed) => {
+  const input = modelConfig.buildInput(instruction, image, { seed });
   const output = await callWithRetry(
     () => replicate.run(modelConfig.slug, { input }),
     {
@@ -182,7 +202,7 @@ const generateWithReplicate = async (modelConfig, enhancedPrompt, image) => {
   );
 
   const url = toImageUrl(output);
-  if (!url) return [];
+  if (!url) return null;
 
   const downloaded = await fetch(url);
   if (!downloaded.ok) {
@@ -191,12 +211,54 @@ const generateWithReplicate = async (modelConfig, enhancedPrompt, image) => {
     );
   }
   const arrayBuffer = await downloaded.arrayBuffer();
-  return [
-    {
-      image: Buffer.from(arrayBuffer).toString("base64"),
-      mimeType: downloaded.headers.get("content-type") || "image/png",
-    },
-  ];
+  return {
+    image: Buffer.from(arrayBuffer).toString("base64"),
+    mimeType: downloaded.headers.get("content-type") || "image/png",
+  };
+};
+
+const generateOnce = (modelConfig, instruction, image, seed) =>
+  modelConfig.provider === "gemini"
+    ? generateWithGemini(instruction, image, seed)
+    : generateWithReplicate(modelConfig, instruction, image, seed);
+
+// --- Topic guard -----------------------------------------------------------
+
+/**
+ * Checks a free-text prompt is interior/architecture related. Only runs when
+ * the user actually typed one — params-only requests are intrinsically
+ * on-topic. Fail-open: a guard outage must not block generation.
+ *
+ * @returns {{ allowed: boolean, notice: string|null }}
+ */
+const runTopicGuard = async (prompt) => {
+  const guardPrompt = `
+    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, or similar architectural contexts.
+
+    Prompt: "${prompt}"
+
+    Respond with pure JSON:
+    { "isValid": boolean, "confidence": number, "reasoning": string }
+  `;
+
+  try {
+    const response = await callWithRetry(
+      () =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ text: guardPrompt }],
+        }),
+      { label: "Prompt validation", timeoutMs: 15_000, retries: 0 },
+    );
+    const result = extractJsonResponse(await getResponseText(response));
+    return {
+      allowed: Boolean(result.isValid) && result.confidence >= 0.5,
+      notice: null,
+    };
+  } catch (error) {
+    console.error("Topic guard skipped:", error.message);
+    return { allowed: true, notice: "Prompt topic check was unavailable." };
+  }
 };
 
 // --- Route -----------------------------------------------------------------
@@ -206,7 +268,7 @@ export async function POST(request) {
   let user;
   if (DEV_BYPASS) {
     console.warn(
-      "[generate-image] DEV_AUTH_BYPASS active — auth & validation skipped",
+      "[generate-image] DEV_AUTH_BYPASS active — auth & topic guard skipped",
     );
     user = { id: "dev-bypass" };
   } else {
@@ -237,57 +299,73 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { prompt, spaceType, style, lighting, colorPalette, image } = body;
+  // --- Input validation ---
+  const prompt =
+    typeof body.prompt === "string" && body.prompt.trim().length > 0
+      ? body.prompt.trim()
+      : null;
 
-  if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-    return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
-  }
-
-  if (prompt.length > MAX_PROMPT_LENGTH) {
+  if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
     return NextResponse.json(
       { error: `Prompt is too long (max ${MAX_PROMPT_LENGTH} characters).` },
       { status: 400 },
     );
   }
 
-  if (image !== undefined && image !== null) {
-    if (typeof image !== "string") {
-      return NextResponse.json(
-        { error: "Invalid image data" },
-        { status: 400 },
-      );
-    }
-    if (image.length > MAX_IMAGE_CHARS) {
-      return NextResponse.json(
-        { error: "Image is too large. Please use an image under 10MB." },
-        { status: 413 },
-      );
-    }
+  if (!body.image || typeof body.image !== "string") {
+    return NextResponse.json(
+      { error: "Upload a room photo first — every model edits your image." },
+      { status: 400 },
+    );
+  }
+  if (body.image.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json(
+      { error: "Image is too large. Please use an image under 10MB." },
+      { status: 413 },
+    );
   }
 
-  // Resolve the requested model.
-  const modelConfig = getModel(
-    typeof body.model === "string" ? body.model : DEFAULT_MODEL,
-  );
+  const normalized = await normalizeBaseImage(body.image);
+  if (!normalized.image) {
+    return NextResponse.json({ error: normalized.error }, { status: 400 });
+  }
+  const image = normalized.image;
+  if (image.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json(
+      { error: "Image is too large. Please use an image under 10MB." },
+      { status: 413 },
+    );
+  }
+
+  const validation = validateRenderParams(body.params);
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: validation.errors.join(" ") },
+      { status: 400 },
+    );
+  }
+  const params = validation.params;
+
+  if (!prompt && !hasDirectiveParams(params)) {
+    return NextResponse.json(
+      {
+        error:
+          "Describe a change or set at least one parameter (style, lighting, space, or palette).",
+      },
+      { status: 400 },
+    );
+  }
+
+  // --- Model resolution ---
+  const modelKey =
+    typeof body.model === "string" && body.model ? body.model : DEFAULT_MODEL;
+  const modelConfig = getModel(modelKey);
   if (!modelConfig) {
     return NextResponse.json(
       { error: "Unknown model selected." },
       { status: 400 },
     );
   }
-
-  // Edit-only models need an uploaded image to work from.
-  if (modelConfig.mode === "edit" && !image) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: `The ${modelConfig.label} model needs an uploaded image to edit. Upload a room photo or pick a different model.`,
-      },
-      { status: 400 },
-    );
-  }
-
-  // Configuration guards for Replicate-backed models.
   if (modelConfig.provider === "replicate") {
     if (!modelConfig.slug) {
       return NextResponse.json(
@@ -309,38 +387,14 @@ export async function POST(request) {
     }
   }
 
+  const notices = [];
+
   try {
-    // Step 1: Validate that the prompt is interior/architecture related.
-    // Skipped under DEV_BYPASS so the visualizer works without a Gemini key.
-    if (!DEV_BYPASS) {
-      const validationPrompt = `
-    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, or similar architectural contexts.
-
-    Prompt: "${prompt}"
-
-    Respond with a JSON object containing:
-    {
-      "isValid": boolean,
-      "confidence": number (0-1),
-      "category": string (if valid, what category it falls into),
-      "reasoning": string
-    }
-    `;
-
-      const validationResponse = await callWithRetry(
-        () =>
-          ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: [{ text: validationPrompt }],
-          }),
-        { label: "Prompt validation" },
-      );
-
-      const validationResult = extractJsonResponse(
-        await getResponseText(validationResponse),
-      );
-
-      if (!validationResult.isValid || validationResult.confidence < 0.5) {
+    // --- Topic guard (typed prompts only; params are whitelisted enums) ---
+    if (prompt && !DEV_BYPASS) {
+      const guard = await runTopicGuard(prompt);
+      if (guard.notice) notices.push(guard.notice);
+      if (!guard.allowed) {
         return NextResponse.json(
           {
             success: false,
@@ -352,20 +406,16 @@ export async function POST(request) {
       }
     }
 
-    // Step 2: Generate with the selected backend.
-    const enhancedPrompt = buildEnhancedPrompt(prompt, {
-      spaceType,
-      style,
-      lighting,
-      colorPalette,
-    });
+    // --- Compose the instruction (single source of truth for the prompt) ---
+    const { instruction } = composeRenderPrompt({ prompt, params });
 
-    const images =
-      modelConfig.provider === "gemini"
-        ? await generateWithGemini(enhancedPrompt, image)
-        : await generateWithReplicate(modelConfig, enhancedPrompt, image);
+    // "Different renders every time" off → fixed seed (models that support it).
+    const seed =
+      body.variedSeed === false && modelConfig.supportsSeed ? 42 : undefined;
 
-    if (images.length === 0) {
+    // --- Generate ---
+    let result = await generateOnce(modelConfig, instruction, image, seed);
+    if (!result) {
       return NextResponse.json(
         {
           success: false,
@@ -376,8 +426,96 @@ export async function POST(request) {
       );
     }
 
+    // --- Verify adherence, retry once with strengthened directives ---
+    let adherence = { checked: [], failures: [], skipped: false, retried: false };
+    if (!DEV_BYPASS) {
+      const check = await verifyAdherence(
+        ai,
+        { data: result.image, mimeType: result.mimeType },
+        params,
+      );
+      adherence = { ...check, retried: false };
+
+      if (check.failures.length > 0) {
+        const strengthened = strengthenPrompt(
+          { prompt, params },
+          check.failures.map((f) => f.param),
+        );
+        try {
+          const retryResult = await generateOnce(
+            modelConfig,
+            strengthened,
+            image,
+            seed,
+          );
+          if (retryResult) {
+            const recheck = await verifyAdherence(
+              ai,
+              { data: retryResult.image, mimeType: retryResult.mimeType },
+              params,
+            );
+            // Keep the retry only if it did not get worse.
+            if (
+              recheck.skipped ||
+              recheck.failures.length <= check.failures.length
+            ) {
+              result = retryResult;
+              adherence = { ...recheck, retried: true };
+            }
+            if (adherence.failures.length > 0 && !adherence.skipped) {
+              notices.push(
+                `The model may not have fully applied: ${adherence.failures
+                  .map((f) => `${f.param} (${f.expected})`)
+                  .join(", ")}.`,
+              );
+            }
+          }
+        } catch (retryError) {
+          // Retry is best-effort; deliver the first result.
+          console.error("Adherence retry failed:", retryError.message);
+          notices.push(
+            `The model may not have fully applied: ${check.failures
+              .map((f) => `${f.param} (${f.expected})`)
+              .join(", ")}.`,
+          );
+        }
+      }
+    }
+
+    // --- Persist to history (best-effort) ---
+    let renderId = null;
+    if (DEV_BYPASS) {
+      notices.push("History is not saved in dev bypass mode.");
+    } else {
+      try {
+        const cookieStore = await cookies();
+        const supabase = await createClient(cookieStore);
+        const saved = await saveRender(supabase, user.id, {
+          imageBase64: result.image,
+          mimeType: result.mimeType,
+          model: modelKey,
+          prompt,
+          composedPrompt: instruction,
+          params,
+          adherence,
+        });
+        renderId = saved.renderId;
+      } catch (persistError) {
+        console.error("Render persistence failed:", persistError.message);
+        notices.push("This render could not be saved to your history.");
+      }
+    }
+
     return NextResponse.json(
-      { success: true, images, model: modelConfig.label },
+      {
+        success: true,
+        images: [result],
+        model: modelConfig.label,
+        composedPrompt: instruction,
+        adherence,
+        renderId,
+        notices,
+      },
       { status: 200 },
     );
   } catch (error) {

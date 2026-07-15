@@ -22,9 +22,11 @@ export const IMAGE_MODELS = {
     provider: "replicate",
     slug: "black-forest-labs/flux-kontext-pro",
     mode: "edit",
-    buildInput: (prompt, imageDataUrl) => ({
+    supportsSeed: true,
+    buildInput: (prompt, imageDataUrl, opts = {}) => ({
       prompt,
       input_image: imageDataUrl,
+      ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
     }),
   },
   "nano-banana": {
@@ -42,9 +44,11 @@ export const IMAGE_MODELS = {
     provider: "replicate",
     slug: "black-forest-labs/flux-kontext-max",
     mode: "edit",
-    buildInput: (prompt, imageDataUrl) => ({
+    supportsSeed: true,
+    buildInput: (prompt, imageDataUrl, opts = {}) => ({
       prompt,
       input_image: imageDataUrl,
+      ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
     }),
   },
   "qwen-image-edit": {
