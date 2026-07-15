@@ -61,3 +61,9 @@ select
   coalesce(u.raw_app_meta_data ->> 'user_type', 'user')
 from auth.users u
 on conflict (id) do nothing;
+
+-- The trigger fires with definer rights regardless of EXECUTE grants, so no API
+-- client needs to call this function directly. Revoke EXECUTE to remove the
+-- /rest/v1/rpc/handle_new_user attack surface (Supabase security advisors
+-- 0028/0029).
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
