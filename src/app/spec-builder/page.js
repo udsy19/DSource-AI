@@ -273,7 +273,8 @@ const SpecBuilder = () => {
               {String(categories.length).padStart(2, "0")}
             </SpecCell>
             <SpecCell label="Subtotal" grow={2}>
-              ${subtotal.toFixed(2)}
+              ₹
+              {subtotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </SpecCell>
           </div>
         )}
@@ -356,24 +357,22 @@ const SpecBuilder = () => {
 
                       <div className="flex shrink-0 flex-wrap items-start gap-2">
                         {renderStatusControl(product.id)}
-                        <button
-                          type="button"
-                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
-                        >
-                          Vendor ↗
-                        </button>
-                        <button
-                          type="button"
-                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
-                        >
-                          Details
-                        </button>
-                        <button
-                          type="button"
-                          className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
-                        >
-                          Quote
-                        </button>
+                        {product.link &&
+                          (product.link.startsWith("http")
+                            ? <a
+                                href={product.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                              >
+                                Vendor ↗
+                              </a>
+                            : <Link
+                                href={product.link}
+                                className="viz-mono cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                              >
+                                View product
+                              </Link>)}
                       </div>
                     </div>
 
@@ -391,7 +390,10 @@ const SpecBuilder = () => {
                         {product.id}
                       </SpecCell>
                       <SpecCell label="Price">
-                        ${product.price.toFixed(2)}
+                        ₹
+                        {product.price.toLocaleString("en-IN", {
+                          maximumFractionDigits: 0,
+                        })}
                       </SpecCell>
                       <SpecCell label="Qty">{product.quantity}</SpecCell>
                       <SpecCell label="Timeline">{product.timeline}</SpecCell>

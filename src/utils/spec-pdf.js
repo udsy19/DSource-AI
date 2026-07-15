@@ -30,10 +30,11 @@ const INDIGO = rgb(0x35 / 255, 0x41 / 255, 0x8c / 255); // --viz-blue
 
 const FONT_DIR = path.join(process.cwd(), "src", "assets", "fonts");
 
+// Catalog prices are INR. "Rs" instead of the ₹ glyph — the mono standard
+// fonts (WinAnsi encoding) cannot encode U+20B9.
 const money = (n) =>
-  `$${Number(n).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  `Rs ${Number(n).toLocaleString("en-IN", {
+    maximumFractionDigits: 0,
   })}`;
 
 const pad2 = (n) => String(n).padStart(2, "0");
