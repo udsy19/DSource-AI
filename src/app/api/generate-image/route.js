@@ -52,11 +52,17 @@ const RATE_LIMIT = { windowMs: 60_000, max: 10 };
 const REPLICATE_TIMEOUT_MS = 120_000;
 const MODES = ["render", "moodboard", "cad"];
 
-// Dev-only escape hatch for local testing without a login/Gemini key.
+// Dev-only escape hatch for local testing without a login.
 // Hard-disabled in production builds; enabled only via .env.local flag.
 const DEV_BYPASS =
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH_BYPASS === "true";
+
+// Topic guard + adherence verification depend on Gemini, not on auth — run
+// them whenever a real-looking key is configured, bypass or not.
+const GEMINI_READY = Boolean(
+  process.env.GOOGLE_GENAI_API_KEY?.startsWith("AIza"),
+);
 
 // Split a data URI (or raw base64) into Gemini inlineData fields.
 const parseImageData = (imageData) => {
@@ -493,7 +499,7 @@ export async function POST(request) {
     }
 
     // --- Topic guard (typed prompts only; params are whitelisted enums) ---
-    if (prompt && !DEV_BYPASS) {
+    if (prompt && GEMINI_READY) {
       const guard = await runTopicGuard(prompt);
       if (guard.notice) notices.push(guard.notice);
       if (!guard.allowed) {
@@ -538,7 +544,7 @@ export async function POST(request) {
       skipped: false,
       retried: false,
     };
-    if (!DEV_BYPASS) {
+    if (GEMINI_READY) {
       const check = await prepared.verify({
         data: result.image,
         mimeType: result.mimeType,
