@@ -298,9 +298,7 @@ export default function RenderTab() {
         {searchingLabel && (
           <div className="mt-3 rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-3">
             <div className="flex items-center justify-between">
-              <p className="viz-label">
-                Matching “{searchingLabel}”
-              </p>
+              <p className="viz-label">Matching “{searchingLabel}”</p>
               <p className="viz-mono text-[11px] text-[var(--viz-muted)]">
                 step {Math.max(stageIndex, 0) + 1}/{SEARCH_STAGES.length}
               </p>
@@ -308,15 +306,18 @@ export default function RenderTab() {
             <div className="mt-2 flex gap-1.5">
               {SEARCH_STAGES.map((stage, i) => (
                 <div key={stage.key} className="flex-1">
+                  {/* Track is overflow-hidden; viz-scan sweeps an inner sliver. */}
                   <div
-                    className={`h-1.5 rounded-full ${
+                    className={`h-1.5 overflow-hidden rounded-full ${
                       i < stageIndex
                         ? "bg-[var(--viz-blue)]"
-                        : i === stageIndex
-                          ? "viz-scan bg-[var(--viz-blue)]/70"
-                          : "bg-[var(--viz-ground)]"
+                        : "bg-[var(--viz-ground)]"
                     }`}
-                  />
+                  >
+                    {i === stageIndex && (
+                      <div className="viz-scan h-full w-1/3 rounded-full bg-[var(--viz-blue)]" />
+                    )}
+                  </div>
                   <p
                     className={`viz-mono mt-1 text-[10px] ${
                       i === stageIndex
