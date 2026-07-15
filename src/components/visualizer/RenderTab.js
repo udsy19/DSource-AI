@@ -14,6 +14,7 @@ import HotspotOverlay from "./HotspotOverlay";
 import MatchResultsModal from "./MatchResultsModal";
 import MaterialsPanel from "./MaterialsPanel";
 import NoticesBox from "./NoticesBox";
+import PanoViewer from "./PanoViewer";
 import RenderControls from "./RenderControls";
 import TitleBlock from "./TitleBlock";
 import UploadCanvas from "./UploadCanvas";
@@ -58,6 +59,8 @@ export default function RenderTab() {
   // --- 3D parallax view + layer graph for this design session ---
   const [depthView, setDepthView] = useState(null); // {image, depth}
   const [loading3D, setLoading3D] = useState(false);
+  const [panoView, setPanoView] = useState(null); // {pano}
+  const [loadingPano, setLoadingPano] = useState(false);
   const [editsLog, setEditsLog] = useState([]); // {kind, summary, at}
 
   // Hotspots belong to a specific image — clear them whenever it changes.
@@ -361,6 +364,30 @@ export default function RenderTab() {
     }
   };
 
+  /** Expand the current image into a panorama and open the 360° view. */
+  const handleView360 = async () => {
+    if (!tab.imagePreview || loadingPano) return;
+    setLoadingPano(true);
+    setFindError(null);
+    try {
+      const res = await fetch("/api/pano", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: tab.imagePreview }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setFindError(data.error || "Could not build the 360° view.");
+        return;
+      }
+      setPanoView({ pano: data.pano });
+    } catch {
+      setFindError("Could not build the 360° view. Please try again.");
+    } finally {
+      setLoadingPano(false);
+    }
+  };
+
   const handleAddAllToSpec = () => {
     for (const material of designMaterials) {
       addProductToSpec(
@@ -470,6 +497,18 @@ export default function RenderTab() {
             >
               {loading3D ? "Building 3D view..." : "View in 3D"}
             </button>
+            <button
+              type="button"
+              onClick={handleView360}
+              disabled={loadingPano || Boolean(searchingLabel)}
+              className={`rounded-lg border border-[var(--viz-ink)] px-4 py-2 text-sm font-medium ${
+                loadingPano
+                  ? "cursor-wait opacity-50"
+                  : "cursor-pointer hover:bg-[var(--viz-ink)] hover:text-[var(--viz-paper)]"
+              }`}
+            >
+              {loadingPano ? "Building 360° view..." : "View 360°"}
+            </button>
             {!searchingLabel && (
               <span className="text-xs text-[var(--viz-muted)]">
                 {components.length > 0
@@ -554,6 +593,10 @@ export default function RenderTab() {
           depth={depthView.depth}
           onClose={() => setDepthView(null)}
         />
+      )}
+
+      {panoView && (
+        <PanoViewer pano={panoView.pano} onClose={() => setPanoView(null)} />
       )}
 
       {tab.isGenerating.state && (
