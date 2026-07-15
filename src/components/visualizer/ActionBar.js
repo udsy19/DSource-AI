@@ -49,7 +49,7 @@ export default function ActionBar({
         type="button"
         onClick={onAction}
         disabled={disabled}
-        className={`rounded-full px-9 py-3.5 text-sm font-semibold tracking-wide ${
+        className={`viz-btn rounded-full px-9 py-4 ${
           disabled
             ? "cursor-not-allowed bg-[var(--viz-line)] text-[var(--viz-muted)]"
             : "cursor-pointer bg-[var(--viz-ink)] text-[var(--viz-paper)] hover:bg-black"

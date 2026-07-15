@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import { useParams } from "next/navigation";
+import React, { Suspense, useEffect, useState } from "react";
+import Reveal from "@/components/Reveal";
 import { useSpec } from "../../../../contexts/SpecContext";
 
 const ProductDetailsContent = () => {
   const params = useParams();
-  const router = useRouter();
   const { addProductToSpec } = useSpec();
 
   // Handle catch-all route: [...id] means params.id is an array
@@ -168,7 +168,7 @@ const ProductDetailsContent = () => {
     // Find image for this color
     const colorImageIndex = images.findIndex(
       (img) =>
-        img.color === colorOption.color || img.id === colorOption.productId
+        img.color === colorOption.color || img.id === colorOption.productId,
     );
 
     if (colorImageIndex >= 0) {
@@ -212,23 +212,26 @@ const ProductDetailsContent = () => {
     const tags = Array.isArray(product.tags) ? product.tags : [];
     return !tags.some(
       (tag) =>
-        typeof tag === "string" && tag.toLowerCase().includes("out of stock")
+        typeof tag === "string" && tag.toLowerCase().includes("out of stock"),
     );
   }, [product]);
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading product details...</div>
+      <div className="viz-scope flex min-h-screen w-full items-center justify-center px-4">
+        <p className="viz-mono text-xs tracking-[0.08em] uppercase text-[var(--viz-muted)]">
+          Pulling this sample from the library…
+        </p>
       </div>
     );
   }
 
   if (error || !product) {
     return (
-      <div className="w-full min-h-screen flex items-center justify-center">
-        <div className="text-xl text-red-600">
-          {error || "Product not found"}
+      <div className="viz-scope min-h-screen w-full px-4 pt-24 sm:px-8 sm:pt-32">
+        <div className="mx-auto max-w-3xl rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error || "Product not found"} — head back to the library and pick
+          another sample.
         </div>
       </div>
     );
@@ -236,65 +239,200 @@ const ProductDetailsContent = () => {
 
   const mainImage = images[selectedImageIndex] || images[0];
 
+  const specCells = [
+    { label: "Code", value: product.product_id || product.id },
+    { label: "Brand", value: product.brand_name },
+    { label: "Color", value: product.color },
+    { label: "Price", value: "$100 /sq.ft" },
+    { label: "Stock", value: isInStock ? "In stock" : "Out of stock" },
+  ];
+
+  const detailSections = [
+    {
+      key: "essentials",
+      title: "The essentials",
+      content: (
+        <dl className="space-y-1.5">
+          {product.size && (
+            <div className="flex gap-3">
+              <dt className="viz-label w-24 flex-shrink-0">Size</dt>
+              <dd className="viz-mono text-xs uppercase">{product.size}</dd>
+            </div>
+          )}
+          {product.thickness && (
+            <div className="flex gap-3">
+              <dt className="viz-label w-24 flex-shrink-0">Thickness</dt>
+              <dd className="viz-mono text-xs uppercase">
+                {product.thickness}
+              </dd>
+            </div>
+          )}
+          {product.category_name && (
+            <div className="flex gap-3">
+              <dt className="viz-label w-24 flex-shrink-0">Category</dt>
+              <dd className="viz-mono text-xs uppercase">
+                {product.category_name}
+              </dd>
+            </div>
+          )}
+          {product.brand_name && (
+            <div className="flex gap-3">
+              <dt className="viz-label w-24 flex-shrink-0">Brand</dt>
+              <dd className="viz-mono text-xs uppercase">
+                {product.brand_name}
+              </dd>
+            </div>
+          )}
+        </dl>
+      ),
+    },
+    {
+      key: "installation",
+      title: "Installation information",
+      content: (
+        <>
+          <p>
+            {product.description?.includes("Application") ||
+            product.description?.includes("Best Suited For")
+              ? product.description
+                  .split("Best Suited For:")[1]
+                  ?.split("\n\n")[0] ||
+                "Installation information will be provided upon request."
+              : "Installation information will be provided upon request."}
+          </p>
+          {Array.isArray(product.application) &&
+            product.application.length > 0 && (
+              <p className="viz-mono mt-3 text-[11px] tracking-[0.08em] uppercase text-[var(--viz-muted)]">
+                Applications · {product.application.join(" · ")}
+              </p>
+            )}
+        </>
+      ),
+    },
+    {
+      key: "about",
+      title: "About the product",
+      content: (
+        <p className="leading-relaxed">
+          {product.description || "Product information coming soon."}
+        </p>
+      ),
+    },
+    {
+      key: "additional",
+      title: "Additional details",
+      content: (
+        <div className="space-y-1.5">
+          {product.series_name && (
+            <div className="flex gap-3">
+              <span className="viz-label w-24 flex-shrink-0">Series</span>
+              <span className="viz-mono text-xs uppercase">
+                {product.series_name}
+              </span>
+            </div>
+          )}
+          {product.color_family && (
+            <div className="flex gap-3">
+              <span className="viz-label w-24 flex-shrink-0">Color family</span>
+              <span className="viz-mono text-xs uppercase">
+                {product.color_family}
+              </span>
+            </div>
+          )}
+          {Array.isArray(product.tags) && product.tags.length > 0 && (
+            <p className="viz-mono pt-1 text-[11px] tracking-[0.08em] uppercase text-[var(--viz-muted)]">
+              {product.tags.slice(0, 10).join(" · ")}
+            </p>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="w-full min-h-screen bg-white py-12 md:py-32">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
-          {/* Left Side - Product Images */}
+    <div className="viz-scope min-h-screen w-full">
+      <div className="mx-auto max-w-6xl px-4 pt-24 pb-16 sm:px-8 sm:pt-32 md:pb-24">
+        {/* Folio masthead */}
+        <Reveal>
+          <div className="flex items-baseline justify-between gap-4 pb-2">
+            <p className="viz-label">
+              {product.sub_category?.[0] || product.category_name || "Sample"}
+            </p>
+            <p className="viz-label">{product.product_id || product.id}</p>
+          </div>
+          <div className="relative pt-5">
+            <span
+              className="viz-rule absolute top-0 left-0 h-0.5 w-full bg-[var(--viz-ink)]"
+              aria-hidden="true"
+            />
+            <span className="viz-dots-rule" aria-hidden="true" />
+            <h1 className="viz-serif text-3xl leading-tight sm:text-4xl">
+              {product.product_name || product.brand_name || "Product"}
+            </h1>
+          </div>
+        </Reveal>
+
+        <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
+          {/* The plate — product imagery */}
           <div className="flex flex-col">
-            {/* Main Image */}
-            <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
-              {mainImage?.url ? (
-                <>
-                  <Image
-                    src={mainImage.url}
-                    alt={product.product_name || "Product"}
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                  {/* Heart Icon */}
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors z-10"
-                  >
-                    <svg
-                      className={`w-6 h-6 ${
-                        isFavorite
-                          ? "text-red-500 fill-red-500"
-                          : "text-gray-600"
-                      }`}
-                      fill={isFavorite ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-ground)]">
+              {mainImage?.url
+                ? <>
+                    <Image
+                      src={mainImage.url}
+                      alt={product.product_name || "Product"}
+                      fill
+                      className="object-cover"
+                      priority
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsFavorite(!isFavorite)}
+                      aria-label={
+                        isFavorite ? "Remove from saved" : "Save for later"
+                      }
+                      aria-pressed={isFavorite}
+                      className="absolute top-4 right-4 z-10 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)] p-2 transition-colors hover:bg-[var(--viz-ground)]"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
-                  </button>
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  No Image
-                </div>
-              )}
+                      <svg
+                        className={`h-5 w-5 ${
+                          isFavorite
+                            ? "text-[var(--viz-blue)]"
+                            : "text-[var(--viz-muted)]"
+                        }`}
+                        fill={isFavorite ? "currentColor" : "none"}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                : <div className="viz-mono flex h-full w-full items-center justify-center text-[11px] tracking-[0.08em] uppercase text-[var(--viz-muted)]">
+                    No image on file
+                  </div>}
             </div>
 
             {/* Thumbnails */}
             {images.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
                 {images.slice(0, 3).map((img, index) => (
                   <button
-                    key={index}
+                    key={img.id ?? img.url}
+                    type="button"
                     onClick={() => setSelectedImageIndex(index)}
-                    className={`flex-shrink-0 relative w-24 h-24 rounded-lg overflow-hidden border-2 ${
+                    aria-label={`Show image ${index + 1}`}
+                    aria-pressed={selectedImageIndex === index}
+                    className={`relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
                       selectedImageIndex === index
-                        ? "border-gray-900"
-                        : "border-gray-200"
+                        ? "border-[var(--viz-blue)]"
+                        : "border-[var(--viz-line)] hover:border-[var(--viz-muted)]"
                     }`}
                   >
                     <Image
@@ -309,65 +447,39 @@ const ProductDetailsContent = () => {
             )}
           </div>
 
-          {/* Right Side - Product Information */}
+          {/* The facts — spec cells and selections */}
           <div className="flex flex-col">
-            {/* Category with Share */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">
-                {product.sub_category?.[0] ||
-                  product.category_name ||
-                  "Product"}
-              </span>
-              <button
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                title="Share"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            {/* Title-block spec cells */}
+            <div className="flex flex-wrap gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
+              {specCells.map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="min-w-24 flex-1 bg-[var(--viz-paper)] px-3 py-1.5"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                  />
-                </svg>
-              </button>
+                  <div className="viz-label">{label}</div>
+                  <div className="viz-mono mt-0.5 truncate text-xs uppercase">
+                    {value || "—"}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Product Name */}
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-              {product.brand_name || product.product_name || "Product Name"}
-            </h1>
-
-            {/* Product ID and Color */}
-            <p className="text-gray-600 mb-4">
-              {product.product_id || product.id} | {product.color || "N/A"}
-            </p>
-
-            {/* Price */}
-            <div className="text-2xl font-semibold text-gray-900 mb-6">
-              $100 /Sq.Ft
-            </div>
-
-            {/* Color Selection */}
+            {/* Color selection */}
             {availableColors.length > 0 && (
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
-                  Color
-                </label>
-                <div className="flex gap-3">
-                  {availableColors.map((colorOption, index) => (
+              <div className="mt-6">
+                <p className="viz-label mb-3">Color</p>
+                <div className="flex flex-wrap gap-3">
+                  {availableColors.map((colorOption) => (
                     <button
-                      key={index}
+                      key={colorOption.color}
+                      type="button"
                       onClick={() => handleColorSelect(colorOption)}
-                      className={`w-10 h-10 rounded-full border-2 transition-all ${
+                      aria-label={colorOption.color}
+                      aria-pressed={selectedColor === colorOption.colorCode}
+                      className={`h-9 w-9 rounded-full border-2 transition-all ${
                         selectedColor === colorOption.colorCode
-                          ? "border-gray-900 scale-110"
-                          : "border-gray-300 hover:border-gray-400"
+                          ? "scale-110 border-[var(--viz-blue)]"
+                          : "border-[var(--viz-line)] hover:border-[var(--viz-muted)]"
                       }`}
                       style={{ backgroundColor: colorOption.colorCode }}
                       title={colorOption.color}
@@ -377,21 +489,21 @@ const ProductDetailsContent = () => {
               </div>
             )}
 
-            {/* Pattern Selection */}
+            {/* Pattern selection — a typeset run, not a chip grid */}
             {availablePatterns.length > 0 && (
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
-                  Pattern
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {availablePatterns.slice(0, 3).map((pattern, index) => (
+              <div className="mt-6">
+                <p className="viz-label mb-2">Pattern</p>
+                <div className="flex flex-wrap gap-x-1 gap-y-1 text-sm">
+                  {availablePatterns.slice(0, 3).map((pattern) => (
                     <button
-                      key={index}
+                      key={pattern}
+                      type="button"
                       onClick={() => setSelectedPattern(pattern)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      aria-pressed={selectedPattern === pattern}
+                      className={`rounded px-1.5 py-0.5 transition-colors ${
                         selectedPattern === pattern
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                          : "text-[var(--viz-ink)] hover:bg-[var(--viz-ground)]"
                       }`}
                     >
                       {pattern}
@@ -401,290 +513,74 @@ const ProductDetailsContent = () => {
               </div>
             )}
 
-            {/* Availability */}
-            <div className="mb-6">
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  isInStock
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {isInStock ? "In Stock" : "Out of Stock"}
-              </span>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            {/* Actions */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
+                type="button"
+                onClick={handleAddToSpec}
+                className="flex-1 rounded-full bg-[var(--viz-ink)] px-6 py-3 text-sm font-medium text-[var(--viz-paper)] transition-colors hover:bg-[var(--viz-well)]"
+              >
+                Add to spec
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   // Open product in new tab or navigate
                   window.open(product.image_url || "#", "_blank");
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium"
+                className="flex-1 rounded-full border border-[var(--viz-line)] px-6 py-3 text-sm font-medium text-[var(--viz-ink)] transition-colors hover:bg-[var(--viz-ground)]"
               >
-                View Product
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </button>
-
-              <button
-                onClick={handleAddToSpec}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium"
-              >
-                Add to Spec +
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                Open full image →
               </button>
             </div>
 
-            {/* Description Section */}
-            <div className="border-t border-gray-200 pt-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Description
-              </h2>
+            {/* Description */}
+            <div className="mt-8 border-t border-[var(--viz-line)] pt-6">
+              <h2 className="viz-serif text-xl">Description</h2>
 
-              {/* Main Description */}
               {product.description && (
-                <p className="text-gray-700 mb-6 leading-relaxed">
+                <p className="mt-3 leading-relaxed text-[var(--viz-ink)]/85">
                   {product.description.split("\n\n")[0]}
                 </p>
               )}
 
-              {/* Collapsible Sections */}
-              <div className="space-y-2">
-                {/* The Essentials */}
-                <div className="border border-gray-200 rounded-lg">
-                  <button
-                    onClick={() => toggleSection("essentials")}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="font-medium text-gray-900">
-                      The Essentials
-                    </span>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
-                        expandedSections.essentials ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+              {/* Collapsible detail sections */}
+              <div className="mt-6 divide-y divide-[var(--viz-line)] border-y border-[var(--viz-line)]">
+                {detailSections.map(({ key, title, content }) => (
+                  <div key={key}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(key)}
+                      aria-expanded={expandedSections[key]}
+                      className="flex w-full items-center justify-between py-3 text-left"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                  {expandedSections.essentials && (
-                    <div className="p-4 pt-0 border-t border-gray-200">
-                      <div className="space-y-2 text-sm text-gray-700">
-                        {product.size && (
-                          <div>
-                            <span className="font-medium">Size: </span>
-                            {product.size}
-                          </div>
-                        )}
-                        {product.thickness && (
-                          <div>
-                            <span className="font-medium">Thickness: </span>
-                            {product.thickness}
-                          </div>
-                        )}
-                        {product.category_name && (
-                          <div>
-                            <span className="font-medium">Category: </span>
-                            {product.category_name}
-                          </div>
-                        )}
-                        {product.brand_name && (
-                          <div>
-                            <span className="font-medium">Brand: </span>
-                            {product.brand_name}
-                          </div>
-                        )}
+                      <span className="viz-mono text-xs tracking-[0.08em] uppercase text-[var(--viz-ink)]">
+                        {title}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-[var(--viz-muted)] transition-transform ${
+                          expandedSections[key] ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                    {expandedSections[key] && (
+                      <div className="pb-4 text-sm text-[var(--viz-ink)]/85">
+                        {content}
                       </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Installation Information */}
-                <div className="border border-gray-200 rounded-lg">
-                  <button
-                    onClick={() => toggleSection("installation")}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="font-medium text-gray-900">
-                      Installation Information
-                    </span>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
-                        expandedSections.installation ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                  {expandedSections.installation && (
-                    <div className="p-4 pt-0 border-t border-gray-200">
-                      <p className="text-sm text-gray-700">
-                        {product.description?.includes("Application") ||
-                        product.description?.includes("Best Suited For")
-                          ? product.description
-                              .split("Best Suited For:")[1]
-                              ?.split("\n\n")[0] ||
-                            "Installation information will be provided upon request."
-                          : "Installation information will be provided upon request."}
-                      </p>
-                      {Array.isArray(product.application) &&
-                        product.application.length > 0 && (
-                          <div className="mt-3">
-                            <span className="font-medium text-sm">
-                              Applications:{" "}
-                            </span>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {product.application.map((app, idx) => (
-                                <span
-                                  key={idx}
-                                  className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                                >
-                                  {app}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </div>
-
-                {/* About the Product */}
-                <div className="border border-gray-200 rounded-lg">
-                  <button
-                    onClick={() => toggleSection("about")}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="font-medium text-gray-900">
-                      About the Product
-                    </span>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
-                        expandedSections.about ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                  {expandedSections.about && (
-                    <div className="p-4 pt-0 border-t border-gray-200">
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        {product.description ||
-                          "Product information coming soon."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Additional Details */}
-                <div className="border border-gray-200 rounded-lg">
-                  <button
-                    onClick={() => toggleSection("additional")}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="font-medium text-gray-900">
-                      Additional Details
-                    </span>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
-                        expandedSections.additional ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                  {expandedSections.additional && (
-                    <div className="p-4 pt-0 border-t border-gray-200">
-                      <div className="space-y-2 text-sm text-gray-700">
-                        {product.series_name && (
-                          <div>
-                            <span className="font-medium">Series: </span>
-                            {product.series_name}
-                          </div>
-                        )}
-                        {product.color_family && (
-                          <div>
-                            <span className="font-medium">Color Family: </span>
-                            {product.color_family}
-                          </div>
-                        )}
-                        {Array.isArray(product.tags) &&
-                          product.tags.length > 0 && (
-                            <div>
-                              <span className="font-medium">Tags: </span>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {product.tags.slice(0, 10).map((tag, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -698,8 +594,10 @@ const ProductDetails = () => {
   return (
     <Suspense
       fallback={
-        <div className="w-full min-h-screen flex items-center justify-center">
-          <div className="text-xl">Loading...</div>
+        <div className="viz-scope flex min-h-screen w-full items-center justify-center px-4">
+          <p className="viz-mono text-xs tracking-[0.08em] uppercase text-[var(--viz-muted)]">
+            Pulling this sample from the library…
+          </p>
         </div>
       }
     >

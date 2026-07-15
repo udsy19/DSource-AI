@@ -29,8 +29,10 @@ export default function TitleBlock({ sheet, rev, cells, verified = null }) {
           className="min-w-24 flex-1 bg-[var(--viz-paper)] px-3 py-1.5"
         >
           <div className="viz-label">{label}</div>
+          {/* Keyed by value so a change remounts it and replays the tick. */}
           <div
-            className={`viz-mono mt-0.5 truncate text-xs uppercase ${
+            key={String(value ?? "—")}
+            className={`viz-mono viz-value-tick mt-0.5 truncate text-xs uppercase ${
               accent ? "font-bold text-[var(--viz-blue)]" : ""
             }`}
           >

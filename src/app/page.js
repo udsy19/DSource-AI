@@ -1,25 +1,17 @@
-import Banner from "../components/landing-page/banner";
-import Hero from "../components/landing-page/hero";
-import PopularProducts from "../components/landing-page/popular-products";
-import ModernMinimalist from "../components/landing-page/modern-minimalist";
-import MadeWithDsource from "../components/landing-page/made-with-dsource";
+import CollectionParallax from "../components/landing-page/CollectionParallax";
+import GalleryWall from "../components/landing-page/GalleryWall";
+import MaterialFan from "../components/landing-page/MaterialFan";
+import VideoScrollHero from "../components/landing-page/VideoScrollHero";
+import WorkflowPlates from "../components/landing-page/WorkflowPlates";
 
 export default function Home() {
   return (
     <div>
-      <Banner />
-      <div>
-        <Hero />
-      </div>
-      <div>
-        <PopularProducts />
-      </div>
-      <div>
-        <ModernMinimalist />
-      </div>
-      <div>
-        <MadeWithDsource />
-      </div>
+      <VideoScrollHero />
+      <WorkflowPlates />
+      <MaterialFan />
+      <CollectionParallax />
+      <GalleryWall />
     </div>
   );
 }

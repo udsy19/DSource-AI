@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import VendorAuthPanel from "@/components/vendor/VendorAuthPanel";
 import VendorDashboard from "@/components/vendor/VendorDashboard";
-import { createClient } from "@/utils/supabase/server";
 import { getUserRoleFromUser } from "@/utils/api-auth";
 import { ROLES } from "@/utils/roles";
+import { createClient } from "@/utils/supabase/server";
 
 export const metadata = {
   title: "Vendor Dashboard | DSource",
@@ -16,12 +16,12 @@ export default async function VendorPage() {
   const supabase = await createClient(cookieStore);
 
   const [
-    { data: { user }, error: userError },
+    {
+      data: { user },
+      error: userError,
+    },
     { data: sessionData },
-  ] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
+  ] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
 
   let totalProducts = 0;
   let recentProducts = [];
@@ -52,7 +52,7 @@ export default async function VendorPage() {
 
   // Prepare dashboard stats
   const dashboardStats = {
-    totalProducts: productsError ? 0 : totalProducts ?? 0,
+    totalProducts: productsError ? 0 : (totalProducts ?? 0),
     // These would ideally come from a sales/orders table - using placeholder for now
     totalSales: 1000, // Would be fetched from orders table
     totalOrders: 300, // Would be fetched from orders table
@@ -63,18 +63,13 @@ export default async function VendorPage() {
 
   return (
     <>
-      {user && isVendor ? (
-        <VendorDashboard user={user} dashboardStats={dashboardStats} />
-      ) : (
-        <div className="relative isolate py-16 sm:py-24">
-          <div className="pointer-events-none absolute inset-0 -z-10 opacity-70">
-            <div className="mx-auto h-full max-w-4xl bg-gradient-to-b from-gray-100 via-white to-white blur-3xl" />
-          </div>
-          <div className="mx-auto max-w-4xl px-4">
-            <VendorAuthPanel />
-          </div>
-        </div>
-      )}
+      {user && isVendor
+        ? <VendorDashboard user={user} dashboardStats={dashboardStats} />
+        : <div className="viz-scope viz-grain flex min-h-svh items-center justify-center px-4 pt-24 pb-14 sm:px-6">
+            <div className="w-full max-w-4xl">
+              <VendorAuthPanel />
+            </div>
+          </div>}
     </>
   );
 }

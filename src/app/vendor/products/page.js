@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ITEMS_PER_PAGE = 10;
+
+const fieldClasses =
+  "w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-3 py-2 text-sm text-[var(--viz-ink)] placeholder:text-[var(--viz-muted)]";
+
+const quietButtonClasses =
+  "flex cursor-pointer items-center gap-2 rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-4 py-2 text-sm text-[var(--viz-ink)] transition-colors hover:bg-[var(--viz-ground)]";
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -470,10 +476,11 @@ export default function ProductsPage() {
     if (sortConfig.key !== columnKey) {
       return (
         <svg
-          className="w-4 h-4 ml-1 text-gray-400"
+          className="ml-1 h-4 w-4 text-[var(--viz-muted)]"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -484,41 +491,43 @@ export default function ProductsPage() {
         </svg>
       );
     }
-    return sortConfig.direction === "asc" ? (
-      <svg
-        className="w-4 h-4 ml-1 text-blue-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 15l7-7 7 7"
-        />
-      </svg>
-    ) : (
-      <svg
-        className="w-4 h-4 ml-1 text-blue-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M19 9l-7 7-7-7"
-        />
-      </svg>
-    );
+    return sortConfig.direction === "asc"
+      ? <svg
+          className="ml-1 h-4 w-4 text-[var(--viz-blue)]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 15l7-7 7 7"
+          />
+        </svg>
+      : <svg
+          className="ml-1 h-4 w-4 text-[var(--viz-blue)]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <p className="viz-mono text-sm text-[var(--viz-muted)]">
+          Fetching your catalog…
+        </p>
       </div>
     );
   }
@@ -526,20 +535,21 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="relative max-w-md flex-1">
           <input
             type="text"
-            placeholder="Search for id, name product"
+            placeholder="Search by ID or name"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] py-2 pr-10 pl-4 text-sm text-[var(--viz-ink)] placeholder:text-[var(--viz-muted)]"
           />
           <svg
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+            className="absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 text-[var(--viz-muted)]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -550,22 +560,23 @@ export default function ProductsPage() {
           </svg>
         </div>
 
-        <div className="flex gap-3 flex-wrap items-center">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowFilterPanel((open) => !open)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              className={`flex cursor-pointer items-center gap-2 rounded-md border px-4 py-2 text-sm transition-colors ${
                 hasActiveFilters
-                  ? "border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                  : "border-gray-300 hover:bg-gray-50"
+                  ? "border-[var(--viz-blue)] bg-[var(--viz-blue)]/5 text-[var(--viz-blue-deep)]"
+                  : "border-[var(--viz-line)] bg-[var(--viz-paper)] text-[var(--viz-ink)] hover:bg-[var(--viz-ground)]"
               }`}
             >
               <svg
-                className="w-5 h-5"
+                className="h-5 w-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -576,7 +587,7 @@ export default function ProductsPage() {
               </svg>
               <span>Filter</span>
               {hasActiveFilters && (
-                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-200 text-xs font-medium text-blue-800">
+                <span className="viz-mono ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--viz-blue)] text-xs text-[var(--viz-paper)]">
                   {
                     [
                       filters.category,
@@ -595,16 +606,14 @@ export default function ProductsPage() {
                   aria-hidden="true"
                   onClick={() => setShowFilterPanel(false)}
                 />
-                <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                <div className="viz-panel absolute top-full left-0 z-20 mt-1 w-72 p-4 shadow-lg">
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Filters
-                    </span>
+                    <span className="viz-label">Filters</span>
                     {hasActiveFilters && (
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="text-xs text-blue-600 hover:underline"
+                        className="cursor-pointer text-xs text-[var(--viz-blue)] hover:underline"
                       >
                         Clear all
                       </button>
@@ -612,13 +621,17 @@ export default function ProductsPage() {
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-500">
+                      <label
+                        htmlFor="filter-category"
+                        className="viz-label mb-1 block"
+                      >
                         Category
                       </label>
                       <select
+                        id="filter-category"
                         value={filters.category}
                         onChange={(e) => setFilter("category", e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="viz-select w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-2 py-1.5 text-sm text-[var(--viz-ink)]"
                       >
                         <option value="">All categories</option>
                         {filterOptions.categories.map((c) => (
@@ -629,13 +642,17 @@ export default function ProductsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-500">
+                      <label
+                        htmlFor="filter-brand"
+                        className="viz-label mb-1 block"
+                      >
                         Brand
                       </label>
                       <select
+                        id="filter-brand"
                         value={filters.brand}
                         onChange={(e) => setFilter("brand", e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="viz-select w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-2 py-1.5 text-sm text-[var(--viz-ink)]"
                       >
                         <option value="">All brands</option>
                         {filterOptions.brands.map((b) => (
@@ -646,13 +663,17 @@ export default function ProductsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-500">
+                      <label
+                        htmlFor="filter-status"
+                        className="viz-label mb-1 block"
+                      >
                         Status
                       </label>
                       <select
+                        id="filter-status"
                         value={filters.status}
                         onChange={(e) => setFilter("status", e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="viz-select w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-2 py-1.5 text-sm text-[var(--viz-ink)]"
                       >
                         <option value="">All</option>
                         <option value="active">Active</option>
@@ -660,13 +681,17 @@ export default function ProductsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-500">
+                      <label
+                        htmlFor="filter-color"
+                        className="viz-label mb-1 block"
+                      >
                         Color
                       </label>
                       <select
+                        id="filter-color"
                         value={filters.color}
                         onChange={(e) => setFilter("color", e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="viz-select w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-2 py-1.5 text-sm text-[var(--viz-ink)]"
                       >
                         <option value="">All colors</option>
                         {filterOptions.colors.map((c) => (
@@ -691,16 +716,17 @@ export default function ProductsPage() {
               onChange={handleFileChange}
             />
             <button
+              type="button"
               onClick={handleUploadClick}
               disabled={uploading}
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#E8703A" }}
+              className="flex cursor-pointer items-center gap-2 rounded-full bg-[var(--viz-ink)] px-5 py-2 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-[var(--viz-well)] disabled:cursor-not-allowed disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)]"
             >
               <svg
-                className="w-5 h-5"
+                className="h-5 w-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -709,19 +735,21 @@ export default function ProductsPage() {
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              <span>{uploading ? "Uploading..." : "Upload CSV File"}</span>
+              <span>{uploading ? "Uploading…" : "Upload CSV"}</span>
             </button>
           </div>
 
           <button
+            type="button"
             onClick={handleNewProduct}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className={quietButtonClasses}
           >
             <svg
-              className="w-5 h-5"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -730,19 +758,21 @@ export default function ProductsPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <span>New Product</span>
+            <span>New product</span>
           </button>
 
           <button
+            type="button"
             onClick={handleBulkDelete}
             disabled={selectedProducts.length === 0 || bulkDeleting}
-            className="flex items-center gap-2 px-4 py-2 border border-red-200 rounded-lg text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            className="flex cursor-pointer items-center gap-2 rounded-md border border-red-300 px-4 py-2 text-sm text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             <svg
-              className="w-5 h-5"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -753,17 +783,18 @@ export default function ProductsPage() {
             </svg>
             <span>
               {bulkDeleting
-                ? "Deleting..."
-                : `Bulk Delete${selectedProducts.length > 0 ? ` (${selectedProducts.length})` : ""}`}
+                ? "Deleting…"
+                : `Bulk delete${selectedProducts.length > 0 ? ` (${selectedProducts.length})` : ""}`}
             </span>
           </button>
 
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button type="button" className={quietButtonClasses}>
             <svg
-              className="w-5 h-5"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -778,10 +809,10 @@ export default function ProductsPage() {
       </div>
 
       {/* Products Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="viz-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="border-b border-[var(--viz-line)]">
               <tr>
                 <th className="px-4 py-3 text-left">
                   <input
@@ -791,234 +822,242 @@ export default function ProductsPage() {
                       selectedProducts.length === currentProducts.length
                     }
                     onChange={toggleAllProducts}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    aria-label="Select all products on this page"
+                    className="h-4 w-4 accent-[var(--viz-blue)]"
                   />
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("id")}
                 >
-                  <div className="flex items-center">
+                  <div className="viz-label flex items-center">
                     ID
                     <SortIcon columnKey="id" />
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                  Image
+                <th className="px-4 py-3 text-left">
+                  <span className="viz-label">Image</span>
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("product_name")}
                 >
-                  <div className="flex items-center">
-                    Product Name
+                  <div className="viz-label flex items-center">
+                    Product name
                     <SortIcon columnKey="product_name" />
                   </div>
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("product_id")}
                 >
-                  <div className="flex items-center">
+                  <div className="viz-label flex items-center">
                     Product ID
                     <SortIcon columnKey="product_id" />
                   </div>
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("id")}
                 >
-                  <div className="flex items-center">
+                  <div className="viz-label flex items-center">
                     QTY
                     <SortIcon columnKey="id" />
                   </div>
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("created_at")}
                 >
-                  <div className="flex items-center">
+                  <div className="viz-label flex items-center">
                     Date
                     <SortIcon columnKey="created_at" />
                   </div>
                 </th>
                 <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("id")}
                 >
-                  <div className="flex items-center">
+                  <div className="viz-label flex items-center">
                     Status
                     <SortIcon columnKey="id" />
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                  Action
+                <th className="px-4 py-3 text-left">
+                  <span className="viz-label">Action</span>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {currentProducts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-8 text-center text-gray-500"
-                  >
-                    No products found
-                  </td>
-                </tr>
-              ) : (
-                currentProducts.map((product, index) => {
-                  const active = isProductActive(product);
-                  const isSelected = selectedProducts.includes(product.id);
-                  return (
-                    <tr
-                      key={product.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleProductSelection(product.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">
-                        {String(index + 1 + startIndex).padStart(2, "0")}
-                      </td>
-                      <td className="px-4 py-4">
-                        {product.image_url && !imageErrors.has(product.id) ? (
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
-                            <Image
-                              src={product.image_url}
-                              alt={product.product_name || "Product"}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                setImageErrors(
-                                  (prev) => new Set([...prev, product.id]),
-                                );
-                              }}
-                            />
+            <tbody className="divide-y divide-[var(--viz-line)]">
+              {currentProducts.length === 0
+                ? <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center">
+                      <span className="viz-mono text-sm text-[var(--viz-muted)]">
+                        No products found — adjust the filters or upload a CSV.
+                      </span>
+                    </td>
+                  </tr>
+                : currentProducts.map((product, index) => {
+                    const active = isProductActive(product);
+                    const isSelected = selectedProducts.includes(product.id);
+                    return (
+                      <tr
+                        key={product.id}
+                        className="transition-colors hover:bg-[var(--viz-ground)]"
+                      >
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleProductSelection(product.id)}
+                            aria-label={`Select ${product.product_name || "product"}`}
+                            className="h-4 w-4 accent-[var(--viz-blue)]"
+                          />
+                        </td>
+                        <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
+                          {String(index + 1 + startIndex).padStart(2, "0")}
+                        </td>
+                        <td className="px-4 py-4">
+                          {product.image_url && !imageErrors.has(product.id)
+                            ? <div className="h-12 w-12 overflow-hidden rounded-md border border-[var(--viz-line)] bg-[var(--viz-ground)]">
+                                <Image
+                                  src={product.image_url}
+                                  alt={product.product_name || "Product"}
+                                  width={48}
+                                  height={48}
+                                  className="h-full w-full object-cover"
+                                  onError={() => {
+                                    setImageErrors(
+                                      (prev) => new Set([...prev, product.id]),
+                                    );
+                                  }}
+                                />
+                              </div>
+                            : <div className="viz-mono flex h-12 w-12 items-center justify-center rounded-md border border-[var(--viz-line)] bg-[var(--viz-ground)] text-[10px] text-[var(--viz-muted)]">
+                                No image
+                              </div>}
+                        </td>
+                        <td className="px-4 py-4 text-sm font-medium text-[var(--viz-ink)]">
+                          {product.product_name || "N/A"}
+                        </td>
+                        <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
+                          {product.product_id || "N/A"}
+                        </td>
+                        <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
+                          40
+                        </td>
+                        <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
+                          {formatDate(product.created_at)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span
+                            className={`viz-mono inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs ${
+                              active
+                                ? "border-[var(--viz-blue)]/40 bg-[var(--viz-blue)]/5 text-[var(--viz-blue-deep)]"
+                                : "border-[var(--viz-line)] text-[var(--viz-muted)]"
+                            }`}
+                          >
+                            {active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(product)}
+                              disabled={togglingActive === product.id}
+                              className="cursor-pointer text-[var(--viz-muted)] transition-colors hover:text-[var(--viz-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                              title={active ? "Make inactive" : "Make active"}
+                            >
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditProduct(product)}
+                              className="cursor-pointer text-[var(--viz-muted)] transition-colors hover:text-[var(--viz-ink)]"
+                              title="Edit"
+                            >
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setProductToDelete(product)}
+                              className="cursor-pointer text-[var(--viz-muted)] transition-colors hover:text-red-700"
+                              title="Delete"
+                            >
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
                           </div>
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
-                            No Image
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        {product.product_name || "N/A"}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {product.product_id || "N/A"}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">40</td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {formatDate(product.created_at)}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            active
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleToggleActive(product)}
-                            disabled={togglingActive === product.id}
-                            className="text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={active ? "Make inactive" : "Make active"}
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleEditProduct(product)}
-                            className="text-gray-400 hover:text-blue-600 transition-colors"
-                            title="Edit"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => setProductToDelete(product)}
-                            className="text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        </td>
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              {startIndex + 1} - {Math.min(endIndex, filteredProducts.length)}{" "}
-              of {filteredProducts.length} Pages
+          <div className="flex items-center justify-between border-t border-[var(--viz-line)] px-4 py-4">
+            <div className="viz-mono text-sm text-[var(--viz-muted)]">
+              {startIndex + 1}–{Math.min(endIndex, filteredProducts.length)} of{" "}
+              {filteredProducts.length} products
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>The page on</span>
+              <div className="flex items-center gap-2">
+                <label htmlFor="products-page-select" className="viz-label">
+                  Page
+                </label>
                 <select
+                  id="products-page-select"
                   value={currentPage}
                   onChange={(e) => setCurrentPage(Number(e.target.value))}
-                  className="border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="viz-select rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-2 py-1 text-sm text-[var(--viz-ink)]"
                 >
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                     (page) => (
@@ -1031,17 +1070,20 @@ export default function ProductsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(1, prev - 1))
                   }
                   disabled={currentPage === 1}
-                  className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous page"
+                  className="cursor-pointer rounded-md border border-[var(--viz-line)] p-2 transition-colors hover:bg-[var(--viz-ground)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
-                    className="w-5 h-5"
+                    className="h-5 w-5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -1052,17 +1094,20 @@ export default function ProductsPage() {
                   </svg>
                 </button>
                 <button
+                  type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.min(totalPages, prev + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next page"
+                  className="cursor-pointer rounded-md border border-[var(--viz-line)] p-2 transition-colors hover:bg-[var(--viz-ground)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
-                    className="w-5 h-5"
+                    className="h-5 w-5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -1080,181 +1125,226 @@ export default function ProductsPage() {
 
       {/* Product Modal */}
       {showProductModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2A261E]/60 backdrop-blur-sm">
+          <div className="viz-panel mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto shadow-xl">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                {editingProduct ? "Edit Product" : "New Product"}
+              <h2 className="viz-serif mb-4 text-xl">
+                {editingProduct ? "Edit product" : "New product"}
               </h2>
               <form onSubmit={handleProductSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Product Name *
+                  <label
+                    htmlFor="product-name"
+                    className="viz-label mb-1 block"
+                  >
+                    Product name *
                   </label>
                   <input
+                    id="product-name"
                     type="text"
                     value={productForm.product_name}
                     onChange={(e) =>
                       handleProductFormChange("product_name", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="product-id" className="viz-label mb-1 block">
                     Product ID *
                   </label>
                   <input
+                    id="product-id"
                     type="number"
                     value={productForm.product_id}
                     onChange={(e) =>
                       handleProductFormChange("product_id", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                     required
                     disabled={!!editingProduct}
                   />
                   {editingProduct && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-[var(--viz-muted)]">
                       Product ID cannot be changed when editing
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Brand Name
+                  <label
+                    htmlFor="product-brand"
+                    className="viz-label mb-1 block"
+                  >
+                    Brand name
                   </label>
                   <input
+                    id="product-brand"
                     type="text"
                     value={productForm.brand_name}
                     onChange={(e) =>
                       handleProductFormChange("brand_name", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="product-category"
+                    className="viz-label mb-1 block"
+                  >
                     Category
                   </label>
                   <input
+                    id="product-category"
                     type="text"
                     value={productForm.category_name}
                     onChange={(e) =>
                       handleProductFormChange("category_name", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="product-color"
+                      className="viz-label mb-1 block"
+                    >
                       Color
                     </label>
                     <input
+                      id="product-color"
                       type="text"
                       value={productForm.color}
                       onChange={(e) =>
                         handleProductFormChange("color", e.target.value)
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={fieldClasses}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Color Code
+                    <label
+                      htmlFor="product-color-code"
+                      className="viz-label mb-1 block"
+                    >
+                      Color code
                     </label>
                     <input
+                      id="product-color-code"
                       type="text"
                       value={productForm.color_code}
                       onChange={(e) =>
                         handleProductFormChange("color_code", e.target.value)
                       }
                       placeholder="#hex"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={fieldClasses}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="product-description"
+                    className="viz-label mb-1 block"
+                  >
                     Description
                   </label>
                   <textarea
+                    id="product-description"
                     value={productForm.description}
                     onChange={(e) =>
                       handleProductFormChange("description", e.target.value)
                     }
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="product-image-url"
+                    className="viz-label mb-1 block"
+                  >
                     Image URL
                   </label>
                   <input
+                    id="product-image-url"
                     type="url"
                     value={productForm.image_url}
                     onChange={(e) =>
                       handleProductFormChange("image_url", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Series Name
+                    <label
+                      htmlFor="product-series"
+                      className="viz-label mb-1 block"
+                    >
+                      Series name
                     </label>
                     <input
+                      id="product-series"
                       type="text"
                       value={productForm.series_name}
                       onChange={(e) =>
                         handleProductFormChange("series_name", e.target.value)
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={fieldClasses}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label
+                      htmlFor="product-thickness"
+                      className="viz-label mb-1 block"
+                    >
                       Thickness
                     </label>
                     <input
+                      id="product-thickness"
                       type="text"
                       value={productForm.thickness}
                       onChange={(e) =>
                         handleProductFormChange("thickness", e.target.value)
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={fieldClasses}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="product-size"
+                    className="viz-label mb-1 block"
+                  >
                     Size
                   </label>
                   <input
+                    id="product-size"
                     type="text"
                     value={productForm.size}
                     onChange={(e) =>
                       handleProductFormChange("size", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="product-tags"
+                    className="viz-label mb-1 block"
+                  >
                     Tags (comma-separated)
                   </label>
                   <input
+                    id="product-tags"
                     type="text"
                     value={productForm.tags}
                     onChange={(e) =>
                       handleProductFormChange("tags", e.target.value)
                     }
                     placeholder="tag1, tag2, tag3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={fieldClasses}
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
@@ -1264,18 +1354,17 @@ export default function ProductsPage() {
                       setShowProductModal(false);
                       setEditingProduct(null);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    className={quietButtonClasses}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: "#E8703A" }}
+                    className="cursor-pointer rounded-full bg-[var(--viz-ink)] px-5 py-2 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-[var(--viz-well)] disabled:cursor-not-allowed disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)]"
                   >
                     {submitting
-                      ? "Saving..."
+                      ? "Saving…"
                       : editingProduct
                         ? "Update"
                         : "Create"}
@@ -1289,30 +1378,30 @@ export default function ProductsPage() {
 
       {/* Delete Confirmation Dialog */}
       {productToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Delete Product
-            </h3>
-            <p className="text-gray-600 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2A261E]/60 backdrop-blur-sm">
+          <div className="viz-panel mx-4 w-full max-w-md p-6 shadow-xl">
+            <h3 className="viz-serif mb-2 text-xl">Delete product</h3>
+            <p className="mb-6 text-sm text-[var(--viz-muted)]">
               Are you sure you want to delete &quot;
               {productToDelete.product_name || "this product"}&quot;? This
               action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
+                type="button"
                 onClick={() => setProductToDelete(null)}
                 disabled={deleting}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                className={`${quietButtonClasses} disabled:opacity-60`}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="cursor-pointer rounded-full bg-red-700 px-5 py-2 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {deleting ? "Deleting..." : "Delete"}
+                {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>

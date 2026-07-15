@@ -1,28 +1,49 @@
-import React from "react";
-import Link from "next/link";
+import Reveal from "./Reveal";
 
 const Footer = () => {
   return (
-    <div className="w-full h-auto min-h-[40vh] sm:h-[50vh] my-6 sm:my-12 px-4 sm:px-8 md:px-16 lg:px-24 py-6 sm:py-8 md:py-12" id="footer">
-      <div className="flex flex-col sm:flex-row sm:justify-between gap-6 sm:gap-8">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
-          Join DSource.AI for 7 days free trial
-        </h1>
-        <div className="flex flex-col sm:flex-row w-full sm:w-1/3 gap-4 sm:gap-0">
-          <input
-            type="text"
-            placeholder="Enter your email"
-            className="w-full sm:w-2/3 bg-white/10 backdrop-blur-md shadow-sm shadow-white/50 rounded-lg pl-4 pr-4 sm:pr-16 py-2 sm:py-2 border-2 border-white/20 focus:outline-none text-white placeholder:text-white/70"
-          />
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center bg-orange-500 text-white rounded-full px-6 sm:px-4 py-2 sm:-ml-10 sm:z-10 border-2 border-white/20 hover:bg-orange-600 transition-colors"
+    <footer className="viz-scope my-6 w-full px-2 sm:my-12 sm:px-4">
+      {/* CTA band — the studio at night */}
+      <div className="relative overflow-hidden rounded-2xl bg-[var(--viz-well)] px-6 py-10 sm:px-10 md:px-16 md:py-14">
+        <div
+          className="viz-dots-light viz-dots-drift pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        />
+        <Reveal className="relative flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-xl">
+            <p className="viz-mono text-[11px] uppercase tracking-widest text-stone-400">
+              DSource.AI
+            </p>
+            <h2 className="viz-serif mt-2 text-3xl text-stone-100 sm:text-4xl">
+              Seven days on us.
+              <span className="italic text-stone-300"> Bring a room.</span>
+            </h2>
+            <p className="mt-3 text-sm text-stone-400">
+              Render it, board it, draw it — every version kept, every brief
+              checked.
+            </p>
+          </div>
+          <form
+            action="/signup"
+            className="flex w-full max-w-md flex-col gap-3 sm:flex-row"
           >
-            Get Started
-          </Link>
-        </div>
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter your email"
+              aria-label="Email"
+              className="w-full rounded-full border border-stone-600 bg-transparent px-5 py-2.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-stone-300 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="viz-btn shrink-0 cursor-pointer rounded-full bg-[var(--viz-paper)] px-7 py-3 text-[var(--viz-ink)] hover:bg-white"
+            >
+              Get started
+            </button>
+          </form>
+        </Reveal>
       </div>
-    </div>
+    </footer>
   );
 };
 

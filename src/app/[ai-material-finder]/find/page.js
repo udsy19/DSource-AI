@@ -1,11 +1,7 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
-import uploadIcon from "../../../../public/upload-icon.png";
-import identifyIcon from "../../../../public/identify-icon.png";
-import shopIcon from "../../../../public/shop-icon.png";
 import { useSpec } from "../../../contexts/SpecContext";
 
 const AiMaterialFinder = () => {
@@ -30,7 +26,7 @@ const AiMaterialFinder = () => {
     try {
       const categoriesQuery = categoryLabels.join(",");
       const apiUrl = `/api/get-products?categories=${encodeURIComponent(
-        categoriesQuery
+        categoriesQuery,
       )}`;
 
       const response = await fetch(apiUrl);
@@ -40,7 +36,7 @@ const AiMaterialFinder = () => {
 
       const data = await response.json();
       const availableCategories = (data.categories || []).map(
-        (cat) => cat.label
+        (cat) => cat.label,
       );
 
       return availableCategories;
@@ -53,8 +49,8 @@ const AiMaterialFinder = () => {
   const toggleCategory = (index) => {
     setCategories((prev) =>
       prev.map((item, i) =>
-        i === index ? { ...item, selected: !item.selected } : item
-      )
+        i === index ? { ...item, selected: !item.selected } : item,
+      ),
     );
   };
 
@@ -158,8 +154,8 @@ const AiMaterialFinder = () => {
       prev.map((c) =>
         c.label === category.label
           ? { ...c, hovered: true }
-          : { ...c, hovered: false }
-      )
+          : { ...c, hovered: false },
+      ),
     );
   };
 
@@ -176,7 +172,7 @@ const AiMaterialFinder = () => {
     // If no categories are selected, show an error or return early
     if (selectedCategories.length === 0) {
       alert(
-        "Please select at least one available category to generate products"
+        "Please select at least one available category to generate products",
       );
       return;
     }
@@ -189,7 +185,7 @@ const AiMaterialFinder = () => {
     // Build query string with selected categories
     const categoriesQuery = selectedCategories.join(",");
     const apiUrl = `/api/get-products?categories=${encodeURIComponent(
-      categoriesQuery
+      categoriesQuery,
     )}`;
 
     fetch(apiUrl)
@@ -227,6 +223,7 @@ const AiMaterialFinder = () => {
     }
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: analysis must run only when a new image is uploaded; checkCategoryAvailability is recreated each render and would retrigger it
   useEffect(() => {
     // Create fake analysis loading component
     // Add fake product categories
@@ -240,7 +237,7 @@ const AiMaterialFinder = () => {
         formData.append(
           "image",
           uploadedImage,
-          uploadedImage.name || "uploaded-image"
+          uploadedImage.name || "uploaded-image",
         );
 
         fetch("/api/analyze-image", {
@@ -283,18 +280,17 @@ const AiMaterialFinder = () => {
               // Check which categories are available in the database
               setCheckingAvailability(true);
               const categoryLabels = normalizedCategories.map(
-                (cat) => cat.label
+                (cat) => cat.label,
               );
-              const availableCategories = await checkCategoryAvailability(
-                categoryLabels
-              );
+              const availableCategories =
+                await checkCategoryAvailability(categoryLabels);
 
               // Update categories with availability status
               const categoriesWithAvailability = normalizedCategories.map(
                 (category) => ({
                   ...category,
                   available: availableCategories.includes(category.label),
-                })
+                }),
               );
 
               setCategories(categoriesWithAvailability);
@@ -303,7 +299,7 @@ const AiMaterialFinder = () => {
             } else {
               setError(
                 data?.error ||
-                  "We couldn't understand this image. Please try another interior photo."
+                  "We couldn't understand this image. Please try another interior photo.",
               );
               setCategories([]);
               setCheckingAvailability(false);
@@ -312,7 +308,7 @@ const AiMaterialFinder = () => {
           .catch((err) => {
             console.error(err);
             setError(
-              "Something went wrong while analyzing the image. Please try again."
+              "Something went wrong while analyzing the image. Please try again.",
             );
             setCategories([]);
             setCheckingAvailability(false);
@@ -326,6 +322,7 @@ const AiMaterialFinder = () => {
     }
   }, [uploadedImage]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the filter exactly when a new product list arrives; the handler is recreated each render
   useEffect(() => {
     handleProductCategorySelection("All");
   }, [products]);
@@ -334,507 +331,305 @@ const AiMaterialFinder = () => {
   console.log(uploadedImage);
 
   return (
-    <div className="w-full">
-      {/* Analysis Loading Modal */}
+    <div className="viz-scope w-full">
+      {/* Analysis in progress — a plate label on a scrim, not a spinner card */}
       {isAnalyzing.state && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-xl p-4">
-          <div className="bg-white/20 backdrop-blur-md rounded-lg p-6 sm:p-8 flex flex-col items-center space-y-4 w-full max-w-[400px] border border-white/30 shadow-xl">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-black"></div>
-            <p className="text-base sm:text-lg text-center text-black">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a261e]/60 p-4 pb-10 backdrop-blur-sm sm:items-center sm:pb-4">
+          <div className="w-full max-w-xl rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-6 shadow-2xl">
+            <div className="flex items-baseline justify-between gap-4">
+              <p className="viz-label">In the studio</p>
+              <p className="viz-mono text-[11px] tracking-widest text-[var(--viz-muted)] uppercase">
+                Reading the room
+              </p>
+            </div>
+            <p className="viz-serif mt-3 text-xl italic sm:text-2xl">
               {isAnalyzing.message}
+            </p>
+            {/* The plotter draws along the rule */}
+            <div className="mt-5 h-[3px] overflow-hidden rounded-full bg-[var(--viz-line)]/50">
+              <div className="viz-scan h-full w-1/4 rounded-full bg-[var(--viz-blue)]" />
+            </div>
+            <p className="mt-3 max-w-md text-xs text-[var(--viz-muted)]">
+              We name every piece we can see, then check what&rsquo;s stocked
+              near you. Your photo stays untouched.
             </p>
           </div>
         </div>
       )}
-      <div className="mt-20 sm:mt-28 md:mt-32 lg:mt-40 px-4 sm:px-6 md:px-8 lg:px-12">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6">
-          <div className="flex items-center w-full lg:w-1/3">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
-              AI Material Finder
-            </h1>
-            <div className="w-4 sm:w-5 md:w-6 ml-2 sm:ml-3 md:ml-4">
-              <Image
-                src={identifyIcon}
-                alt="Identify Icon"
-                width={24}
-                height={24}
-                className="sm:w-6 sm:h-6"
-              />
-            </div>
-          </div>
-          <div className="flex justify-between w-full lg:w-1/3 gap-2 sm:gap-4">
-            <div className="flex flex-col items-center">
-              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image
-                  src={uploadIcon}
-                  alt="Upload Icon"
-                  width={24}
-                  height={24}
-                  className="sm:w-6 sm:h-6"
-                />
-              </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
-                Upload Image
-              </h2>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image
-                  src={identifyIcon}
-                  alt="Identify Icon"
-                  width={24}
-                  height={24}
-                  className="sm:w-6 sm:h-6"
-                />
-              </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
-                AI Match
-              </h2>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-8 sm:w-10 md:w-12 p-2 sm:p-3 bg-gray-100 rounded-full border-2 border-black">
-                <Image
-                  src={shopIcon}
-                  alt="Shop Icon"
-                  width={24}
-                  height={24}
-                  className="sm:w-6 sm:h-6"
-                />
-              </div>
-              <h2 className="text-xs sm:text-sm md:text-lg font-bold mt-2 sm:mt-4 text-center">
-                Shop
-              </h2>
-            </div>
-          </div>
-          <div className="w-full lg:w-1/3 flex items-center justify-start lg:justify-end">
+
+      <div className="px-4 pt-24 pb-16 sm:px-6 sm:pt-32 md:px-8 lg:px-12">
+        {/* Masthead folio: meta line over an ink rule, deck at the baseline */}
+        <header>
+          <div className="flex items-baseline justify-between gap-4 pb-2">
+            <p className="viz-label">DSource Studio</p>
             <Link
               href="/ai-material-finder/tutorial"
-              className="text-black px-6 sm:px-8 md:px-12 py-2 sm:py-3 border-2 border-black rounded-full cursor-pointer hover:bg-gray-800 transition-all duration-300 font-bold text-sm sm:text-base"
+              className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
             >
-              View Tutorial
+              View tutorial →
             </Link>
           </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 md:gap-8 lg:gap-12 mt-6 sm:mt-8 md:mt-12">
-          {/* Image Upload */}
+          <div className="relative pt-5">
+            <span
+              className="viz-rule absolute top-0 left-0 h-0.5 w-full bg-[var(--viz-ink)]"
+              aria-hidden="true"
+            />
+            <span className="viz-dots-rule" aria-hidden="true" />
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+              <h1 className="viz-serif text-4xl leading-none sm:text-5xl md:text-[3.6rem]">
+                AI Material Finder
+              </h1>
+              <div className="pb-1 lg:text-right">
+                <p className="viz-serif max-w-md text-base italic text-[var(--viz-muted)] sm:text-lg">
+                  Show us the room you love. We&rsquo;ll find the pieces in it.
+                </p>
+                <p className="viz-mono mt-2 text-[11px] tracking-[0.08em] text-[var(--viz-muted)] uppercase">
+                  01 Upload · 02 Match · 03 Shop
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:mt-10 lg:grid-cols-12 lg:gap-10">
+          {/* The plate: dark well with registration marks */}
           <div
             className={`${
               categories.length > 0 ? "lg:col-span-8" : "lg:col-span-12"
-            } h-auto min-h-[30rem] sm:min-h-[40rem] md:h-[50rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-3 sm:p-4`}
+            }`}
           >
-            {imagePreview ? (
-              <div
-                className="relative w-full flex items-center justify-center"
-                style={{ minHeight: "25rem" }}
-              >
-                <div
-                  className="relative w-full rounded-lg overflow-hidden flex items-center justify-center"
-                  style={{ minHeight: "25rem" }}
-                >
-                  <img
-                    src={imagePreview}
-                    alt="Uploaded image"
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                    style={{ maxHeight: "40rem" }}
-                  />
-                  {/* {categories.map(
-                    (category, index) =>
-                      category.position && (
-                        <div
-                          key={index}
-                          className="absolute"
-                          style={{
-                            left: category.position?.x,
-                            top: category.position?.y,
-                          }}
+            <div className="relative flex flex-col">
+              <span className="viz-crop viz-crop-tl" aria-hidden="true" />
+              <span className="viz-crop viz-crop-tr" aria-hidden="true" />
+              <span className="viz-crop viz-crop-bl" aria-hidden="true" />
+              <span className="viz-crop viz-crop-br" aria-hidden="true" />
+
+              <div className="flex min-h-[24rem] flex-1 items-center justify-center rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-well)] p-3 sm:min-h-[30rem] sm:p-4">
+                {imagePreview
+                  ? <div className="relative flex w-full items-center justify-center">
+                      {/* Data-URL previews can't go through next/image optimization. */}
+                      {/* biome-ignore lint/performance/noImgElement: data URLs cannot use next/image */}
+                      <img
+                        src={imagePreview}
+                        alt="The room you uploaded"
+                        draggable={false}
+                        className="block max-h-[70vh] max-w-full select-none rounded-lg object-contain"
+                      />
+                      {categories.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-sm text-white hover:bg-red-600"
+                          aria-label="Remove image"
                         >
-                          {category.hovered &&
-                            (filteredProducts.length > 0 ? (
-                              <div className="absolute -top-10 left-12 w-64 overflow-hidden bg-white/10 backdrop-blur-md border border-2 border-black/80 rounded-lg p-4 z-50">
-                                <div className="flex items-center gap-4 ">
-                                  <div className="w-24 h-16 rounded-lg overflow-hidden">
-                                    <div
-                                      className="w-full h-full bg-gray-100"
-                                      style={{
-                                        backgroundImage: `url(${filteredProducts[0].products[0].image})`,
-                                        backgroundSize: "cover",
-                                        backgroundPosition: "center",
-                                      }}
-                                    ></div>
-                                  </div>
-                                  <div className="flex flex-col justify-between">
-                                    <div>
-                                      <h3 className="text-sm font-bold">
-                                        {filteredProducts[0].products[0].title}
-                                      </h3>
-                                      <p className="text-xs font-bold">$$$</p>
-                                      <h4 className="text-xs">
-                                        Brand:{" "}
-                                        {filteredProducts[0].products[0].brand}
-                                      </h4>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-2">
-                                  <button className="w-1/2 border border-black px-2 py-1 rounded text-xs">
-                                    View
-                                  </button>
-                                  <button className="w-1/2 border border-black px-2 py-1 rounded text-xs">
-                                    Wishlist
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 absolute -top-10 left-0 w-40 overflow-hidden text-ellipsis whitespace-nowrap bg-white/10 backdrop-blur-md border border-2 border-black/80 rounded-md transition-all duration-300 p-2">
-                                <span>
-                                  {category.selected ? (
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                      className="w-5 h-5 text-black"
-                                    >
-                                      <path
-                                        fillRule="evenodd"
-                                        d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                                        clipRule="evenodd"
-                                      />
-                                    </svg>
-                                  ) : (
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
-                                      className="w-4 h-4 text-black"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M12 4.5v15m7.5-7.5h-15"
-                                      />
-                                    </svg>
-                                  )}
-                                </span>
-                                {category.label}
-                              </div>
-                            ))}
-                          <div
-                            key={index}
-                            className="cursor-pointer w-8 h-8 bg-white border border-5 border-black/80 rounded-full transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-black/30"
-                            onMouseEnter={() => handleMouseEnter(category)}
-                            onMouseLeave={() => handleMouseLeave()}
-                            onClick={() => {
-                              toggleCategory(index);
-                              if (filteredProducts.length > 0) {
-                                handleProductCategorySelection(category.label);
-                              }
-                            }}
-                          ></div>
-                        </div>
-                      )
-                  )} */}
-                </div>
-                {categories.length > 0 && (
-                  <button
-                    onClick={removeImage}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
-                  >
-                    ×
-                  </button>
-                )}
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  : <button
+                      type="button"
+                      className="w-full cursor-pointer rounded-lg border-2 border-dashed border-stone-600 bg-transparent px-6 py-16 text-center transition-colors hover:border-stone-400 sm:py-24"
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={handleClick}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/svg+xml"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <p className="viz-serif text-lg italic text-stone-200">
+                        Every search starts with a picture. Bring yours.
+                      </p>
+                      <p className="mt-2 text-sm text-stone-400">
+                        Drag &amp; drop or choose a photo to upload.
+                      </p>
+                      <p className="viz-mono mt-1 text-xs text-stone-500">
+                        JPG, PNG or SVG · max 10MB
+                      </p>
+                    </button>}
               </div>
-            ) : (
-              <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-16 md:p-32 lg:p-64 text-center cursor-pointer hover:border-gray-400 transition-colors w-full"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={handleClick}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/svg+xml"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div className="p-4 rounded-lg">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 mx-auto text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-500 text-sm">
-                  Drag & drop or choose file to upload.
-                </p>
-                <p className="text-gray-500 text-sm">
-                  Image format: JPG, PNG, & SVG. Max 10MB.
-                </p>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
               </div>
             )}
           </div>
+
+          {/* The match list */}
           <div
-            className={`lg:col-span-4 h-auto min-h-[10rem] sm:min-h-[40rem] md:h-[50rem] ${
+            className={`lg:col-span-4 ${
               categories.length > 0 ? "block" : "hidden"
             }`}
           >
-            {products.length > 0 ? (
-              <div className="flex flex-col justify-center">
-                <h2 className="text-2xl font-bold">AI Material Match</h2>
+            {products.length > 0
+              ? <div className="flex flex-col">
+                  <h2 className="viz-serif text-2xl">Your matches</h2>
 
-                <div className="relative mt-4 border border-black rounded-lg">
-                  <button
-                    onClick={scrollProductsLeft}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-6 h-6"
+                  {/* Category filter: a typeset run on a hairline, arrows to leaf */}
+                  <div className="relative mt-4 border-b border-[var(--viz-line)]">
+                    <button
+                      type="button"
+                      onClick={scrollProductsLeft}
+                      aria-label="Scroll categories left"
+                      className="absolute top-1/2 left-0 z-10 -translate-y-1/2 cursor-pointer bg-[var(--viz-paper)] pr-1 text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15.75 19.5L8.25 12l7.5-7.5"
-                      />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={scrollProductsRight}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-6 h-6"
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      onClick={scrollProductsRight}
+                      aria-label="Scroll categories right"
+                      className="absolute top-1/2 right-0 z-10 -translate-y-1/2 cursor-pointer bg-[var(--viz-paper)] pl-1 text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M8.25 4.5l7.5 7.5-7.5 7.5"
-                      />
-                    </svg>
-                  </button>
+                      →
+                    </button>
 
-                  <div
-                    ref={productsScrollRef}
-                    className="overflow-x-auto hide-scrollbar p-4 rounded-lg ml-4 mr-6"
-                  >
-                    <div className="grid grid-flow-col min-w-max">
-                      <div
-                        className={`cursor-pointer text-center py-2 px-4 rounded-lg font-semibold ${
-                          productCategorySelected === "All"
-                            ? "underline"
-                            : "text-black/40"
-                        }`}
-                        onClick={() => handleProductCategorySelection("All")}
-                      >
-                        All
-                      </div>
-                      {products.map((category, index) => (
-                        <div
-                          key={index}
-                          className={`cursor-pointer text-center py-2 px-4 rounded-lg font-semibold ${
-                            productCategorySelected === category.label
-                              ? "underline"
-                              : "text-black/40"
+                    <div
+                      ref={productsScrollRef}
+                      className="hide-scrollbar mx-5 overflow-x-auto"
+                    >
+                      <div className="flex min-w-max gap-1">
+                        <button
+                          type="button"
+                          aria-pressed={productCategorySelected === "All"}
+                          className={`viz-mono cursor-pointer px-3 py-2 text-xs tracking-[0.08em] uppercase transition-colors duration-200 ${
+                            productCategorySelected === "All"
+                              ? "text-[var(--viz-ink)] underline underline-offset-8"
+                              : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
                           }`}
-                          onClick={() =>
-                            handleProductCategorySelection(category.label)
-                          }
+                          onClick={() => handleProductCategorySelection("All")}
                         >
-                          {category.label}
-                        </div>
-                      ))}
+                          All
+                        </button>
+                        {products.map((category) => (
+                          <button
+                            type="button"
+                            key={category.label}
+                            aria-pressed={
+                              productCategorySelected === category.label
+                            }
+                            className={`viz-mono cursor-pointer px-3 py-2 text-xs tracking-[0.08em] uppercase transition-colors duration-200 ${
+                              productCategorySelected === category.label
+                                ? "text-[var(--viz-ink)] underline underline-offset-8"
+                                : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
+                            }`}
+                            onClick={() =>
+                              handleProductCategorySelection(category.label)
+                            }
+                          >
+                            {category.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="py-4 h-auto min-h-[20rem] sm:min-h-[30rem] md:h-[42rem] max-h-[42rem] overflow-y-auto hide-scrollbar">
-                  {filteredProducts.map((category, index) => (
-                    <div key={index} className="my-4">
-                      {category.products.map((product, index) => (
-                        <div
-                          key={index}
-                          className="my-4 flex gap-4 bg-gray-100 rounded-lg p-4"
-                        >
+
+                  <div className="hide-scrollbar max-h-[42rem] overflow-y-auto py-2">
+                    {filteredProducts.map((category) => (
+                      <div key={category.label} className="my-2">
+                        {category.products.map((product, index) => (
                           <div
-                            className="w-32 sm:w-40 md:w-48 h-24 sm:h-28 md:h-32 rounded-lg overflow-hidden flex-shrink-0"
-                            style={{
-                              backgroundImage: `url(${product.image})`,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                            }}
-                          ></div>
-                          <div className="flex flex-col justify-between">
-                            <div>
-                              <h3 className="text-md font-bold pt-1">
-                                {product.title}
-                              </h3>
-                              <p className="text-xs font-bold">$$$</p>
-                              <h4 className="text-sm">
-                                Brand: {product.brand}
-                              </h4>
-                              <h4 className="text-xs">
-                                Color: {product.color}
-                              </h4>
-                            </div>
-                            <div className="flex flex-col lg:flex-row items-center gap-2">
-                              <Link
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center w-full lg:w-auto"
-                                href={product.link || "/marketplace"}
-                              >
-                                <div>View Product</div>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth={3}
-                                  stroke="currentColor"
-                                  className="w-3 h-3 ml-2"
+                            key={`${category.label}-${product.title}-${index}`}
+                            className="my-3 flex gap-4 rounded-lg border border-[var(--viz-line)] bg-white p-3"
+                          >
+                            <div
+                              className="h-24 w-28 shrink-0 rounded-md bg-[var(--viz-ground)] sm:h-28 sm:w-32"
+                              style={{
+                                backgroundImage: `url(${product.image})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }}
+                            />
+                            <div className="flex min-w-0 flex-col justify-between gap-2">
+                              <div>
+                                <h3 className="text-sm font-semibold">
+                                  {product.title}
+                                </h3>
+                                <p className="viz-mono mt-1 text-[11px] text-[var(--viz-muted)]">
+                                  $$$ · {product.brand}
+                                </p>
+                                <p className="viz-mono text-[11px] text-[var(--viz-muted)]">
+                                  Colour · {product.color}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Link
+                                  className="rounded-md border border-[var(--viz-line)] px-3 py-1 text-xs transition-colors duration-200 hover:bg-[var(--viz-ground)]"
+                                  href={product.link || "/marketplace"}
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-                                  />
-                                </svg>
-                              </Link>
-                              <button
-                                className="border-2 border-black px-4 py-1 rounded-lg text-xs cursor-pointer flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all duration-300 focus:outline-none focus:ring-0 focus:ring-offset-0 w-full lg:w-auto"
-                                onClick={() => {
-                                  addProductToSpec(product, category.label);
-                                }}
-                              >
-                                <div>Add to Spec</div>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth={3}
-                                  stroke="currentColor"
-                                  className="w-3 h-3 ml-2"
+                                  View product ↗
+                                </Link>
+                                <button
+                                  type="button"
+                                  className="cursor-pointer rounded-md bg-[var(--viz-ink)] px-3 py-1 text-xs text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
+                                  onClick={() => {
+                                    addProductToSpec(product, category.label);
+                                  }}
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 4.5v15m7.5-7.5h-15"
-                                  />
-                                </svg>
-                              </button>
+                                  Add to spec
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              : <div className="viz-panel flex flex-col rounded-2xl p-5">
+                  <h2 className="viz-serif text-2xl">Choose your pieces</h2>
+                  {/* Options set as type, not boxes — struck names aren't stocked */}
+                  <fieldset className="mt-4">
+                    <legend className="viz-label">Found in your photo</legend>
+                    <div className="mt-3 flex flex-wrap gap-x-1 gap-y-2">
+                      {categories.map((category, index) => (
+                        <button
+                          type="button"
+                          key={category.label}
+                          aria-pressed={category.selected}
+                          disabled={!category.available}
+                          onMouseEnter={() => handleMouseEnter(category)}
+                          onMouseLeave={() => handleMouseLeave()}
+                          onClick={() => {
+                            if (category.available) {
+                              toggleCategory(index);
+                            }
+                          }}
+                          className={`rounded-md px-2 py-1 text-sm transition-colors duration-200 ${
+                            !category.available
+                              ? "cursor-not-allowed text-[var(--viz-muted)] line-through"
+                              : category.selected
+                                ? "cursor-pointer bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                                : `cursor-pointer underline-offset-4 ${
+                                    category.hovered
+                                      ? "underline"
+                                      : "hover:underline"
+                                  }`
+                          }`}
+                        >
+                          {category.label}
+                        </button>
                       ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col justify-center">
-                <h2 className="text-2xl font-bold">Select Products</h2>
-                <div
-                  className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 p-4 sm:p-6 md:p-8 rounded-lg"
-                  style={{ background: "#E5E7EB" }}
-                >
-                  {categories.map((category, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        if (category.available) {
-                          toggleCategory(index);
-                        }
-                      }}
-                      disabled={!category.available}
-                      className={`py-2 rounded-lg backdrop-blur-md border shadow-lg shadow-black/10 transition-all duration-300 flex items-center justify-center ${
-                        category.available
-                          ? category.hovered
-                            ? "scale-110 bg-white/20 border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.5)] bg-white/10 border-white/80 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)]"
-                            : "bg-white/10 border-white/80 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_0_15px_rgba(255,255,255,0.5)]"
-                          : "bg-gray-300/50 border-gray-400/50 opacity-50 cursor-not-allowed"
-                      }`}
-                    >
-                      {category.available ? (
-                        category.selected ? (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="w-5 h-5 text-black"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                            className="w-4 h-4 text-black"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 4.5v15m7.5-7.5h-15"
-                            />
-                          </svg>
-                        )
-                      ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          className="w-4 h-4 text-gray-500"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M18 12H6"
-                          />
-                        </svg>
-                      )}
-                      <span
-                        className={`ml-1 text-sm font-bold ${
-                          category.available ? "text-black" : "text-gray-500"
-                        }`}
-                      >
-                        {category.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className="w-full mt-4 py-4 rounded-full bg-black text-white hover:bg-gray-800 transition-all duration-300"
-                  onClick={handleGenerateProducts}
-                >
-                  Generate Products
-                </button>
-              </div>
-            )}
+                  </fieldset>
+                  <p className="viz-mono mt-3 text-[11px] text-[var(--viz-muted)]">
+                    {checkingAvailability
+                      ? "Checking what's stocked near you…"
+                      : "Struck-through pieces aren't stocked locally yet."}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-6 w-full cursor-pointer rounded-full bg-[var(--viz-ink)] px-6 py-3 text-sm text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
+                    onClick={handleGenerateProducts}
+                  >
+                    Find matching products
+                  </button>
+                </div>}
           </div>
         </div>
       </div>

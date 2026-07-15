@@ -1,20 +1,35 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  Geist_Mono,
+  Libre_Caslon_Text,
+} from "next/font/google";
 import "./globals.css";
 
-import Header from "../components/header";
 import ConditionalFooter from "../components/ConditionalFooter";
-import { SpecProvider } from "../contexts/SpecContext";
+import Header from "../components/header";
 import { AuthProvider } from "../contexts/AuthContext";
 import { PathnameProvider } from "../contexts/PathnameContext";
+import { SpecProvider } from "../contexts/SpecContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Interface face: a grotesque with actual character (ink traps, quirky
+// terminals) — never the system-default look.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Editorial serif for the atelier identity (.viz-serif) — shared by the
+// header wordmark, footer, and the visualizer's promise moments.
+const caslon = Libre_Caslon_Text({
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-caslon",
 });
 
 export const metadata = {
@@ -27,16 +42,16 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${bricolage.variable} ${geistMono.variable} ${caslon.variable} antialiased`}
       >
         <PathnameProvider>
           <AuthProvider>
             <SpecProvider>
-              <div className="max-w-[1728px] mx-auto px-2 sm:px-4">
-                <Header />
-                <main className="relative z-0">{children}</main>
-                <ConditionalFooter />
-              </div>
+              {/* No global gutter: sections bleed to the viewport edge and
+                  every page owns its horizontal padding. */}
+              <Header />
+              <main className="relative z-0">{children}</main>
+              <ConditionalFooter />
             </SpecProvider>
           </AuthProvider>
         </PathnameProvider>

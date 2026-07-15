@@ -28,14 +28,15 @@ const replicate = new Replicate({
  */
 export const embedImage = async (imageUrlOrDataUri) => {
   const output = await callWithRetry(
-    () => replicate.run(EMBEDDING_MODEL, { input: { inputs: imageUrlOrDataUri } }),
-    { label: "Image embedding", timeoutMs: 60_000 }
+    () =>
+      replicate.run(EMBEDDING_MODEL, { input: { inputs: imageUrlOrDataUri } }),
+    { label: "Image embedding", timeoutMs: 60_000 },
   );
 
   const embedding = Array.isArray(output) ? output[0]?.embedding : null;
   if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIM) {
     throw new Error(
-      `Embedding failed: expected ${EMBEDDING_DIM} dims, got ${embedding?.length ?? "none"}`
+      `Embedding failed: expected ${EMBEDDING_DIM} dims, got ${embedding?.length ?? "none"}`,
     );
   }
   return embedding;
