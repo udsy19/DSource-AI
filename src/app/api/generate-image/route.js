@@ -18,6 +18,7 @@ import {
   normalizeBaseImage,
   normalizeProductImages,
 } from "@/utils/visualizer/images";
+import { sanitizeLayers } from "@/utils/visualizer/layers";
 import {
   getBankProduct,
   isMaterialBankConfigured,
@@ -672,6 +673,7 @@ export async function POST(request) {
           params: prepared.params,
           adherence,
           mode,
+          layers: sanitizeLayers(body.layers),
         });
         renderId = saved.renderId;
       } catch (persistError) {

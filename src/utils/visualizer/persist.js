@@ -35,6 +35,7 @@ export const saveRender = async (
     params,
     adherence,
     mode = "render",
+    layers = null,
   },
 ) => {
   const ext = EXT_BY_MIME[mimeType] ?? "png";
@@ -63,6 +64,9 @@ export const saveRender = async (
       params,
       image_path: imagePath,
       adherence: adherence ?? null,
+      // Only sent when present so inserts keep working on databases where
+      // the 20260716_render_layers migration hasn't been applied yet.
+      ...(layers ? { layers } : {}),
     });
   if (insertError) {
     // Don't leave an orphaned object behind.
@@ -80,15 +84,28 @@ export const listRenders = async (
   supabase,
   { limit = 24, mode = null } = {},
 ) => {
-  let query = supabase
-    .from("visualizer_renders")
-    .select("id, created_at, model, prompt, params, image_path")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (mode) {
-    query = query.eq("mode", mode);
+  const buildQuery = (columns) => {
+    let query = supabase
+      .from("visualizer_renders")
+      .select(columns)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (mode) {
+      query = query.eq("mode", mode);
+    }
+    return query;
+  };
+
+  let { data: rows, error } = await buildQuery(
+    "id, created_at, model, prompt, params, image_path, layers",
+  );
+  // Databases that predate the 20260716_render_layers migration have no
+  // layers column (42703) — history must keep working without it.
+  if (error && /layers/.test(error.message)) {
+    ({ data: rows, error } = await buildQuery(
+      "id, created_at, model, prompt, params, image_path",
+    ));
   }
-  const { data: rows, error } = await query;
   if (error) {
     throw new Error(`History query failed: ${error.message}`);
   }
@@ -104,6 +121,7 @@ export const listRenders = async (
         model: row.model,
         prompt: row.prompt,
         params: row.params,
+        layers: row.layers ?? null,
         imageUrl: signed?.signedUrl ?? null,
       };
     }),

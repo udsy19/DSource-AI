@@ -8,6 +8,7 @@ import {
   SPACE_KIND_LABELS,
 } from "@/utils/visualizer/params";
 import ActionBar, { CREATIVITY_LABELS } from "./ActionBar";
+import Depth3DViewer from "./Depth3DViewer";
 import HistoryStrip from "./HistoryStrip";
 import HotspotOverlay from "./HotspotOverlay";
 import MatchResultsModal from "./MatchResultsModal";
@@ -54,6 +55,11 @@ export default function RenderTab() {
   const { addProductToSpec } = useSpec();
   const [designMaterials, setDesignMaterials] = useState([]);
 
+  // --- 3D parallax view + layer graph for this design session ---
+  const [depthView, setDepthView] = useState(null); // {image, depth}
+  const [loading3D, setLoading3D] = useState(false);
+  const [editsLog, setEditsLog] = useState([]); // {kind, summary, at}
+
   // Hotspots belong to a specific image — clear them whenever it changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on image change only
   useEffect(() => {
@@ -68,7 +74,34 @@ export default function RenderTab() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on base-photo change only
   useEffect(() => {
     setDesignMaterials([]);
+    setEditsLog([]);
   }, [tab.originalUpload]);
+
+  /**
+   * Serializable layer graph for this design session (base -> edits ->
+   * components -> materials). Sent with each generate so persistence keeps
+   * the design's construction history — future 3D/history features render
+   * from this data. Server-side sanitizeLayers enforces caps.
+   */
+  const buildLayers = (nextEdit) => {
+    const edits = [...editsLog, ...(nextEdit ? [nextEdit] : [])];
+    return {
+      version: 1,
+      editCount: edits.length,
+      edits: edits.slice(-20),
+      components: components.map((c) => ({
+        label: c.label,
+        category: c.category,
+        box_2d: c.box_2d,
+      })),
+      materials: designMaterials.map((m) => ({
+        id: String(m.id),
+        name: m.name,
+        label: m.label,
+        price: typeof m.price === "number" ? m.price : null,
+      })),
+    };
+  };
 
   const handleControlChange = (key, value) => {
     setControls((prev) => {
@@ -92,6 +125,17 @@ export default function RenderTab() {
       );
       return;
     }
+    const edit = {
+      kind: "render",
+      summary:
+        controls.prompt.trim() ||
+        [controls.style, controls.lighting, controls.colorPalette]
+          .filter(Boolean)
+          .join(", ") ||
+        "parameter render",
+      at: new Date().toISOString(),
+    };
+    setEditsLog((prev) => [...prev, edit]);
     tab.generate({
       message: "Rendering the room you briefed…",
       promptForHistory: controls.prompt.trim() || null,
@@ -99,6 +143,7 @@ export default function RenderTab() {
         image: tab.imagePreview,
         prompt: controls.prompt.trim() || undefined,
         variedSeed: controls.variedSeed,
+        layers: buildLayers(edit),
         params: {
           spaceKind: controls.spaceKind,
           roomType: controls.roomType,
@@ -274,6 +319,12 @@ export default function RenderTab() {
     const swapBox = matchResult?.box ?? null;
     const componentLabel = matchResult?.label ?? null;
     setMatchResult(null);
+    const edit = {
+      kind: "swap",
+      summary: `Swapped in: ${match.name}`.slice(0, 160),
+      at: new Date().toISOString(),
+    };
+    setEditsLog((prev) => [...prev, edit]);
     tab.generate({
       message: `Placing “${match.name}” into your render...`,
       promptForHistory: `Swapped in: ${match.name}`,
@@ -281,8 +332,33 @@ export default function RenderTab() {
         image: tab.imagePreview,
         swap: { productId, label: componentLabel, box: swapBox },
         params: {},
+        layers: buildLayers(edit),
       },
     });
+  };
+
+  /** Compute a depth map for the current image and open the 3D parallax view. */
+  const handleView3D = async () => {
+    if (!tab.imagePreview || loading3D) return;
+    setLoading3D(true);
+    setFindError(null);
+    try {
+      const res = await fetch("/api/depth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: tab.imagePreview }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setFindError(data.error || "Could not build the 3D view.");
+        return;
+      }
+      setDepthView({ image: tab.imagePreview, depth: data.depth });
+    } catch {
+      setFindError("Could not build the 3D view. Please try again.");
+    } finally {
+      setLoading3D(false);
+    }
   };
 
   const handleAddAllToSpec = () => {
@@ -382,6 +458,18 @@ export default function RenderTab() {
                   ? "Re-detect materials"
                   : "Find materials in this image"}
             </button>
+            <button
+              type="button"
+              onClick={handleView3D}
+              disabled={loading3D || Boolean(searchingLabel)}
+              className={`rounded-lg border border-[var(--viz-ink)] px-4 py-2 text-sm font-medium ${
+                loading3D
+                  ? "cursor-wait opacity-50"
+                  : "cursor-pointer hover:bg-[var(--viz-ink)] hover:text-[var(--viz-paper)]"
+              }`}
+            >
+              {loading3D ? "Building 3D view..." : "View in 3D"}
+            </button>
             {!searchingLabel && (
               <span className="text-xs text-[var(--viz-muted)]">
                 {components.length > 0
@@ -459,6 +547,14 @@ export default function RenderTab() {
         onAddToSpec={handleAddToSpec}
         onSwap={handleSwap}
       />
+
+      {depthView && (
+        <Depth3DViewer
+          image={depthView.image}
+          depth={depthView.depth}
+          onClose={() => setDepthView(null)}
+        />
+      )}
 
       {tab.isGenerating.state && (
         <GeneratingOverlay message={tab.isGenerating.message} />
