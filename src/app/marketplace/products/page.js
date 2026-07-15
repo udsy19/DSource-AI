@@ -50,23 +50,24 @@ const ProductsContent = () => {
         if (!response.ok) throw new Error("Failed to fetch products");
 
         const data = await response.json();
-        setProducts(data.products || []);
+        const list = Array.isArray(data.products) ? data.products : [];
+        setProducts(list);
 
         // Extract unique brands, colors, categories, and patterns
         const uniqueBrands = [
-          ...new Set(data.products.map((p) => p.brand_name).filter(Boolean)),
+          ...new Set(list.map((p) => p.brand_name).filter(Boolean)),
         ].sort();
         const uniqueColors = [
-          ...new Set(data.products.map((p) => p.color).filter(Boolean)),
+          ...new Set(list.map((p) => p.color).filter(Boolean)),
         ].sort();
         const uniqueCategories = [
-          ...new Set(data.products.map((p) => p.category_name).filter(Boolean)),
+          ...new Set(list.map((p) => p.category_name).filter(Boolean)),
         ].sort();
 
         // Extract patterns from series_name
         const uniquePatterns = [
           ...new Set(
-            data.products
+            list
               .map((p) => {
                 if (p.series_name) return p.series_name;
                 // Try to extract from sub_category if available
