@@ -57,27 +57,37 @@ const rerankCandidates = async (
   { trustHosts = false } = {},
 ) => {
   try {
-    const candidateParts = [];
-    const usable = [];
-    for (const candidate of candidates) {
-      const imageUrl = candidate.image_url ?? candidate.imageUrl;
-      if (!imageUrl) continue;
-      if (!trustHosts && !isAllowedImageHost(imageUrl)) continue;
-      try {
-        const res = await fetch(imageUrl);
-        if (!res.ok) continue;
-        const buffer = Buffer.from(await res.arrayBuffer());
-        candidateParts.push({
-          inlineData: {
-            mimeType: res.headers.get("content-type") || "image/jpeg",
-            data: buffer.toString("base64"),
-          },
-        });
-        usable.push(candidate);
-      } catch {
-        // Skip candidates whose image can't be fetched.
-      }
-    }
+    // Fetch all candidate images in parallel — sequential fetches were a
+    // large share of the pipeline's wall-clock time.
+    const fetched = await Promise.all(
+      candidates.map(async (candidate) => {
+        const imageUrl = candidate.image_url ?? candidate.imageUrl;
+        if (!imageUrl) return null;
+        if (!trustHosts && !isAllowedImageHost(imageUrl)) return null;
+        try {
+          const res = await fetch(imageUrl, {
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!res.ok) return null;
+          const buffer = Buffer.from(await res.arrayBuffer());
+          return {
+            candidate,
+            part: {
+              inlineData: {
+                mimeType: res.headers.get("content-type") || "image/jpeg",
+                data: buffer.toString("base64"),
+              },
+            },
+          };
+        } catch {
+          // Skip candidates whose image can't be fetched.
+          return null;
+        }
+      }),
+    );
+    const loaded = fetched.filter(Boolean);
+    const candidateParts = loaded.map((f) => f.part);
+    const usable = loaded.map((f) => f.candidate);
     if (usable.length === 0) {
       return { candidates, reranked: false };
     }
@@ -90,7 +100,10 @@ The following ${usable.length} images are numbered product candidates (1..${usab
 Rank the candidates by how visually and functionally similar each product is to the item in the first image (shape, material, color, type). Exclude candidates that are clearly a different kind of item.
 
 Respond with pure JSON (no markdown fencing):
-{ "ranking": [candidate numbers, best first, excluding vetoed], "reason": string }
+{ "ranking": [ { "n": candidate number, "note": string } ] }
+Order "ranking" best-first, excluding vetoed candidates. "note" is a scannable
+reason of AT MOST 6 words, e.g. "same conical shade, slender base" or
+"right shape, darker color".
 `;
 
     const response = await callWithRetry(
@@ -108,16 +121,22 @@ Respond with pure JSON (no markdown fencing):
 
     const parsed = extractJsonResponse(await getResponseText(response));
     const ranking = Array.isArray(parsed?.ranking) ? parsed.ranking : [];
-    const ordered = ranking.map((n) => usable[Number(n) - 1]).filter(Boolean);
+    // Accept both {n, note} objects and bare numbers (model drift tolerance).
+    const ordered = ranking
+      .map((entry) => {
+        const n = typeof entry === "number" ? entry : Number(entry?.n);
+        const candidate = usable[n - 1];
+        if (!candidate) return null;
+        const note =
+          typeof entry?.note === "string" ? entry.note.slice(0, 60) : null;
+        return { ...candidate, matchNote: note };
+      })
+      .filter(Boolean);
 
     if (ordered.length === 0) {
       return { candidates, reranked: false };
     }
-    return {
-      candidates: ordered,
-      reranked: true,
-      reason: typeof parsed?.reason === "string" ? parsed.reason : null,
-    };
+    return { candidates: ordered, reranked: true };
   } catch (error) {
     console.error("Re-ranking skipped:", error.message);
     return { candidates, reranked: false };
@@ -241,77 +260,107 @@ export async function POST(request) {
     return NextResponse.json({ error: normalized.error }, { status: 400 });
   }
 
-  try {
-    // 1. Crop the selected component out of the render.
-    const crop = await cropBoxToDataUri(normalized.image, body.box);
+  // The pipeline takes 10-20s (describe + hybrid search + vision rerank), so
+  // the response is an NDJSON stream: stage events first, final payload last.
+  // Validation errors above still return plain JSON with real status codes.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (obj) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(obj)}\n`));
 
-    // 2. Find candidates — material bank API when configured, else the
-    //    user's own Supabase catalog (CLIP + pgvector).
-    let candidates;
-    let searchQuery = null;
-    if (isMaterialBankConfigured()) {
-      const described = await describeCropForSearch(ai, crop, label);
-      searchQuery = described.query;
-      candidates = await searchMaterialBank(searchQuery, CANDIDATE_COUNT);
-      if (candidates.length === 0 && label && searchQuery !== label) {
-        candidates = await searchMaterialBank(label, CANDIDATE_COUNT);
-      }
-      if (candidates.length === 0) {
-        return NextResponse.json({
+      try {
+        // 1. Crop the selected component out of the render.
+        emit({ stage: "crop" });
+        const crop = await cropBoxToDataUri(normalized.image, body.box);
+
+        // 2. Find candidates — material bank API when configured, else the
+        //    user's own Supabase catalog (CLIP + pgvector).
+        let candidates;
+        let searchQuery = null;
+        if (isMaterialBankConfigured()) {
+          emit({ stage: "describe" });
+          const described = await describeCropForSearch(ai, crop, label);
+          searchQuery = described.query;
+          emit({ stage: "search", query: searchQuery });
+          candidates = await searchMaterialBank(searchQuery, CANDIDATE_COUNT);
+          if (candidates.length === 0 && label && searchQuery !== label) {
+            candidates = await searchMaterialBank(label, CANDIDATE_COUNT);
+          }
+          if (candidates.length === 0) {
+            emit({
+              done: true,
+              success: true,
+              matches: [],
+              croppedImage: crop,
+              searchQuery,
+              notice:
+                "No matches found in the material bank for this component.",
+            });
+            controller.close();
+            return;
+          }
+        } else {
+          emit({ stage: "search" });
+          const result = await matchViaSupabase(crop, category);
+          if (result.error) {
+            emit({ done: true, success: false, error: result.error });
+            controller.close();
+            return;
+          }
+          candidates = result.candidates;
+          if (candidates.length === 0) {
+            emit({
+              done: true,
+              success: true,
+              matches: [],
+              croppedImage: crop,
+              notice:
+                "No indexed products yet — run the embeddings backfill on your catalog.",
+            });
+            controller.close();
+            return;
+          }
+        }
+
+        // 3. Re-rank with Gemini vision (fail-open to original order).
+        emit({ stage: "rerank", count: candidates.length });
+        const rerank = await rerankCandidates(crop, label, candidates, {
+          trustHosts: isMaterialBankConfigured(),
+        });
+
+        const matches = rerank.candidates
+          .slice(0, RESULT_COUNT)
+          // Drop the internal snake_case duplicate before responding.
+          .map(({ image_url: _imageUrl, ...match }) => match);
+
+        emit({
+          done: true,
           success: true,
-          matches: [],
+          matches,
           croppedImage: crop,
           searchQuery,
-          notice: "No matches found in the material bank for this component.",
+          reranked: rerank.reranked,
+        });
+      } catch (error) {
+        console.error("Reverse search failed:", error);
+        const message = String(error?.message ?? "");
+        emit({
+          done: true,
+          success: false,
+          error: message.includes("too small")
+            ? message
+            : "Reverse search failed. Please try again.",
         });
       }
-    } else {
-      const result = await matchViaSupabase(crop, category);
-      if (result.error) {
-        return NextResponse.json(
-          { success: false, error: result.error },
-          { status: result.status },
-        );
-      }
-      candidates = result.candidates;
-      if (candidates.length === 0) {
-        return NextResponse.json({
-          success: true,
-          matches: [],
-          croppedImage: crop,
-          notice:
-            "No indexed products yet — run the embeddings backfill on your catalog.",
-        });
-      }
-    }
+      controller.close();
+    },
+  });
 
-    // 3. Re-rank with Gemini vision (fail-open to original order).
-    const rerank = await rerankCandidates(crop, label, candidates, {
-      trustHosts: isMaterialBankConfigured(),
-    });
-
-    const matches = rerank.candidates
-      .slice(0, RESULT_COUNT)
-      // Drop the internal snake_case duplicate before responding.
-      .map(({ image_url: _imageUrl, ...match }) => match);
-
-    return NextResponse.json({
-      success: true,
-      matches,
-      croppedImage: crop,
-      searchQuery,
-      reranked: rerank.reranked,
-      rerankReason: rerank.reason ?? null,
-    });
-  } catch (error) {
-    console.error("Reverse search failed:", error);
-    const message = String(error?.message ?? "");
-    if (message.includes("too small")) {
-      return NextResponse.json({ error: message }, { status: 400 });
-    }
-    return NextResponse.json(
-      { success: false, error: "Reverse search failed. Please try again." },
-      { status: 500 },
-    );
-  }
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache",
+    },
+  });
 }

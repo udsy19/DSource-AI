@@ -15,21 +15,13 @@ const formatPrice = (match) => {
  */
 export default function MatchResultsModal({ result, onClose }) {
   if (!result) return null;
-  const {
-    label,
-    matches,
-    croppedImage,
-    reranked,
-    rerankReason,
-    notice,
-    searchQuery,
-  } = result;
+  const { label, matches, croppedImage, notice, searchQuery } = result;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#262521]/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">
+          <h3 className="viz-display text-xl font-semibold">
             Closest matches{label ? ` — ${label}` : ""}
           </h3>
           <button
@@ -51,9 +43,7 @@ export default function MatchResultsModal({ result, onClose }) {
           <div className="flex gap-4 items-start">
             {croppedImage && (
               <div className="w-32 shrink-0">
-                <div className="text-xs font-semibold text-gray-600 mb-1">
-                  Searched region
-                </div>
+                <div className="viz-label mb-1">Searched region</div>
                 {/* biome-ignore lint/performance/noImgElement: data URI cannot use next/image */}
                 <img
                   src={croppedImage}
@@ -80,7 +70,7 @@ export default function MatchResultsModal({ result, onClose }) {
                   return (
                     <div
                       key={match.id}
-                      className="flex gap-3 bg-gray-50 rounded-xl p-3"
+                      className="flex gap-3 rounded-xl border border-[var(--viz-line)] bg-white p-3"
                     >
                       {/* biome-ignore lint/performance/noImgElement: transient catalog thumbnails */}
                       <img
@@ -94,11 +84,16 @@ export default function MatchResultsModal({ result, onClose }) {
                             {match.name || "Untitled product"}
                           </h4>
                           {typeof match.similarity === "number" && (
-                            <span className="shrink-0 text-xs font-semibold bg-black text-white rounded-full px-2 py-0.5">
+                            <span className="viz-mono shrink-0 rounded-full bg-[var(--viz-blue)] px-2 py-0.5 text-xs text-white">
                               {Math.round(match.similarity * 100)}%
                             </span>
                           )}
                         </div>
+                        {match.matchNote && (
+                          <p className="viz-mono mt-0.5 truncate text-[11px] text-[var(--viz-blue)]">
+                            ▸ {match.matchNote}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-600 truncate">
                           {[
                             match.brand,
@@ -141,11 +136,6 @@ export default function MatchResultsModal({ result, onClose }) {
                   );
                 })}
               </div>
-              {reranked && rerankReason && (
-                <p className="mt-3 text-xs text-gray-500 italic">
-                  {rerankReason}
-                </p>
-              )}
             </div>
           </div>
         </div>

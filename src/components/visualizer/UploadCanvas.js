@@ -1,11 +1,20 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { IMAGE_TYPES } from "./useVisualizerTab";
 
+// Minimum drag size (in 0-1000 normalized units) to count as a selection
+// rather than a click.
+const MIN_DRAG_UNITS = 20;
+
 /**
- * Shared canvas: image preview (with remove / reset-to-original) or an
- * upload dropzone when empty.
+ * Shared canvas: a dark "lightbox" well so renders read true. Shows the
+ * image preview (with remove / reset-to-original) or an upload dropzone
+ * when empty.
+ *
+ * When `onRegionSelect` is provided, dragging a box directly on the image
+ * calls it with a Gemini-style [ymin, xmin, ymax, xmax] box in 0-1000 —
+ * precise manual selection for reverse search.
  */
 export default function UploadCanvas({
   imagePreview,
@@ -15,29 +24,97 @@ export default function UploadCanvas({
   canReset,
   emptyHint,
   overlay = null,
+  onRegionSelect = null,
 }) {
   const fileInputRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const [drag, setDrag] = useState(null); // {x0,y0,x1,y1} in 0-1000 units
+
+  const toUnits = (event) => {
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    const clamp = (v) => Math.min(1000, Math.max(0, Math.round(v)));
+    return {
+      x: clamp(((event.clientX - rect.left) / rect.width) * 1000),
+      y: clamp(((event.clientY - rect.top) / rect.height) * 1000),
+    };
+  };
+
+  const handlePointerDown = (event) => {
+    // Only start a selection on the image itself (not hotspots/buttons).
+    if (!onRegionSelect || event.target.tagName !== "IMG") return;
+    const point = toUnits(event);
+    if (!point) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDrag({ x0: point.x, y0: point.y, x1: point.x, y1: point.y });
+  };
+
+  const handlePointerMove = (event) => {
+    if (!drag) return;
+    const point = toUnits(event);
+    if (!point) return;
+    setDrag((prev) => (prev ? { ...prev, x1: point.x, y1: point.y } : prev));
+  };
+
+  const handlePointerUp = () => {
+    if (!drag) return;
+    const box = [
+      Math.min(drag.y0, drag.y1),
+      Math.min(drag.x0, drag.x1),
+      Math.max(drag.y0, drag.y1),
+      Math.max(drag.x0, drag.x1),
+    ];
+    setDrag(null);
+    // Tiny drags are treated as clicks, not selections.
+    if (box[2] - box[0] >= MIN_DRAG_UNITS && box[3] - box[1] >= MIN_DRAG_UNITS) {
+      onRegionSelect?.(box);
+    }
+  };
+
+  const dragRect = drag
+    ? {
+        left: `${Math.min(drag.x0, drag.x1) / 10}%`,
+        top: `${Math.min(drag.y0, drag.y1) / 10}%`,
+        width: `${Math.abs(drag.x1 - drag.x0) / 10}%`,
+        height: `${Math.abs(drag.y1 - drag.y0) / 10}%`,
+      }
+    : null;
 
   return (
-    <div className="flex-1 min-h-[24rem] sm:min-h-[30rem] flex items-center justify-center border-1 border-gray-700 rounded-2xl p-3 sm:p-4 bg-gray-50">
+    <div className="flex min-h-[24rem] flex-1 items-center justify-center rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-well)] p-3 sm:min-h-[30rem] sm:p-4">
       {imagePreview
-        ? <div className="relative w-full h-full min-h-[24rem] flex items-center justify-center">
+        ? <div className="relative flex h-full min-h-[24rem] w-full items-center justify-center">
             {/* Shrink-wrapped wrapper: overlay children position in % of the
                 actual image, not the letterboxed container. */}
-            <div className="relative inline-block">
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer handlers implement drag-select on the image; hotspots stay buttons */}
+            <div
+              ref={wrapperRef}
+              className={`relative inline-block ${onRegionSelect ? "cursor-crosshair touch-none" : ""}`}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={() => setDrag(null)}
+            >
               {/* Data-URL / signed-URL images can't go through next/image optimization. */}
               {/* biome-ignore lint/performance/noImgElement: data/signed URLs cannot use next/image */}
               <img
                 src={imagePreview}
                 alt="Canvas"
-                className="block max-w-full max-h-[34rem] object-contain rounded-lg"
+                draggable={false}
+                className="block max-h-[34rem] max-w-full select-none rounded-lg object-contain"
               />
               {overlay}
+              {dragRect && (
+                <span
+                  className="pointer-events-none absolute rounded border-2 border-dashed border-[var(--viz-blue)] bg-[var(--viz-blue)]/10"
+                  style={dragRect}
+                />
+              )}
             </div>
             <button
               type="button"
               onClick={onRemove}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
+              className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-sm text-white hover:bg-red-600"
               aria-label="Remove image"
             >
               ×
@@ -46,7 +123,7 @@ export default function UploadCanvas({
               <button
                 type="button"
                 onClick={onReset}
-                className="absolute bottom-2 right-2 bg-white/90 border border-gray-400 rounded-full px-3 py-1 text-xs hover:bg-white"
+                className="viz-mono absolute bottom-2 right-2 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)]/95 px-3 py-1 text-xs hover:bg-[var(--viz-paper)]"
               >
                 Reset to original photo
               </button>
@@ -54,7 +131,7 @@ export default function UploadCanvas({
           </div>
         : <button
             type="button"
-            className="border-2 border-dashed border-gray-300 rounded-lg p-10 sm:p-16 text-center cursor-pointer hover:border-gray-400 transition-colors w-full bg-transparent"
+            className="w-full cursor-pointer rounded-lg border-2 border-dashed border-stone-600 bg-transparent p-10 text-center transition-colors hover:border-stone-400 sm:p-16"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -71,7 +148,7 @@ export default function UploadCanvas({
             />
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-8 w-8 mx-auto text-gray-400"
+              className="mx-auto h-8 w-8 text-stone-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -84,11 +161,11 @@ export default function UploadCanvas({
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            <p className="text-gray-500 text-sm mt-2">
+            <p className="mt-2 text-sm text-stone-300">
               {emptyHint ?? "Drag & drop or choose a photo to upload."}
             </p>
-            <p className="text-gray-500 text-sm">
-              Image format: JPG, PNG &amp; WEBP. Max 10MB.
+            <p className="viz-mono mt-1 text-xs text-stone-500">
+              JPG, PNG or WEBP · max 10MB
             </p>
           </button>}
     </div>

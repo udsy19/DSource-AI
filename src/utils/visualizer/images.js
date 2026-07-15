@@ -124,7 +124,9 @@ export const isValidBox = (box) =>
 export const cropBoxToDataUri = async (
   dataUri,
   box,
-  { pad = 0.05, maxSize = 512 } = {}
+  // Tight padding: too much context around the item skews both the CLIP
+  // embedding and the Gemini description toward the surroundings.
+  { pad = 0.02, maxSize = 512 } = {}
 ) => {
   // Lazy-import: sharp is a native module only needed on this path.
   const { default: sharp } = await import("sharp");
