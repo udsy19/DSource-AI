@@ -4,7 +4,8 @@
 -- Embeddings are CLIP ViT-L/14 (768 dims) via Replicate andreasjansson/clip-features —
 -- the SAME model must embed catalog images and query crops.
 
-create extension if not exists vector;
+create schema if not exists extensions;
+create extension if not exists vector schema extensions;
 
 alter table public.scraped_product_list
   add column if not exists embedding vector(768);
@@ -35,6 +36,9 @@ returns table (
 )
 language sql
 stable
+-- Pinned (non-mutable) search_path per Supabase advisor 0011; 'extensions'
+-- is required so the <=> operator resolves after the extension moved there.
+set search_path = extensions
 as $$
   select
     p.id::text,
