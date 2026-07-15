@@ -92,6 +92,14 @@ const AiMaterialFinder = () => {
 
   const handleGenerate = async (type) => {
     if (type === "visualizer") {
+      // Every model edits the uploaded room, so an image is required.
+      if (!imagePreview) {
+        setValidationError(
+          "Please upload a room photo first — every model edits your uploaded image.",
+        );
+        return;
+      }
+
       // Validate prompt
       if (!prompt || prompt.trim().length === 0) {
         setValidationError("Please enter a prompt to generate an image.");
@@ -289,14 +297,13 @@ const AiMaterialFinder = () => {
                   {MODEL_OPTIONS.map((model) => (
                     <option key={model.value} value={model.value}>
                       {model.label}
-                      {model.requiresImage ? " (needs an image)" : ""}
                     </option>
                   ))}
                 </select>
                 {needsImage && (
                   <p className="mt-1 text-xs text-amber-600">
-                    This model edits an existing photo — upload a room image or
-                    pick a different model.
+                    Upload a room photo first — every model edits your uploaded
+                    image.
                   </p>
                 )}
 
@@ -460,8 +467,13 @@ const AiMaterialFinder = () => {
                 </div>
                 <div className="mt-4">
                   <button
-                    className="w-full bg-black text-white rounded-lg p-2 text-sm cursor-pointer"
+                    className={`w-full rounded-lg p-2 text-sm ${
+                      needsImage
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-black text-white cursor-pointer"
+                    }`}
                     onClick={() => handleGenerate("visualizer")}
+                    disabled={needsImage}
                   >
                     Generate
                   </button>

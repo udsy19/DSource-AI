@@ -1,14 +1,17 @@
 /**
  * Registry of image-generation models offered by the AI Visualizer.
  *
- * Single source of truth for both the API route (behavior) and the UI dropdown
- * (labels). `slug` values are Replicate model identifiers (owner/name) — edit a
- * slug here to change a model version; nothing else needs to change.
+ * The visualizer is image-edit-first: the user uploads a room photo (the base)
+ * and describes the change, so every model requires an input image and edits it
+ * rather than generating from scratch. `slug` values are Replicate model
+ * identifiers (owner/name) — edit a slug here to change a model; nothing else
+ * needs to change.
  *
  * `mode`:
- *   - "text-to-image": prompt only
- *   - "edit":          requires an input image
- *   - "both":          works with or without an input image
+ *   - "edit": requires an input image (all current models)
+ *
+ * `buildInput(prompt, imageDataUrl)` returns the model-specific input object.
+ * The route guarantees `imageDataUrl` is present before calling it.
  */
 
 export const DEFAULT_MODEL = "flux-kontext-pro";
@@ -28,39 +31,48 @@ export const IMAGE_MODELS = {
     label: "Nano Banana",
     provider: "replicate",
     slug: "google/nano-banana",
-    mode: "both",
+    mode: "edit",
     buildInput: (prompt, imageDataUrl) => ({
       prompt,
-      ...(imageDataUrl ? { image_input: [imageDataUrl] } : {}),
+      image_input: [imageDataUrl],
     }),
   },
-  ideogram: {
-    label: "Ideogram",
+  "flux-kontext-max": {
+    label: "Black Forest (Kontext Max)",
     provider: "replicate",
-    slug: "ideogram-ai/ideogram-v3-turbo",
-    mode: "text-to-image",
-    buildInput: (prompt) => ({ prompt }),
+    slug: "black-forest-labs/flux-kontext-max",
+    mode: "edit",
+    buildInput: (prompt, imageDataUrl) => ({
+      prompt,
+      input_image: imageDataUrl,
+    }),
   },
-  flux: {
-    label: "Black Forest (FLUX)",
+  "qwen-image-edit": {
+    label: "Qwen Image Edit",
     provider: "replicate",
-    // TODO(confirm): which FLUX model? defaulting to flux-1.1-pro.
-    slug: "black-forest-labs/flux-1.1-pro",
-    mode: "text-to-image",
-    buildInput: (prompt) => ({ prompt }),
+    slug: "qwen/qwen-image-edit",
+    mode: "edit",
+    buildInput: (prompt, imageDataUrl) => ({
+      prompt,
+      image: imageDataUrl,
+    }),
   },
   "m5-blaze": {
     label: "M5 Blaze",
     provider: "replicate",
-    // TODO(required): set the real Replicate slug for "m5 blaze".
+    // TODO(required): set the real Replicate slug for "m5 blaze", then confirm
+    // its image-input field name and update buildInput accordingly.
     slug: "",
-    mode: "text-to-image",
-    buildInput: (prompt) => ({ prompt }),
+    mode: "edit",
+    buildInput: (prompt, imageDataUrl) => ({
+      prompt,
+      input_image: imageDataUrl,
+    }),
   },
   gemini: {
     label: "Gemini (2.5 Flash Image)",
     provider: "gemini",
-    mode: "both",
+    mode: "edit",
   },
 };
 
