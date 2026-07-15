@@ -1,0 +1,65 @@
+{
+  "geometry": {
+    "scale": {"mmPerUnit": 1.0, "source": "golden", "confidence": 1.0, "samples": 4},
+    "wallNetwork": [
+      {
+        "outer": [[0, 0], [10000, 0], [10000, 8000], [0, 8000]],
+        "holes": [[[240, 240], [9760, 240], [9760, 7760], [240, 7760]]]
+      }
+    ],
+    "walls": [
+      {"x1": 0, "y1": 0, "x2": 10000, "y2": 0, "thickness": 240},
+      {"x1": 0, "y1": 8000, "x2": 10000, "y2": 8000, "thickness": 240}
+    ],
+    "doors": [
+      {
+        "width": 900,
+        "hinge": [3000, 240],
+        "leaf": {"x1": 3000, "y1": 240, "x2": 3900, "y2": 240},
+        "swingArc": {"cx": 3000, "cy": 240, "r": 900, "startDeg": 0, "endDeg": 90}
+      },
+      {
+        "width": 800,
+        "hinge": [9760, 5000],
+        "leaf": {"x1": 9760, "y1": 5000, "x2": 9760, "y2": 5800},
+        "swingArc": {"cx": 9760, "cy": 5000, "r": 800, "startDeg": 0, "endDeg": 90}
+      }
+    ],
+    "windows": [
+      {
+        "x1": 6000, "y1": 120, "x2": 7200, "y2": 120,
+        "faceLines": [
+          {"x1": 6000, "y1": 0, "x2": 7200, "y2": 0},
+          {"x1": 6000, "y1": 240, "x2": 7200, "y2": 240}
+        ],
+        "glazingLine": {"x1": 6000, "y1": 120, "x2": 7200, "y2": 120}
+      }
+    ],
+    "rooms": [
+      {
+        "label": "LIVING",
+        "polygon": [[240, 240], [5000, 240], [5000, 7760], [240, 7760]],
+        "areaM2": 35.8,
+        "floorPattern": "wood"
+      },
+      {
+        "label": "BEDROOM",
+        "polygon": [[5000, 240], [9760, 240], [9760, 7760], [5000, 7760]],
+        "areaM2": 35.8,
+        "floorPattern": "tile"
+      }
+    ],
+    "fixtures": [
+      {"type": "stairs", "label": "STAIRS", "x1": 8200, "y1": 6000, "x2": 9200, "y2": 7600}
+    ],
+    "assets": [
+      {"id": "a1", "symbol": "sofa", "x": 1000, "y": 3000, "w": 2000, "h": 900, "rotation": 0},
+      {"id": "a2", "symbol": "bed-double", "x": 6000, "y": 2000, "w": 1600, "h": 2000, "rotation": 90}
+    ],
+    "dimensions": [
+      {"text": "3600", "valueMm": 3600, "x1": 240, "y1": 240, "x2": 3840, "y2": 240}
+    ],
+    "bounds": {"minX": 0, "maxX": 10000, "minY": 0, "maxY": 8000}
+  },
+  "meta": {"projectName": "GOLDEN FULL", "dateStr": "2026-07-15"}
+}
