@@ -6,7 +6,7 @@ import { ROLES } from "./roles";
  * Get authenticated user from API request
  */
 export async function getAuthenticatedUser() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
 
   const {
@@ -27,12 +27,10 @@ export async function getAuthenticatedUser() {
 export function getUserRoleFromUser(user) {
   if (!user) return null;
 
-  const metadata = user.user_metadata || {};
+  // Roles are read ONLY from app_metadata, which is settable exclusively with
+  // the service-role key. user_metadata is user-controlled and must never be
+  // trusted for authorization.
   const appMetadata = user.app_metadata || {};
-
-  if (metadata.user_type && Object.values(ROLES).includes(metadata.user_type)) {
-    return metadata.user_type;
-  }
 
   if (appMetadata.user_type && Object.values(ROLES).includes(appMetadata.user_type)) {
     return appMetadata.user_type;

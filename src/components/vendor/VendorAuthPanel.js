@@ -43,14 +43,14 @@ export default function VendorAuthPanel() {
 
       let response;
       if (mode === "signUp") {
+        // A self-service signup must NOT grant the vendor role. Roles are read
+        // only from app_metadata, which is not settable from the client.
+        // TODO: vendor role must be granted server-side via service-role/app_metadata
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
           options: {
             emailRedirectTo: emailRedirect,
-            data: {
-              user_type: "vendor",
-            },
           },
         });
       } else {
@@ -68,16 +68,9 @@ export default function VendorAuthPanel() {
         setFeedback({
           type: "success",
           message:
-            "Check your inbox to confirm the email address before logging in.",
+            "Thanks for registering. Confirm your email, then an administrator will review your request and provision vendor access before you can upload products.",
         });
       } else {
-        // After sign in, refresh the session to get updated user data
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          console.log("Session after login:", session.user);
-          console.log("User metadata:", session.user.user_metadata);
-          console.log("App metadata:", session.user.app_metadata);
-        }
         router.refresh();
       }
     } catch (error) {
@@ -100,9 +93,9 @@ export default function VendorAuthPanel() {
           {mode === "signIn" ? "Sign in to upload products" : "Request access"}
         </h1>
         <p className="text-sm text-gray-600">
-          Use your vendor email credentials. New partners can request access via
-          the sign-up form below—we&apos;ll send a confirmation link to verify
-          your address.
+          Use your vendor email credentials to sign in. New partners can register
+          below, but vendor access is provisioned by an administrator—signing up
+          creates an account only and does not grant vendor permissions.
         </p>
       </div>
 
@@ -196,8 +189,9 @@ export default function VendorAuthPanel() {
 
       {mode === "signIn" && (
         <p className="mt-4 text-xs text-gray-500">
-          Need an account? Switch to &ldquo;Request access&rdquo; and we&apos;ll
-          guide you through onboarding with Supabase email auth.
+          Need an account? Switch to &ldquo;Request access&rdquo; to register.
+          An administrator will provision vendor access after reviewing your
+          request.
         </p>
       )}
     </div>

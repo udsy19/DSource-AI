@@ -61,8 +61,11 @@ export default function SignUpPage() {
         password: parsedPassword,
         options: {
           emailRedirectTo: emailRedirect,
+          // This lands in user_metadata and is cosmetic only. Role
+          // authorization is derived exclusively from app_metadata
+          // (service-role controlled); user_metadata is never trusted.
           data: {
-            user_type: "user", // Set as regular user by default
+            user_type: "user",
           },
         },
       });

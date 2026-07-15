@@ -50,16 +50,15 @@ export async function middleware(request) {
     }
   );
 
-  // Get session
+  // Get the verified user (getUser revalidates with the Auth server; getSession
+  // trusts unverified cookies and must not be used for gating).
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const user = session?.user;
-  const userRole =
-    user?.user_metadata?.user_type ||
-    user?.app_metadata?.user_type ||
-    "user";
+  // Role comes ONLY from app_metadata (service-role controlled); user_metadata
+  // is user-controlled and must never be trusted for authorization.
+  const userRole = user?.app_metadata?.user_type || "user";
 
   // Check if route requires vendor role
   if (vendorRoutes.some((route) => pathname.startsWith(route))) {
