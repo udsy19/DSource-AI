@@ -2,7 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedRoutes = ["/spec-builder", "/ai-material-finder"];
+const protectedRoutes = [
+  "/spec-builder",
+  "/ai-material-finder",
+  "/ai-visualizer",
+];
 
 // Routes that require vendor role
 const vendorRoutes = ["/vendor"];
@@ -16,6 +20,15 @@ export async function middleware(request) {
     pathname.startsWith("/api") ||
     pathname.startsWith("/static") ||
     pathname.match(/\.(ico|png|jpg|jpeg|svg|webp|avif)$/)
+  ) {
+    return NextResponse.next();
+  }
+
+  // Dev-only escape hatch: skip all auth gating for local testing.
+  // Hard-disabled in production builds; enabled only via .env.local flag.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEV_AUTH_BYPASS === "true"
   ) {
     return NextResponse.next();
   }
@@ -37,17 +50,17 @@ export async function middleware(request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   // Get session
@@ -57,9 +70,7 @@ export async function middleware(request) {
 
   const user = session?.user;
   const userRole =
-    user?.user_metadata?.user_type ||
-    user?.app_metadata?.user_type ||
-    "user";
+    user?.user_metadata?.user_type || user?.app_metadata?.user_type || "user";
 
   // Check if route requires vendor role
   if (vendorRoutes.some((route) => pathname.startsWith(route))) {
@@ -96,4 +107,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
-

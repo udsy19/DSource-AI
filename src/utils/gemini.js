@@ -1,3 +1,65 @@
+const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_RETRIES = 1;
+
+const isRetryableError = (error) => {
+  const status = error?.status ?? error?.code ?? error?.response?.status;
+  if (status === 429 || status === 500 || status === 503) {
+    return true;
+  }
+  const message = String(error?.message ?? "").toLowerCase();
+  return (
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    message.includes("overloaded") ||
+    message.includes("temporarily") ||
+    message.includes("unavailable")
+  );
+};
+
+const withTimeout = (promise, ms, label) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+
+/**
+ * Runs an async Gemini call with a hard timeout and a bounded retry on
+ * transient failures (429/5xx/timeout). Non-retryable errors surface immediately.
+ */
+export const callWithRetry = async (
+  fn,
+  {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    retries = DEFAULT_RETRIES,
+    label = "Gemini request",
+  } = {},
+) => {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await withTimeout(Promise.resolve().then(fn), timeoutMs, label);
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries && isRetryableError(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
 export const extractJsonResponse = (rawText) => {
   if (!rawText || typeof rawText !== "string") {
     throw new Error("Model response was empty or not a string");

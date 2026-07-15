@@ -6,7 +6,7 @@ import { ROLES } from "./roles";
  * Get authenticated user from API request
  */
 export async function getAuthenticatedUser() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
 
   const {

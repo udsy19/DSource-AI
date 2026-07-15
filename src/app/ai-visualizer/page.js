@@ -1,15 +1,18 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
 
 import Image from "next/image";
-import Link from "next/link";
+import React, { useEffect, useRef, useState } from "react";
 
 import visualizerIcon from "../../../public/visualizer-icon.png";
+import { DEFAULT_MODEL, MODEL_OPTIONS } from "@/utils/replicate-models";
+
+const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/svg+xml"];
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 const AiMaterialFinder = () => {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState({ state: false, message: "" });
   const [analysisResults, setAnalysisResults] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("visualizer");
@@ -18,6 +21,7 @@ const AiMaterialFinder = () => {
   const [isPositionExpanded, setIsPositionExpanded] = useState(true);
   const [isStyleExpanded, setIsStyleExpanded] = useState(false);
   const fileInputRef = useRef(null);
+  const abortRef = useRef(null);
 
   // Form state for AI Visualizer
   const [prompt, setPrompt] = useState("");
@@ -25,38 +29,37 @@ const AiMaterialFinder = () => {
   const [selectedStyle, setSelectedStyle] = useState("");
   const [selectedLighting, setSelectedLighting] = useState("");
   const [selectedColorPalette, setSelectedColorPalette] = useState("");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
   const [validationError, setValidationError] = useState(null);
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      // Validate file type
-      const validTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/svg+xml",
-      ];
-      if (!validTypes.includes(file.type)) {
-        alert("Please upload a valid image file (JPG, PNG, or SVG)");
-        return;
-      }
+  const activeModel = MODEL_OPTIONS.find((m) => m.value === selectedModel);
+  const needsImage = activeModel?.requiresImage && !imagePreview;
 
-      // Validate file size (10MB max)
-      if (file.size > 10 * 1024 * 1024) {
-        alert("File size must be less than 10MB");
-        return;
-      }
+  // Validate and accept an image file from either the picker or drag-and-drop.
+  const acceptImageFile = (file) => {
+    if (!file) return;
 
-      setUploadedImage(file);
-
-      // Create preview URL
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
+    if (!IMAGE_TYPES.includes(file.type)) {
+      setError("Please upload a valid image file (JPG, PNG, or SVG).");
+      return;
     }
+    if (file.size > MAX_FILE_BYTES) {
+      setError("File size must be less than 10MB.");
+      return;
+    }
+
+    setError(null);
+    setUploadedImage(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileUpload = (event) => {
+    acceptImageFile(event.target.files[0]);
   };
 
   const handleDragOver = (event) => {
@@ -65,31 +68,13 @@ const AiMaterialFinder = () => {
 
   const handleDrop = (event) => {
     event.preventDefault();
-    const files = event.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      const validTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/svg+xml",
-      ];
-      if (validTypes.includes(file.type)) {
-        if (file.size <= 10 * 1024 * 1024) {
-          setUploadedImage(file);
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            setImagePreview(e.target.result);
-          };
-          reader.readAsDataURL(file);
-        } else {
-          alert("File size must be less than 10MB");
-        }
-      } else {
-        alert("Please upload a valid image file (JPG, PNG, or SVG)");
-      }
-    }
+    acceptImageFile(event.dataTransfer.files[0]);
   };
+
+  // Cancel any in-flight generate request on unmount.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   const handleClick = () => {
     fileInputRef.current.click();
@@ -126,6 +111,7 @@ const AiMaterialFinder = () => {
         // Prepare request body with optional image
         const requestBody = {
           prompt: prompt.trim(),
+          model: selectedModel,
           spaceType: visualizerSpace || selectedSpace,
           style: selectedStyle,
           lighting: selectedLighting,
@@ -137,15 +123,27 @@ const AiMaterialFinder = () => {
           requestBody.image = imagePreview;
         }
 
+        // Cancel any previous in-flight request before starting a new one.
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         const response = await fetch("/api/generate-image", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(requestBody),
+          signal: controller.signal,
         });
 
         const data = await response.json();
+
+        if (response.status === 401) {
+          setValidationError("Please log in to generate images.");
+          setIsAnalyzing({ state: false, message: "" });
+          return;
+        }
 
         if (!response.ok) {
           // Handle validation errors or API errors
@@ -187,9 +185,13 @@ const AiMaterialFinder = () => {
           setIsAnalyzing({ state: false, message: "" });
         }
       } catch (err) {
+        // Ignore aborts triggered by a new request or unmount.
+        if (err.name === "AbortError") {
+          return;
+        }
         console.error("Error generating image:", err);
         setError(
-          "An error occurred while generating the image. Please try again."
+          "An error occurred while generating the image. Please try again.",
         );
         setIsAnalyzing({ state: false, message: "" });
       }
@@ -200,15 +202,13 @@ const AiMaterialFinder = () => {
         message: "Generating CAD drawing",
       });
 
-      const timer = setTimeout(() => {
+      setTimeout(() => {
         setImagePreview("/api/images/cad-drawing.jpeg");
         setIsAnalyzing({
           state: false,
           message: "CAD drawing generated successfully",
         });
       }, 5000);
-
-      return () => clearTimeout(timer);
     }
   };
 
@@ -279,8 +279,29 @@ const AiMaterialFinder = () => {
             {/* AI Visualizer Content */}
             {activeTab === "visualizer" && (
               <div>
+                {/* Model selection */}
+                <div className="text-sm font-bold">Model</div>
+                <select
+                  className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                >
+                  {MODEL_OPTIONS.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                      {model.requiresImage ? " (needs an image)" : ""}
+                    </option>
+                  ))}
+                </select>
+                {needsImage && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    This model edits an existing photo — upload a room image or
+                    pick a different model.
+                  </p>
+                )}
+
                 {/* Define your space */}
-                <div className="text-sm font-bold">Define your space</div>
+                <div className="text-sm font-bold mt-4">Define your space</div>
                 <div className="flex mt-2 gap-8">
                   <button
                     className={`w-1/3 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
@@ -900,76 +921,75 @@ const AiMaterialFinder = () => {
             )}
           </div>
           <div className="w-full lg:w-4/6 max-h-[40rem] flex items-center justify-center border-1 border-gray-700 rounded-lg p-3 sm:p-4">
-            {imagePreview ? (
-              <div className="relative w-full" style={{ height: "37rem" }}>
-                <div
-                  className="relative w-full rounded-lg overflow-hidden"
-                  style={{ height: "95%" }}
-                >
-                  <Image
-                    src={imagePreview}
-                    alt="Uploaded image"
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-                <button
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
-                >
-                  ×
-                </button>
-                <div className="text-center">
-                  {/* <p className="text-sm text-gray-600">
+            {imagePreview
+              ? <div className="relative w-full" style={{ height: "37rem" }}>
+                  <div
+                    className="relative w-full rounded-lg overflow-hidden"
+                    style={{ height: "95%" }}
+                  >
+                    <Image
+                      src={imagePreview}
+                      alt="Uploaded image"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                  <button
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                  <div className="text-center">
+                    {/* <p className="text-sm text-gray-600">
                     File: {uploadedImage?.name} (
                     {(uploadedImage?.size / 1024 / 1024).toFixed(2)} MB)
                   </p> */}
-                  {analysisResults?.productRecommendations &&
-                    analysisResults.productRecommendations.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Hover over the blue dots to see product recommendations
-                      </p>
-                    )}
+                    {analysisResults?.productRecommendations &&
+                      analysisResults.productRecommendations.length > 0 && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Hover over the blue dots to see product
+                          recommendations
+                        </p>
+                      )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={handleClick}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/svg+xml"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div className="p-4 rounded-lg">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 mx-auto text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-500 text-sm">
-                  Drag & drop or choose file to upload.
-                </p>
-                <p className="text-gray-500 text-sm">
-                  Image format: JPG, PNG, & SVG. Max 10MB.
-                </p>
-              </div>
-            )}
+              : <div
+                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={handleClick}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/svg+xml"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <div className="p-4 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-8 w-8 mx-auto text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    Drag & drop or choose file to upload.
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    Image format: JPG, PNG, & SVG. Max 10MB.
+                  </p>
+                </div>}
           </div>
         </div>
       </div>
