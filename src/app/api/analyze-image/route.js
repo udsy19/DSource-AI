@@ -1,10 +1,20 @@
-import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { extractJsonResponse, getResponseText } from "@/utils/gemini";
+import { NextResponse } from "next/server";
+import { requireAuth } from "@/utils/api-auth";
+import {
+  AiResponseError,
+  assertNotBlocked,
+  generateContentWithResilience,
+  getResponseText,
+  parseModelJsonObject,
+} from "@/utils/gemini";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB, matches client limit
+const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const clamp = (value, min, max) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -15,6 +25,8 @@ const clamp = (value, min, max) => {
 
 export async function POST(request) {
   try {
+    await requireAuth();
+
     const formData = await request.formData();
     const imageFile = formData.get("image");
 
@@ -22,12 +34,27 @@ export async function POST(request) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    // Convert image to base64
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString("base64");
-
     // Get MIME type
     const mimeType = imageFile.type;
+
+    if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+      return NextResponse.json(
+        { error: "Unsupported image type. Use PNG, JPEG, or WEBP." },
+        { status: 415 },
+      );
+    }
+
+    // Convert image to base64
+    const arrayBuffer = await imageFile.arrayBuffer();
+
+    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json(
+        { error: "Image is too large. Maximum size is 10 MB." },
+        { status: 413 },
+      );
+    }
+
+    const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
     // Step 1: Validate if image is interior-related
     const interiorValidationPrompt = `
@@ -41,7 +68,7 @@ export async function POST(request) {
     }
     `;
 
-    const validationResponse = await ai.models.generateContent({
+    const validationResponse = await generateContentWithResilience(ai, {
       model: "gemini-2.5-flash",
       contents: [
         {
@@ -54,21 +81,24 @@ export async function POST(request) {
       ],
     });
 
-    // Extract JSON from validation response text
-    const validationResult = extractJsonResponse(
-      await getResponseText(validationResponse)
+    assertNotBlocked(
+      validationResponse,
+      "This image couldn't be processed. Please try another photo.",
     );
 
-    console.log(validationResult);
+    // Extract JSON from validation response text
+    const validationResult = parseModelJsonObject(
+      await getResponseText(validationResponse),
+      "We couldn't interpret the image. Please try another photo.",
+    );
 
     if (!validationResult.isInterior) {
       return NextResponse.json(
         {
           success: false,
           error: "Image does not appear to be an interior space",
-          details: validationResult,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,7 +127,7 @@ export async function POST(request) {
     - The response must be pure JSON. Do not include backticks, Markdown fencing, or additional commentary.
     `;
 
-    const categoryAnalysisResponse = await ai.models.generateContent({
+    const categoryAnalysisResponse = await generateContentWithResilience(ai, {
       model: "gemini-2.5-flash",
       contents: [
         {
@@ -110,8 +140,14 @@ export async function POST(request) {
       ],
     });
 
-    const categoryAnalysisResult = extractJsonResponse(
-      await getResponseText(categoryAnalysisResponse)
+    assertNotBlocked(
+      categoryAnalysisResponse,
+      "This image couldn't be processed. Please try another photo.",
+    );
+
+    const categoryAnalysisResult = parseModelJsonObject(
+      await getResponseText(categoryAnalysisResponse),
+      "We couldn't interpret the image. Please try another photo.",
     );
 
     const categories =
@@ -146,10 +182,19 @@ export async function POST(request) {
       summary: categoryAnalysisResult?.summary ?? "",
     });
   } catch (error) {
+    if (error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error instanceof AiResponseError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Error analyzing image:", error);
     return NextResponse.json(
-      { error: "Failed to analyze image", details: error.message },
-      { status: 500 }
+      { error: "Failed to analyze image" },
+      { status: 500 },
     );
   }
 }
