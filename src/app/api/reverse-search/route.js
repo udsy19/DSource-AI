@@ -6,6 +6,7 @@ import {
   callWithRetry,
   extractJsonResponse,
   getResponseText,
+  parseImageData,
 } from "@/utils/gemini";
 import { isAllowedImageHost } from "@/utils/image-hosts.mjs";
 import { checkRateLimit } from "@/utils/rate-limit";
@@ -32,14 +33,6 @@ const RESULT_COUNT = 5;
 const DEV_BYPASS =
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH_BYPASS === "true";
-
-const parseImageData = (imageData) => {
-  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
-  if (matches) {
-    return { data: matches[2], mimeType: matches[1] || "image/png" };
-  }
-  return { data: imageData, mimeType: "image/png" };
-};
 
 /**
  * Gemini re-rank of the candidates: sees the query crop plus each candidate's

@@ -5,6 +5,7 @@ import {
   callWithRetry,
   extractJsonResponse,
   getResponseText,
+  parseImageData,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
 import {
@@ -21,14 +22,6 @@ const MAX_COMPONENTS = 10;
 const DEV_BYPASS =
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH_BYPASS === "true";
-
-const parseImageData = (imageData) => {
-  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
-  if (matches) {
-    return { data: matches[2], mimeType: matches[1] || "image/png" };
-  }
-  return { data: imageData, mimeType: "image/png" };
-};
 
 const DETECTION_PROMPT = `
 Detect the distinct interior components in this image that a user could shop
@@ -144,8 +137,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Could not detect components in this image. Please try again.",
+        error: "Could not detect components in this image. Please try again.",
       },
       { status: 502 },
     );

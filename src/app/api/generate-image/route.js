@@ -7,6 +7,7 @@ import {
   callWithRetry,
   extractJsonResponse,
   getResponseText,
+  parseImageData,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
 import { getModel } from "@/utils/replicate-models";
@@ -69,18 +70,6 @@ const DEV_BYPASS =
 const GEMINI_READY = Boolean(
   process.env.GOOGLE_GENAI_API_KEY?.startsWith("AIza"),
 );
-
-// Split a data URI (or raw base64) into Gemini inlineData fields.
-const parseImageData = (imageData) => {
-  if (!imageData.includes(",")) {
-    return { data: imageData, mimeType: "image/png" };
-  }
-  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
-  if (matches) {
-    return { data: matches[2], mimeType: matches[1] || "image/png" };
-  }
-  return { data: imageData, mimeType: "image/png" };
-};
 
 // Normalize the many shapes replicate.run() can return into a single URL string.
 const toImageUrl = (output) => {

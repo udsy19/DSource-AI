@@ -1,3 +1,25 @@
+// Convert a data URL (or bare base64 string) into { data, mimeType } for Gemini inlineData parts
+export const parseImageData = (imageData) => {
+  if (!imageData) return null;
+
+  // If it's already a base64 string without data URL prefix
+  if (!imageData.includes(",")) {
+    return { data: imageData, mimeType: "image/png" };
+  }
+
+  // Extract mime type and base64 data from data URL
+  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
+  if (matches) {
+    return {
+      data: matches[2],
+      mimeType: matches[1] || "image/png",
+    };
+  }
+
+  // If it's just base64 data
+  return { data: imageData, mimeType: "image/png" };
+};
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RETRIES = 1;
 
