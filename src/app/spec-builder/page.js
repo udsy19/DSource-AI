@@ -4,9 +4,46 @@ import Image from "next/image";
 import { useSpec } from "../../contexts/SpecContext";
 
 const SpecBuilder = () => {
-  const { specProducts } = useSpec();
+  const { specProducts, projectName, setProjectName } = useSpec();
   const [expandedCategories, setExpandedCategories] = useState({});
   const [productStatuses, setProductStatuses] = useState({});
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
+
+  /** Generate the spec-sheet PDF server-side from the live spec data. */
+  const handleDownload = async () => {
+    if (!specProducts.length || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/spec-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectName, products: specProducts }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDownloadError(data.error || "Could not generate the spec sheet.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${
+        projectName.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") ||
+        "spec"
+      }-spec-sheet.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Could not generate the spec sheet. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const toggleCategory = (category) => {
     setExpandedCategories((prev) => ({
@@ -203,13 +240,30 @@ const SpecBuilder = () => {
 
         <div className="px-0 sm:px-4 md:px-8 lg:px-12">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8 md:mb-12">
-            <h2 className="text-xl sm:text-2xl font-bold">Project: Peterville Home</h2>
-            <div>
-              <a
-                href="/specsheet.pdf"
-                download="specsheet.pdf"
-                type="application/pdf"
-                className="bg-black text-white px-6 sm:px-8 py-2 sm:py-3 rounded-xl flex items-center gap-2 text-sm sm:text-base"
+            <label className="flex items-center gap-2 text-xl sm:text-2xl font-bold">
+              <span>Project:</span>
+              <input
+                type="text"
+                value={projectName}
+                maxLength={80}
+                onChange={(e) => setProjectName(e.target.value)}
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) setProjectName("Untitled Project");
+                }}
+                className="min-w-0 flex-1 border-b-2 border-transparent bg-transparent font-bold outline-none transition-colors focus:border-black sm:max-w-md"
+                aria-label="Project name"
+              />
+            </label>
+            <div className="flex flex-col items-start gap-1 sm:items-end">
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={!specProducts.length || downloading}
+                className={`flex items-center gap-2 rounded-xl px-6 py-2 text-sm sm:px-8 sm:py-3 sm:text-base ${
+                  !specProducts.length || downloading
+                    ? "cursor-not-allowed bg-gray-300 text-gray-500"
+                    : "cursor-pointer bg-black text-white hover:bg-gray-800"
+                }`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -225,8 +279,11 @@ const SpecBuilder = () => {
                     d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
                   />
                 </svg>
-                <span>Download</span>
-              </a>
+                <span>{downloading ? "Preparing PDF..." : "Download"}</span>
+              </button>
+              {downloadError && (
+                <span className="text-xs text-red-600">{downloadError}</span>
+              )}
             </div>
           </div>
           {/* Totals Header */}
