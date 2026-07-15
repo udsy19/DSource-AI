@@ -9,13 +9,10 @@ import {
   getResponseText,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
-import {
-  DEFAULT_MODEL,
-  DEFAULT_MOODBOARD_MODEL,
-  getModel,
-} from "@/utils/replicate-models";
+import { getModel } from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
 import {
+  aspectRatioFromImage,
   isValidBox,
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
@@ -25,6 +22,7 @@ import {
   getBankProduct,
   isMaterialBankConfigured,
 } from "@/utils/visualizer/material-bank";
+import { routeTask } from "@/utils/visualizer/model-router";
 import {
   hasDirectiveParams,
   validateCadParams,
@@ -321,13 +319,21 @@ const prepareRender = async (body, prompt) => {
       locationHint,
       prompt,
     };
+    // Multi-input models can't "match_input_image" unambiguously — compute
+    // the room's aspect explicitly (this caused the cropped-swap bug).
+    const aspectRatio = await aspectRatioFromImage(
+      normalized.image,
+      getModel("seedream-4")?.aspectRatios ?? [],
+    );
     return {
+      task: "swap",
       params: { ...params, swapProductId: productId },
-      // Order contract with the composer: room FIRST, product SECOND.
-      images: [normalized.image, productImage],
+      // Order contract (A/B tested): product FIRST, room LAST — the model
+      // treats the last image as the canvas to edit.
+      images: [productImage, normalized.image],
       requiresImage: true,
       requiresMultiImage: true,
-      defaultModel: DEFAULT_MOODBOARD_MODEL,
+      io: aspectRatio ? { aspectRatio } : {},
       instruction: composeSwapPrompt(composeInput).instruction,
       // Style params don't apply to a swap; skip param verification.
       verify: async () => ({ checked: [], failures: [], skipped: false }),
@@ -345,10 +351,10 @@ const prepareRender = async (body, prompt) => {
 
   const composeInput = { prompt, params };
   return {
+    task: "render",
     params,
     images: [normalized.image],
     requiresImage: true,
-    defaultModel: DEFAULT_MODEL,
     instruction: composeRenderPrompt(composeInput).instruction,
     verify: (image) => verifyAdherence(ai, image, params),
     strengthen: (failures) =>
@@ -400,12 +406,12 @@ const prepareMoodboard = async (body, prompt, notices) => {
   };
 
   return {
+    task: "moodboard",
     params,
     images,
     requiresImage: false,
     requiresMultiImage: true,
-    defaultModel: DEFAULT_MOODBOARD_MODEL,
-    aspectRatio: params.aspectRatio,
+    io: { aspectRatio: params.aspectRatio },
     instruction: composeMoodboardPrompt(composeInput).instruction,
     verify: (image) => verifyAdherence(ai, image, params),
     strengthen: (failures) =>
@@ -435,10 +441,10 @@ const prepareCad = async (body, prompt) => {
   const composeInput = { prompt, params };
 
   return {
+    task: "cad",
     params,
     images: [normalized.image],
     requiresImage: true,
-    defaultModel: DEFAULT_MODEL,
     instruction: composeCadPrompt(composeInput).instruction,
     verify: (image) => verifyCad(ai, image, params.view),
     strengthen: () => strengthenCadPrompt(composeInput),
@@ -522,23 +528,18 @@ export async function POST(request) {
       );
     }
 
-    // --- Model resolution ---
-    const modelKey =
-      typeof body.model === "string" && body.model
-        ? body.model
-        : prepared.defaultModel;
-    const modelConfig = getModel(modelKey);
-    if (!modelConfig) {
-      return NextResponse.json(
-        { error: "Unknown model selected." },
-        { status: 400 },
-      );
+    // --- Model resolution: the router decides per task; body.model is an
+    // undocumented override kept for internal testing only. ---
+    const route = routeTask(prepared.task);
+    let modelKey = route.modelKey;
+    let modelConfig = route.model;
+    if (typeof body.model === "string" && body.model && getModel(body.model)) {
+      modelKey = body.model;
+      modelConfig = getModel(body.model);
     }
     if (prepared.requiresMultiImage && !modelConfig.multiImage) {
       return NextResponse.json(
-        {
-          error: `${modelConfig.label} can't combine multiple images — pick Nano Banana or Gemini for mood boards.`,
-        },
+        { error: "This task needs a model that can combine multiple images." },
         { status: 400 },
       );
     }
@@ -583,7 +584,8 @@ export async function POST(request) {
     // "Different renders every time" off → fixed seed (models that support it).
     const seed =
       body.variedSeed === false && modelConfig.supportsSeed ? 42 : undefined;
-    const generateOpts = { seed, aspectRatio: prepared.aspectRatio };
+    // IO policy: router defaults, then task-specific values from the preparer.
+    const generateOpts = { seed, ...route.io, ...(prepared.io ?? {}) };
 
     // --- Generate ---
     let result = await generateOnce(

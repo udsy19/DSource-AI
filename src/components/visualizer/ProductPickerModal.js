@@ -60,11 +60,11 @@ export default function ProductPickerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#262521]/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">
-            Add Products to Moodboard ({picked.length}/{MAX_MOODBOARD_PRODUCTS})
+          <h3 className="viz-serif text-xl">
+            Add products ({picked.length}/{MAX_MOODBOARD_PRODUCTS})
           </h3>
           <button
             type="button"
@@ -96,8 +96,10 @@ export default function ProductPickerModal({
                   key={product.id}
                   type="button"
                   onClick={() => togglePick(product)}
-                  className={`text-left rounded-lg border-2 overflow-hidden ${
-                    isPicked ? "border-black" : "border-gray-200"
+                  className={`text-left rounded-lg border-2 overflow-hidden bg-white ${
+                    isPicked
+                      ? "border-[var(--viz-blue)]"
+                      : "border-[var(--viz-line)]"
                   }`}
                 >
                   {/* Catalog images are remote-host URLs already whitelisted for next/image, but thumbnails here are transient — plain img keeps it simple. */}
@@ -120,14 +122,14 @@ export default function ProductPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 text-sm border border-gray-400 rounded-full"
+            className="cursor-pointer rounded-lg border border-[var(--viz-line)] px-5 py-2 text-sm hover:bg-[var(--viz-ground)]"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={() => onConfirm(picked)}
-            className="px-5 py-2 text-sm bg-black text-white rounded-full"
+            className="cursor-pointer rounded-lg bg-[var(--viz-blue)] px-5 py-2 text-sm text-white hover:bg-[var(--viz-blue-deep)]"
           >
             Add {picked.length} product{picked.length === 1 ? "" : "s"}
           </button>

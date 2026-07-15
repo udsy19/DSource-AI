@@ -56,6 +56,16 @@ export const directiveFor = (param, value, spaceKind = "interior") => {
       return `Adjust the lighting so the scene has ${value.toLowerCase()} lighting.`;
     case "colorPalette":
       return `Use a ${value.toLowerCase()} color palette across materials and decor.`;
+    case "flooring":
+      return `Replace the flooring with ${value.toLowerCase()} flooring.`;
+    case "wallFinish":
+      return `Finish the walls with ${value.toLowerCase()} walls.`;
+    case "furnitureDensity":
+      return value === "Minimal"
+        ? "Keep the furnishing minimal and sparse — only essential pieces."
+        : value === "Richly furnished"
+          ? "Furnish the space richly with layered decor, textiles, and accessories."
+          : "Furnish the space to a balanced, livable level.";
     default:
       return null;
   }
@@ -70,8 +80,17 @@ export const directiveFor = (param, value, spaceKind = "interior") => {
  * @returns {{ instruction: string, directives: Array<{param: string, value: string, text: string}> }}
  */
 export const composeRenderPrompt = ({ prompt, params }) => {
-  const { spaceKind, roomType, style, lighting, colorPalette, creativity } =
-    params;
+  const {
+    spaceKind,
+    roomType,
+    style,
+    lighting,
+    colorPalette,
+    flooring,
+    wallFinish,
+    furnitureDensity,
+    creativity,
+  } = params;
 
   const directives = [];
   for (const [param, value] of Object.entries({
@@ -79,6 +98,9 @@ export const composeRenderPrompt = ({ prompt, params }) => {
     style,
     lighting,
     colorPalette,
+    flooring,
+    wallFinish,
+    furnitureDensity,
   })) {
     if (value) {
       directives.push({
@@ -245,7 +267,9 @@ export const locationHintFromBox = (box) => {
 
 /**
  * Compose the instruction for swapping a real catalog product into the room.
- * Image order contract: room photo FIRST, product photo SECOND.
+ * Image order contract (A/B tested on seedream-4): product photo FIRST,
+ * room photo LAST — the model treats the last image as the canvas; the
+ * reverse order produced a product hero shot with the room discarded.
  */
 export const composeSwapPrompt = ({
   productName,
@@ -254,13 +278,14 @@ export const composeSwapPrompt = ({
   prompt,
 }) => {
   const parts = [
-    "Edit the FIRST image, which is a photograph of a room.",
-    `Replace the ${componentLabel || "highlighted item"}${
+    `The first image is a product photo of ${productName}.`,
+    "The last image is a photograph of a room.",
+    `Edit the room photograph: remove the ${componentLabel || "highlighted item"}${
       locationHint ? ` in the ${locationHint} of the image` : ""
-    } with the product shown in the SECOND image (${productName}).`,
-    "Integrate the product realistically: match the room's perspective, scale, lighting, and shadows.",
+    } and place the product from the first image in its position, at the same angle and realistic scale.`,
+    "Reproduce the product's exact design, colors, materials, and proportions.",
     prompt ? sentence(prompt) : null,
-    "Keep the camera angle, room layout, architecture, and every other element exactly unchanged.",
+    "Keep every other element of the room photograph exactly the same — camera angle, walls, floor, rug, curtains, plants, decor, and lighting. Do not add or remove any other furniture or objects.",
     "The result must be a photorealistic, professional interior visualization.",
   ].filter(Boolean);
   return { instruction: parts.join(" "), directives: [] };

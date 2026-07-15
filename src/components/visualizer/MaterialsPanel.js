@@ -5,7 +5,11 @@
  * render via Add-to-Spec or Swap-into-render. Session-scoped to the current
  * base photo (cleared when a new photo is uploaded).
  */
-export default function MaterialsPanel({ materials, onRemove, onAddAllToSpec }) {
+export default function MaterialsPanel({
+  materials,
+  onRemove,
+  onAddAllToSpec,
+}) {
   if (!materials.length) return null;
 
   return (

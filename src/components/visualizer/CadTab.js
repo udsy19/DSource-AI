@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { DEFAULT_MODEL, MODEL_OPTIONS } from "@/utils/replicate-models";
+import { useId, useState } from "react";
 import { CAD_VIEWS } from "@/utils/visualizer/params";
 import ActionBar from "./ActionBar";
 import HistoryStrip from "./HistoryStrip";
 import NoticesBox from "./NoticesBox";
 import { GeneratingOverlay } from "./RenderTab";
+import TitleBlock from "./TitleBlock";
 import UploadCanvas from "./UploadCanvas";
 import { useVisualizerTab } from "./useVisualizerTab";
 
 export default function CadTab() {
+  const fieldId = useId();
   const tab = useVisualizerTab({ mode: "cad" });
   const [view, setView] = useState("floor-plan");
-  const [model, setModel] = useState(DEFAULT_MODEL);
   const [prompt, setPrompt] = useState("");
 
   const handleConvert = () => {
@@ -22,10 +22,9 @@ export default function CadTab() {
       return;
     }
     tab.generate({
-      message: "Converting to a CAD drawing...",
+      message: "Drafting your drawing…",
       promptForHistory: prompt.trim() || null,
       body: {
-        model,
         image: tab.imagePreview,
         prompt: prompt.trim() || undefined,
         params: { view },
@@ -33,25 +32,29 @@ export default function CadTab() {
     });
   };
 
+  const viewLabel = CAD_VIEWS.find((v) => v.value === view)?.label;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
       <aside className="lg:col-span-4">
-        <div className="border-1 border-gray-700 rounded-2xl p-4 sm:p-5">
-          <h2 className="text-lg font-bold">Image to CAD Drawings</h2>
-          <p className="mt-1 text-xs text-gray-600">
+        <div className="viz-panel p-4 sm:p-5">
+          <h2 className="viz-serif text-2xl">Image to CAD</h2>
+          <p className="mt-1.5 text-xs text-[var(--viz-muted)]">
             Convert a room photo or sketch into a clean 2D architectural
             drawing.
           </p>
 
           {/* View */}
-          <div className="mt-4 text-sm font-bold">View</div>
-          <div className="flex mt-2 gap-2">
+          <div className="viz-label mt-5">View</div>
+          <div className="mt-1.5 flex gap-2">
             {CAD_VIEWS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
-                className={`flex-1 border-1 border-gray-700 rounded-lg p-2 text-center text-sm cursor-pointer ${
-                  view === value ? "bg-black text-white" : "bg-white text-black"
+                className={`flex-1 cursor-pointer rounded-md border p-2 text-center text-sm ${
+                  view === value
+                    ? "border-[var(--viz-ink)] bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                    : "border-[var(--viz-line)] bg-white hover:bg-[var(--viz-ground)]"
                 }`}
                 onClick={() => setView(value)}
               >
@@ -62,39 +65,26 @@ export default function CadTab() {
 
           {/* Edits needed */}
           <div className="mt-4">
-            <label className="text-sm font-bold">Edits needed</label>
+            <label className="viz-label" htmlFor={`${fieldId}-prompt`}>
+              Edits needed
+            </label>
             <textarea
-              className="w-full h-24 mt-2 border-1 border-gray-700 rounded-lg px-3 py-3 text-sm resize-none"
+              id={`${fieldId}-prompt`}
+              className="mt-1.5 h-24 w-full resize-none rounded-md border border-[var(--viz-line)] bg-white px-3 py-3 text-sm"
               placeholder="Optional adjustments... (e.g. 'label the kitchen area')"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
             {tab.validationError && (
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{tab.validationError}</p>
+              <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{tab.validationError}</p>
               </div>
             )}
             {tab.error && (
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{tab.error}</p>
+              <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{tab.error}</p>
               </div>
             )}
-          </div>
-
-          {/* Model */}
-          <div className="mt-4">
-            <label className="text-sm font-bold">Model</label>
-            <select
-              className="w-full mt-2 border-1 border-gray-700 rounded-lg p-2 text-sm bg-white"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            >
-              {MODEL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
       </aside>
@@ -107,6 +97,13 @@ export default function CadTab() {
           onReset={tab.resetToOriginal}
           canReset={tab.canResetToOriginal}
           emptyHint="Drag & drop a room photo or floor plan to convert."
+          originalImage={tab.originalUpload}
+        />
+        <TitleBlock
+          sheet="C-01"
+          rev={tab.historyItems.length}
+          verified={tab.isVerified}
+          cells={[{ label: "View", value: viewLabel }]}
         />
         <NoticesBox notices={tab.notices} />
         <HistoryStrip

@@ -9,6 +9,12 @@
 
 export const SPACE_KINDS = ["interior", "exterior", "floor-plan"];
 
+export const SPACE_KIND_LABELS = {
+  interior: "Interior",
+  exterior: "Exterior",
+  "floor-plan": "Floor Plan",
+};
+
 export const ROOM_TYPES = {
   interior: [
     "Living Room",
@@ -31,6 +37,11 @@ export const STYLES = [
   "Minimalist",
   "Bohemian",
   "Japandi",
+  "Art Deco",
+  "Coastal",
+  "Rustic Farmhouse",
+  "Contemporary Luxury",
+  "Wabi-Sabi",
 ];
 
 export const LIGHTING_OPTIONS = [
@@ -39,6 +50,9 @@ export const LIGHTING_OPTIONS = [
   "Cool",
   "Ambient",
   "Dramatic",
+  "Golden Hour",
+  "Evening / Night",
+  "Bright Daylight",
 ];
 
 export const COLOR_PALETTES = [
@@ -48,7 +62,45 @@ export const COLOR_PALETTES = [
   "Monochrome",
   "Bold & Vibrant",
   "Earthy",
+  "Pastel",
+  "Jewel Tones",
 ];
+
+export const FLOORING_OPTIONS = [
+  "Light Oak Hardwood",
+  "Walnut Hardwood",
+  "Marble",
+  "Ceramic Tile",
+  "Polished Concrete",
+  "Terrazzo",
+  "Carpet",
+  "Natural Stone",
+];
+
+export const WALL_FINISHES = [
+  "Painted",
+  "Wallpaper",
+  "Exposed Brick",
+  "Wood Paneling",
+  "Microcement",
+  "Stone Cladding",
+  "Limewash",
+];
+
+export const FURNITURE_DENSITY = ["Minimal", "Balanced", "Richly furnished"];
+
+// UI-only swatch strips for the palette picker — the server never reads
+// these; the palette *name* above is what gets validated and composed.
+export const PALETTE_SWATCHES = {
+  Neutral: ["#e8e3d8", "#cfc8b8", "#a79e8c", "#6e675a"],
+  "Warm Tones": ["#e7c9a9", "#d99a6c", "#b65f3f", "#7c3a2d"],
+  "Cool Tones": ["#d7e0e4", "#a6bcc9", "#6e93a6", "#3f5e70"],
+  Monochrome: ["#f2f2f0", "#c8c8c6", "#8a8a88", "#2e2e2c"],
+  "Bold & Vibrant": ["#d94a3d", "#e8a13c", "#3e7c5b", "#35449c"],
+  Earthy: ["#d9c9a3", "#a98b5f", "#7a6a45", "#4c4632"],
+  Pastel: ["#f0dad5", "#d8e4ee", "#e2ecd5", "#f1e8d0"],
+  "Jewel Tones": ["#116b50", "#22398f", "#8e2040", "#5b2a86"],
+};
 
 export const CREATIVITY_LEVELS = ["precise", "balanced", "creative"];
 
@@ -108,6 +160,24 @@ export const validateRenderParams = (raw = {}) => {
     "colorPalette",
     errors,
   );
+  const flooring = optionalEnum(
+    raw.flooring,
+    FLOORING_OPTIONS,
+    "flooring",
+    errors,
+  );
+  const wallFinish = optionalEnum(
+    raw.wallFinish,
+    WALL_FINISHES,
+    "wallFinish",
+    errors,
+  );
+  const furnitureDensity = optionalEnum(
+    raw.furnitureDensity,
+    FURNITURE_DENSITY,
+    "furnitureDensity",
+    errors,
+  );
   const creativity =
     optionalEnum(raw.creativity, CREATIVITY_LEVELS, "creativity", errors) ??
     "balanced";
@@ -115,7 +185,17 @@ export const validateRenderParams = (raw = {}) => {
   return {
     ok: errors.length === 0,
     errors,
-    params: { spaceKind, roomType, style, lighting, colorPalette, creativity },
+    params: {
+      spaceKind,
+      roomType,
+      style,
+      lighting,
+      colorPalette,
+      flooring,
+      wallFinish,
+      furnitureDensity,
+      creativity,
+    },
   };
 };
 
@@ -125,7 +205,13 @@ export const validateRenderParams = (raw = {}) => {
  */
 export const hasDirectiveParams = (params) =>
   Boolean(
-    params.roomType || params.style || params.lighting || params.colorPalette,
+    params.roomType ||
+      params.style ||
+      params.lighting ||
+      params.colorPalette ||
+      params.flooring ||
+      params.wallFinish ||
+      params.furnitureDensity,
   );
 
 /**

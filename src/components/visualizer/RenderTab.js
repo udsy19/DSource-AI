@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_MODEL } from "@/utils/replicate-models";
+import { useSpec } from "@/contexts/SpecContext";
 import {
   CREATIVITY_LEVELS,
   ROOM_TYPES,
   SPACE_KIND_LABELS,
 } from "@/utils/visualizer/params";
-import { useSpec } from "@/contexts/SpecContext";
 import ActionBar, { CREATIVITY_LABELS } from "./ActionBar";
 import HistoryStrip from "./HistoryStrip";
 import HotspotOverlay from "./HotspotOverlay";
@@ -36,7 +35,9 @@ export default function RenderTab() {
     style: null,
     lighting: null,
     colorPalette: null,
-    model: DEFAULT_MODEL,
+    flooring: null,
+    wallFinish: null,
+    furnitureDensity: null,
     prompt: "",
     variedSeed: true,
   });
@@ -95,7 +96,6 @@ export default function RenderTab() {
       message: "Rendering the room you briefed…",
       promptForHistory: controls.prompt.trim() || null,
       body: {
-        model: controls.model,
         image: tab.imagePreview,
         prompt: controls.prompt.trim() || undefined,
         variedSeed: controls.variedSeed,
@@ -105,6 +105,9 @@ export default function RenderTab() {
           style: controls.style,
           lighting: controls.lighting,
           colorPalette: controls.colorPalette,
+          flooring: controls.flooring,
+          wallFinish: controls.wallFinish,
+          furnitureDensity: controls.furnitureDensity,
           creativity: CREATIVITY_LEVELS[creativityIndex],
         },
       },
@@ -244,7 +247,7 @@ export default function RenderTab() {
     );
   };
 
-  const specProductFromMatch = (match, componentLabel) => ({
+  const specProductFromMatch = (match) => ({
     title: match.name,
     brand: match.brand,
     material: match.category,
@@ -258,7 +261,7 @@ export default function RenderTab() {
 
   const handleAddToSpec = (match) => {
     addProductToSpec(
-      specProductFromMatch(match, matchResult?.label),
+      specProductFromMatch(match),
       matchResult?.label || match.category || "Uncategorized",
     );
     pinMaterial(match, matchResult?.label ?? null);
@@ -275,9 +278,6 @@ export default function RenderTab() {
       message: `Placing “${match.name}” into your render...`,
       promptForHistory: `Swapped in: ${match.name}`,
       body: {
-        // Swap needs a multi-image model; nano-banana is forced regardless of
-        // the dropdown selection.
-        model: "nano-banana",
         image: tab.imagePreview,
         swap: { productId, label: componentLabel, box: swapBox },
         params: {},
@@ -288,7 +288,7 @@ export default function RenderTab() {
   const handleAddAllToSpec = () => {
     for (const material of designMaterials) {
       addProductToSpec(
-        specProductFromMatch(material.match, material.label),
+        specProductFromMatch(material.match),
         material.label || material.match?.category || "Uncategorized",
       );
     }
@@ -469,14 +469,20 @@ export default function RenderTab() {
 
 export function GeneratingOverlay({ message }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2a261e]/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-6 text-center shadow-2xl">
-        <p className="viz-label">In the studio</p>
-        <p className="viz-serif mt-2 text-lg italic">{message}</p>
-        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--viz-ground)]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a261e]/60 p-4 pb-10 backdrop-blur-sm sm:items-center sm:pb-4">
+      <div className="w-full max-w-xl rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-6 shadow-2xl">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="viz-label">In the studio</p>
+          <p className="viz-mono text-[11px] tracking-widest text-[var(--viz-muted)] uppercase">
+            Sheet in progress
+          </p>
+        </div>
+        <p className="viz-serif mt-3 text-xl italic sm:text-2xl">{message}</p>
+        {/* The plotter draws along the rule */}
+        <div className="mt-5 h-[3px] overflow-hidden rounded-full bg-[var(--viz-line)]/50">
           <div className="viz-scan h-full w-1/4 rounded-full bg-[var(--viz-blue)]" />
         </div>
-        <p className="mt-3 text-xs text-[var(--viz-muted)]">
+        <p className="mt-3 max-w-md text-xs text-[var(--viz-muted)]">
           We compare the result against your brief and quietly retry if it
           drifts — this can take a minute. Your original photo is untouched.
         </p>

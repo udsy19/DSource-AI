@@ -28,7 +28,9 @@ export default function MatchResultsModal({
 
   const handleAdd = (match) => {
     onAddToSpec?.(match);
-    setAddedIds((prev) => (prev.includes(match.id) ? prev : [...prev, match.id]));
+    setAddedIds((prev) =>
+      prev.includes(match.id) ? prev : [...prev, match.id],
+    );
   };
 
   return (

@@ -27,6 +27,9 @@ export function useVisualizerTab({ mode }) {
   const [validationError, setValidationError] = useState(null);
   const [error, setError] = useState(null);
   const [notices, setNotices] = useState([]);
+  // Adherence result for the render currently on the canvas (null when the
+  // canvas shows an upload or a history item rather than a fresh render).
+  const [adherence, setAdherence] = useState(null);
 
   const [sessionHistory, setSessionHistory] = useState([]);
   const [serverHistory, setServerHistory] = useState([]);
@@ -48,6 +51,7 @@ export function useVisualizerTab({ mode }) {
       setOriginalUpload(e.target.result);
       setImagePreview(e.target.result);
       setActiveHistoryId(null);
+      setAdherence(null);
     };
     reader.readAsDataURL(file);
   };
@@ -58,11 +62,13 @@ export function useVisualizerTab({ mode }) {
     setActiveHistoryId(null);
     setError(null);
     setNotices([]);
+    setAdherence(null);
   };
 
   const resetToOriginal = () => {
     setImagePreview(originalUpload);
     setActiveHistoryId(null);
+    setAdherence(null);
   };
 
   const fetchServerHistory = useCallback(async () => {
@@ -91,6 +97,7 @@ export function useVisualizerTab({ mode }) {
   const handleHistorySelect = (item) => {
     setImagePreview(item.imageUrl);
     setActiveHistoryId(item.id);
+    setAdherence(null);
   };
 
   const handleHistoryDelete = async (item) => {
@@ -149,6 +156,7 @@ export function useVisualizerTab({ mode }) {
         generated.image
       }`;
       setImagePreview(dataUrl);
+      setAdherence(data.adherence ?? null);
 
       const historyItem = {
         id: data.renderId ?? `session-${Date.now()}`,
@@ -194,6 +202,14 @@ export function useVisualizerTab({ mode }) {
     error,
     notices,
     generate,
+    // True only when the current render was vision-checked against the
+    // brief and every checked parameter passed.
+    isVerified: Boolean(
+      adherence &&
+        !adherence.skipped &&
+        (adherence.checked?.length ?? 0) > 0 &&
+        (adherence.failures?.length ?? 0) === 0,
+    ),
     // history
     historyItems: [...sessionHistory, ...serverHistory],
     activeHistoryId,

@@ -16,13 +16,25 @@ import {
  * skipped rather than blocking the user's result.
  */
 
-const VERIFIABLE_PARAMS = ["roomType", "style", "lighting", "colorPalette"];
+const VERIFIABLE_PARAMS = [
+  "roomType",
+  "style",
+  "lighting",
+  "colorPalette",
+  "flooring",
+  "wallFinish",
+  "furnitureDensity",
+];
 
 const PARAM_QUESTIONS = {
   roomType: (v) => `Does the space clearly read as a ${v}?`,
   style: (v) => `Does the design style clearly match "${v}"?`,
   lighting: (v) => `Does the scene's lighting clearly match "${v}" lighting?`,
   colorPalette: (v) => `Does the color palette clearly match "${v}"?`,
+  flooring: (v) => `Does the floor clearly appear to be ${v}?`,
+  wallFinish: (v) => `Do the walls clearly appear to be ${v}?`,
+  furnitureDensity: (v) =>
+    `Does the level of furnishing clearly read as "${v}"?`,
 };
 
 /**

@@ -126,7 +126,7 @@ export const cropBoxToDataUri = async (
   box,
   // Tight padding: too much context around the item skews both the CLIP
   // embedding and the Gemini description toward the surroundings.
-  { pad = 0.02, maxSize = 512 } = {}
+  { pad = 0.02, maxSize = 512 } = {},
 ) => {
   // Lazy-import: sharp is a native module only needed on this path.
   const { default: sharp } = await import("sharp");
@@ -162,4 +162,32 @@ export const cropBoxToDataUri = async (
     .toBuffer();
 
   return `data:image/png;base64,${out.toString("base64")}`;
+};
+
+/**
+ * Picks the closest supported aspect-ratio enum ("3:2", "4:3", ...) for an
+ * image. Needed for multi-input models where "match_input_image" is
+ * ambiguous (it caused cropped swap outputs).
+ */
+export const aspectRatioFromImage = async (dataUri, supported) => {
+  const { default: sharp } = await import("sharp");
+  const matches = dataUri.match(/^data:[^;]+;base64,(.+)$/);
+  const buffer = Buffer.from(matches ? matches[1] : dataUri, "base64");
+  const { width, height } = await sharp(buffer).metadata();
+  if (!width || !height) return null;
+
+  const ratio = width / height;
+  let best = null;
+  let bestDiff = Infinity;
+  for (const option of supported) {
+    if (!option.includes(":")) continue;
+    const [w, h] = option.split(":").map(Number);
+    if (!w || !h) continue;
+    const diff = Math.abs(Math.log(ratio / (w / h)));
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = option;
+    }
+  }
+  return best;
 };

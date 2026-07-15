@@ -1,10 +1,10 @@
 "use client";
 
-const CREATIVITY_LABELS = ["Precise", "Balance", "Creative"];
+export const CREATIVITY_LABELS = ["Precise", "Balanced", "Creative"];
 
 /**
- * Bottom action bar (per Figma): optional AI creativity slider + the
- * generate/convert button.
+ * Bottom action bar: optional AI creativity slider + the generate/convert
+ * button, styled as the plotter-blue "stamp" of the drawing set.
  */
 export default function ActionBar({
   creativityIndex,
@@ -15,10 +15,10 @@ export default function ActionBar({
   disabled,
 }) {
   return (
-    <div className="mt-4 border-1 border-gray-300 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+    <div className="viz-panel mt-3 flex flex-col items-stretch gap-4 p-4 sm:flex-row sm:items-center">
       {showCreativity
-        ? <div className="flex-1 bg-gray-100 rounded-xl px-4 py-3">
-            <div className="text-sm font-semibold">AI Creativity Level</div>
+        ? <div className="flex-1">
+            <div className="viz-label">AI creativity</div>
             <input
               type="range"
               min={0}
@@ -26,14 +26,18 @@ export default function ActionBar({
               step={1}
               value={creativityIndex}
               onChange={(e) => onCreativityChange(Number(e.target.value))}
-              className="w-full mt-2 accent-black"
+              className="mt-2 w-full accent-[var(--viz-blue)]"
               aria-label="AI creativity level"
             />
-            <div className="flex justify-between text-xs text-gray-600 mt-1">
+            <div className="viz-mono mt-1 flex justify-between text-xs text-[var(--viz-muted)]">
               {CREATIVITY_LABELS.map((label, i) => (
                 <span
                   key={label}
-                  className={i === creativityIndex ? "font-bold" : ""}
+                  className={
+                    i === creativityIndex
+                      ? "font-bold text-[var(--viz-ink)]"
+                      : ""
+                  }
                 >
                   {label}
                 </span>
@@ -45,13 +49,13 @@ export default function ActionBar({
         type="button"
         onClick={onAction}
         disabled={disabled}
-        className={`rounded-full px-10 py-3 text-sm font-semibold ${
+        className={`rounded-full px-9 py-3.5 text-sm font-semibold tracking-wide ${
           disabled
-            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-            : "bg-black text-white cursor-pointer hover:bg-gray-800"
+            ? "cursor-not-allowed bg-[var(--viz-line)] text-[var(--viz-muted)]"
+            : "cursor-pointer bg-[var(--viz-ink)] text-[var(--viz-paper)] hover:bg-black"
         }`}
       >
-        ✦ {actionLabel}
+        {actionLabel}
       </button>
     </div>
   );
