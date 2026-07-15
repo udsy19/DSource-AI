@@ -6,6 +6,7 @@ import {
   canAccessUserRoutes,
   canAccessVendorRoutes,
   getUserRole,
+  isAdmin,
   isUser,
   isVendor,
 } from "@/utils/authorization";
@@ -124,6 +125,7 @@ export function AuthProvider({ children }) {
     // Role checks (for backward compatibility)
     isVendor: isVendor(role),
     isUser: isUser(role),
+    isAdmin: isAdmin(role),
 
     // Authorization helpers
     hasRole,

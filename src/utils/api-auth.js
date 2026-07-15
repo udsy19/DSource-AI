@@ -45,12 +45,17 @@ export function getAdminEmails() {
 }
 
 /**
- * Check if a user is an admin (by email allowlist).
+ * Check if a user is an admin. Two paths:
+ *  1. Granted the `admin` role in app_metadata (service-role controlled; also
+ *     what the DB's is_admin() RLS check uses).
+ *  2. Break-glass: their email is in the ADMIN_EMAILS allowlist. This lets the
+ *     first operator in before any admin role has been granted.
  */
 export function isAdminUser(user) {
-  const email = user?.email?.toLowerCase();
-  if (!email) return false;
-  return getAdminEmails().includes(email);
+  if (!user) return false;
+  if (getUserRole(user) === ROLES.ADMIN) return true;
+  const email = user.email?.toLowerCase();
+  return email ? getAdminEmails().includes(email) : false;
 }
 
 /**

@@ -7,6 +7,9 @@ const protectedRoutes = ["/spec-builder", "/ai-material-finder", "/account"];
 // Routes that require vendor role
 const vendorRoutes = ["/vendor"];
 
+// Routes that require admin role
+const adminRoutes = ["/admin"];
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
@@ -62,6 +65,32 @@ export async function middleware(request) {
   // Role comes ONLY from app_metadata (service-role controlled); user_metadata
   // is user-controlled and must never be trusted for authorization.
   const userRole = user?.app_metadata?.user_type || "user";
+
+  // Admin = granted admin role OR break-glass email allowlist.
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin =
+    userRole === "admin" ||
+    (!!user?.email && adminEmails.includes(user.email.toLowerCase()));
+
+  // Check if route requires admin role
+  if (adminRoutes.some((route) => pathname.startsWith(route))) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+    if (!isAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
 
   // Check if route requires vendor role
   if (vendorRoutes.some((route) => pathname.startsWith(route))) {
