@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 const formatPrice = (match) => {
   if (typeof match.price !== "number") return null;
@@ -12,16 +13,29 @@ const formatPrice = (match) => {
 /**
  * Closest-match results for one detected component: the searched crop plus
  * enriched product cards (material-bank API or the user's own catalog).
+ * `onAddToSpec(match)` / `onSwap(match)` are optional actions supplied by
+ * the hosting tab.
  */
-export default function MatchResultsModal({ result, onClose }) {
+export default function MatchResultsModal({
+  result,
+  onClose,
+  onAddToSpec = null,
+  onSwap = null,
+}) {
+  const [addedIds, setAddedIds] = useState([]);
   if (!result) return null;
   const { label, matches, croppedImage, notice, searchQuery } = result;
+
+  const handleAdd = (match) => {
+    onAddToSpec?.(match);
+    setAddedIds((prev) => (prev.includes(match.id) ? prev : [...prev, match.id]));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#262521]/60 p-4 backdrop-blur-sm">
       <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-5">
         <div className="flex items-center justify-between">
-          <h3 className="viz-display text-xl font-semibold">
+          <h3 className="viz-serif text-xl">
             Closest matches{label ? ` — ${label}` : ""}
           </h3>
           <button
@@ -116,22 +130,49 @@ export default function MatchResultsModal({ result, onClose }) {
                               .join(" · ")}
                           </p>
                         )}
-                        {match.link &&
-                          (isExternal
-                            ? <a
-                                href={match.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block mt-1 text-xs font-semibold border border-black rounded-full px-3 py-1 hover:bg-black hover:text-white transition-colors"
-                              >
-                                View at supplier ↗
-                              </a>
-                            : <Link
-                                href={match.link}
-                                className="inline-block mt-1 text-xs font-semibold border border-black rounded-full px-3 py-1 hover:bg-black hover:text-white transition-colors"
-                              >
-                                View Product
-                              </Link>)}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {onSwap && match.id?.startsWith("mb-") && (
+                            <button
+                              type="button"
+                              onClick={() => onSwap(match)}
+                              className="rounded-full bg-[var(--viz-blue)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:opacity-85"
+                            >
+                              Swap into render
+                            </button>
+                          )}
+                          {onAddToSpec && (
+                            <button
+                              type="button"
+                              onClick={() => handleAdd(match)}
+                              disabled={addedIds.includes(match.id)}
+                              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                                addedIds.includes(match.id)
+                                  ? "cursor-default border-green-600 text-green-700"
+                                  : "border-black hover:bg-black hover:text-white"
+                              }`}
+                            >
+                              {addedIds.includes(match.id)
+                                ? "Added to spec ✓"
+                                : "Add to spec"}
+                            </button>
+                          )}
+                          {match.link &&
+                            (isExternal
+                              ? <a
+                                  href={match.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-full border border-black px-3 py-1 text-xs font-semibold transition-colors hover:bg-black hover:text-white"
+                                >
+                                  Supplier ↗
+                                </a>
+                              : <Link
+                                  href={match.link}
+                                  className="rounded-full border border-black px-3 py-1 text-xs font-semibold transition-colors hover:bg-black hover:text-white"
+                                >
+                                  View Product
+                                </Link>)}
+                        </div>
                       </div>
                     </div>
                   );

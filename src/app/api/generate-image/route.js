@@ -16,10 +16,15 @@ import {
 } from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
 import {
+  isValidBox,
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
   normalizeProductImages,
 } from "@/utils/visualizer/images";
+import {
+  getBankProduct,
+  isMaterialBankConfigured,
+} from "@/utils/visualizer/material-bank";
 import {
   hasDirectiveParams,
   validateCadParams,
@@ -31,6 +36,8 @@ import {
   composeCadPrompt,
   composeMoodboardPrompt,
   composeRenderPrompt,
+  composeSwapPrompt,
+  locationHintFromBox,
   strengthenCadPrompt,
   strengthenPrompt,
 } from "@/utils/visualizer/prompt-composer";
@@ -268,6 +275,65 @@ const prepareRender = async (body, prompt) => {
     return { error: validation.errors.join(" "), status: 400 };
   }
   const params = validation.params;
+
+  // Swap-into-render: fuse a real catalog product into the room. The client
+  // sends only the product id — the canonical image URL is resolved
+  // server-side from the material bank (no client-supplied URLs).
+  if (body.swap && typeof body.swap === "object") {
+    if (!isMaterialBankConfigured()) {
+      return {
+        error: "Product swap requires the material bank connection.",
+        status: 503,
+      };
+    }
+    const productId = Number(body.swap.productId);
+    if (!Number.isFinite(productId)) {
+      return { error: "Invalid product for swap.", status: 400 };
+    }
+    const product = await getBankProduct(productId);
+    if (!product) {
+      return {
+        error: "That product is no longer available in the material bank.",
+        status: 404,
+      };
+    }
+    const productImageRes = await fetch(product.imageUrl);
+    if (!productImageRes.ok) {
+      return {
+        error: "The product's photo could not be loaded — try another match.",
+        status: 502,
+      };
+    }
+    const productBuffer = Buffer.from(await productImageRes.arrayBuffer());
+    const productImage = `data:${
+      productImageRes.headers.get("content-type") || "image/jpeg"
+    };base64,${productBuffer.toString("base64")}`;
+
+    const componentLabel =
+      typeof body.swap.label === "string" ? body.swap.label.slice(0, 60) : null;
+    const locationHint = isValidBox(body.swap.box)
+      ? locationHintFromBox(body.swap.box)
+      : null;
+
+    const composeInput = {
+      productName: product.title,
+      componentLabel,
+      locationHint,
+      prompt,
+    };
+    return {
+      params: { ...params, swapProductId: productId },
+      // Order contract with the composer: room FIRST, product SECOND.
+      images: [normalized.image, productImage],
+      requiresImage: true,
+      requiresMultiImage: true,
+      defaultModel: DEFAULT_MOODBOARD_MODEL,
+      instruction: composeSwapPrompt(composeInput).instruction,
+      // Style params don't apply to a swap; skip param verification.
+      verify: async () => ({ checked: [], failures: [], skipped: false }),
+      strengthen: () => composeSwapPrompt(composeInput).instruction,
+    };
+  }
 
   if (!prompt && !hasDirectiveParams(params)) {
     return {

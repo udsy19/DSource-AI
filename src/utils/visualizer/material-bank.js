@@ -109,3 +109,33 @@ export const searchMaterialBank = async (query, k = 8) => {
     clearTimeout(timer);
   }
 };
+
+/**
+ * Fetches one product record by id from the material bank. Used by
+ * swap-into-render: the client sends only the product id and the server
+ * resolves the canonical image URL itself (no client-supplied URLs).
+ */
+export const getBankProduct = async (productId) => {
+  const base = process.env.MATERIAL_BANK_API_URL.replace(/\/$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(
+      `${base}/api/product/${encodeURIComponent(productId)}`,
+      {
+        signal: controller.signal,
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const product = data?.product;
+    if (!product?.image_url) return null;
+    return {
+      id: product.id,
+      title: product.title ?? "product",
+      imageUrl: product.image_url,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+};

@@ -227,3 +227,41 @@ export const strengthenPrompt = (
 
   return [...emphasized, instruction].join(" ");
 };
+
+// --- Swap product into render -------------------------------------------
+
+const LOCATION_COLS = ["left", "center", "right"];
+const LOCATION_ROWS = ["upper", "middle", "lower"];
+
+/** Rough human-readable location of a box_2d center, e.g. "lower left". */
+export const locationHintFromBox = (box) => {
+  if (!Array.isArray(box) || box.length !== 4) return null;
+  const cx = (box[1] + box[3]) / 2;
+  const cy = (box[0] + box[2]) / 2;
+  const col = LOCATION_COLS[Math.min(2, Math.floor(cx / 334))];
+  const row = LOCATION_ROWS[Math.min(2, Math.floor(cy / 334))];
+  return row === "middle" && col === "center" ? "center" : `${row} ${col}`;
+};
+
+/**
+ * Compose the instruction for swapping a real catalog product into the room.
+ * Image order contract: room photo FIRST, product photo SECOND.
+ */
+export const composeSwapPrompt = ({
+  productName,
+  componentLabel,
+  locationHint,
+  prompt,
+}) => {
+  const parts = [
+    "Edit the FIRST image, which is a photograph of a room.",
+    `Replace the ${componentLabel || "highlighted item"}${
+      locationHint ? ` in the ${locationHint} of the image` : ""
+    } with the product shown in the SECOND image (${productName}).`,
+    "Integrate the product realistically: match the room's perspective, scale, lighting, and shadows.",
+    prompt ? sentence(prompt) : null,
+    "Keep the camera angle, room layout, architecture, and every other element exactly unchanged.",
+    "The result must be a photorealistic, professional interior visualization.",
+  ].filter(Boolean);
+  return { instruction: parts.join(" "), directives: [] };
+};

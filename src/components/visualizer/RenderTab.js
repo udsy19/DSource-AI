@@ -7,10 +7,12 @@ import {
   ROOM_TYPES,
   SPACE_KIND_LABELS,
 } from "@/utils/visualizer/params";
+import { useSpec } from "@/contexts/SpecContext";
 import ActionBar, { CREATIVITY_LABELS } from "./ActionBar";
 import HistoryStrip from "./HistoryStrip";
 import HotspotOverlay from "./HotspotOverlay";
 import MatchResultsModal from "./MatchResultsModal";
+import MaterialsPanel from "./MaterialsPanel";
 import NoticesBox from "./NoticesBox";
 import RenderControls from "./RenderControls";
 import TitleBlock from "./TitleBlock";
@@ -47,6 +49,10 @@ export default function RenderTab() {
   const [matchResult, setMatchResult] = useState(null);
   const [findError, setFindError] = useState(null);
 
+  // --- Materials pinned to this design (via Add-to-Spec / Swap) ---
+  const { addProductToSpec } = useSpec();
+  const [designMaterials, setDesignMaterials] = useState([]);
+
   // Hotspots belong to a specific image — clear them whenever it changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on image change only
   useEffect(() => {
@@ -55,6 +61,13 @@ export default function RenderTab() {
     setSearchingLabel(null);
     setSearchStage(null);
   }, [tab.imagePreview]);
+
+  // Pinned materials belong to the design session — reset on a new photo,
+  // not on every chained edit of the same base.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on base-photo change only
+  useEffect(() => {
+    setDesignMaterials([]);
+  }, [tab.originalUpload]);
 
   const handleControlChange = (key, value) => {
     setControls((prev) => {
@@ -79,7 +92,7 @@ export default function RenderTab() {
       return;
     }
     tab.generate({
-      message: "Generating your render...",
+      message: "Rendering the room you briefed…",
       promptForHistory: controls.prompt.trim() || null,
       body: {
         model: controls.model,
@@ -193,7 +206,9 @@ export default function RenderTab() {
         return;
       }
       setMatchResult({
+        resultId: Date.now(),
         label: label || "Selected area",
+        box: box_2d,
         matches: final.matches ?? [],
         croppedImage: final.croppedImage ?? null,
         notice: final.notice ?? null,
@@ -204,6 +219,78 @@ export default function RenderTab() {
     } finally {
       setSearchingLabel(null);
       setSearchStage(null);
+    }
+  };
+
+  // --- Pin / spec / swap actions from the match modal ---
+  const pinMaterial = (match, componentLabel) => {
+    setDesignMaterials((prev) =>
+      prev.some((m) => m.id === match.id)
+        ? prev
+        : [
+            ...prev,
+            {
+              key: `${match.id}-${componentLabel ?? ""}`,
+              id: match.id,
+              name: match.name,
+              brand: match.brand,
+              price: match.price ?? null,
+              imageUrl: match.imageUrl,
+              label: componentLabel,
+              link: match.link ?? null,
+              match,
+            },
+          ],
+    );
+  };
+
+  const specProductFromMatch = (match, componentLabel) => ({
+    title: match.name,
+    brand: match.brand,
+    material: match.category,
+    finish: match.finish || "N/A",
+    dimensions: match.size || 'W: N/A" H: N/A"',
+    color: match.color || match.finish || "N/A",
+    price: typeof match.price === "number" ? match.price : 0,
+    image: match.imageUrl,
+    link: match.link || "/marketplace",
+  });
+
+  const handleAddToSpec = (match) => {
+    addProductToSpec(
+      specProductFromMatch(match, matchResult?.label),
+      matchResult?.label || match.category || "Uncategorized",
+    );
+    pinMaterial(match, matchResult?.label ?? null);
+  };
+
+  const handleSwap = (match) => {
+    const productId = Number(String(match.id).replace(/^mb-/, ""));
+    if (!Number.isFinite(productId)) return;
+    pinMaterial(match, matchResult?.label ?? null);
+    const swapBox = matchResult?.box ?? null;
+    const componentLabel = matchResult?.label ?? null;
+    setMatchResult(null);
+    tab.generate({
+      message: `Placing “${match.name}” into your render...`,
+      promptForHistory: `Swapped in: ${match.name}`,
+      body: {
+        // Swap needs a multi-image model; nano-banana is forced regardless of
+        // the dropdown selection.
+        model: "nano-banana",
+        image: tab.imagePreview,
+        swap: { productId, label: componentLabel, box: swapBox },
+        params: {},
+      },
+    });
+  };
+
+  const handleAddAllToSpec = () => {
+    for (const material of designMaterials) {
+      addProductToSpec(
+        specProductFromMatch(material.match, material.label),
+        material.label || material.match?.category || "Uncategorized",
+      );
     }
   };
 
@@ -228,6 +315,7 @@ export default function RenderTab() {
           onReset={tab.resetToOriginal}
           canReset={tab.canResetToOriginal}
           emptyHint="Drag & drop or choose a room photo to upload."
+          originalImage={tab.originalUpload}
           onRegionSelect={
             searchingLabel
               ? null
@@ -252,14 +340,27 @@ export default function RenderTab() {
         <TitleBlock
           sheet="A-01"
           rev={tab.historyItems.length}
+          verified={tab.isVerified}
           cells={[
-            { label: "Kind", value: SPACE_KIND_LABELS[controls.spaceKind] },
-            { label: "Space", value: controls.roomType },
+            {
+              label: "Space",
+              value: controls.roomType ?? SPACE_KIND_LABELS[controls.spaceKind],
+            },
             { label: "Style", value: controls.style },
             { label: "Light", value: controls.lighting },
             { label: "Palette", value: controls.colorPalette },
             { label: "Mode", value: CREATIVITY_LABELS[creativityIndex] },
           ]}
+        />
+
+        <MaterialsPanel
+          materials={designMaterials}
+          onRemove={(material) =>
+            setDesignMaterials((prev) =>
+              prev.filter((m) => m.key !== material.key),
+            )
+          }
+          onAddAllToSpec={handleAddAllToSpec}
         />
 
         {/* Reverse material search entry point */}
@@ -352,8 +453,11 @@ export default function RenderTab() {
       </section>
 
       <MatchResultsModal
+        key={matchResult?.resultId ?? "none"}
         result={matchResult}
         onClose={() => setMatchResult(null)}
+        onAddToSpec={handleAddToSpec}
+        onSwap={handleSwap}
       />
 
       {tab.isGenerating.state && (
@@ -365,16 +469,16 @@ export default function RenderTab() {
 
 export function GeneratingOverlay({ message }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#262521]/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2a261e]/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-6 text-center shadow-2xl">
-        <p className="viz-label">Plotting</p>
-        <p className="mt-2 text-base">{message}</p>
+        <p className="viz-label">In the studio</p>
+        <p className="viz-serif mt-2 text-lg italic">{message}</p>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--viz-ground)]">
           <div className="viz-scan h-full w-1/4 rounded-full bg-[var(--viz-blue)]" />
         </div>
         <p className="mt-3 text-xs text-[var(--viz-muted)]">
-          We check that your parameters were applied and retry automatically if
-          needed — this can take a minute.
+          We compare the result against your brief and quietly retry if it
+          drifts — this can take a minute. Your original photo is untouched.
         </p>
       </div>
     </div>
