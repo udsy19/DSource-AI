@@ -15,13 +15,9 @@ export default async function VendorPage() {
   const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
 
-  const [
-    { data: { user }, error: userError },
-    { data: sessionData },
-  ] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   let totalProducts = 0;
   let recentProducts = [];

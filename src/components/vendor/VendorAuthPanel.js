@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { mapAuthError, validateEmail } from "@/utils/auth-validation";
 import { createClient } from "@/utils/supabase/client";
 
 const EMAIL_REDIRECT_FALLBACK = "/vendor";
@@ -29,28 +31,31 @@ export default function VendorAuthPanel() {
     setFeedback(null);
 
     try {
-      const trimmedEmail = form.email.trim().toLowerCase();
-      const parsedPassword = form.password.trim();
+      const emailCheck = validateEmail(form.email);
+      if (!emailCheck.valid) {
+        setFeedback({ type: "error", message: emailCheck.message });
+        setSubmitting(false);
+        return;
+      }
+      const trimmedEmail = emailCheck.value;
+      const parsedPassword = form.password;
 
-      if (!trimmedEmail || !parsedPassword) {
-        setFeedback({
-          type: "error",
-          message: "Please provide both email and password.",
-        });
+      if (!parsedPassword) {
+        setFeedback({ type: "error", message: "Please enter your password." });
         setSubmitting(false);
         return;
       }
 
       let response;
       if (mode === "signUp") {
+        // A self-service signup must NOT grant the vendor role. Roles are read
+        // only from app_metadata, which is not settable from the client. An
+        // admin grants vendor access via /api/admin/grant-role after review.
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
           options: {
-            emailRedirectTo: emailRedirect,
-            data: {
-              user_type: "vendor",
-            },
+            emailRedirectTo: `${emailRedirect}`,
           },
         });
       } else {
@@ -61,30 +66,25 @@ export default function VendorAuthPanel() {
       }
 
       if (response.error) {
-        throw response.error;
+        setFeedback({
+          type: "error",
+          message: mapAuthError(response.error).message,
+        });
+        setSubmitting(false);
+        return;
       }
 
       if (mode === "signUp") {
         setFeedback({
           type: "success",
           message:
-            "Check your inbox to confirm the email address before logging in.",
+            "Thanks for registering. Confirm your email, then an administrator will review your request and provision vendor access before you can upload products.",
         });
       } else {
-        // After sign in, refresh the session to get updated user data
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          console.log("Session after login:", session.user);
-          console.log("User metadata:", session.user.user_metadata);
-          console.log("App metadata:", session.user.app_metadata);
-        }
         router.refresh();
       }
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error?.message ?? "Something went wrong. Please try again.",
-      });
+      setFeedback({ type: "error", message: mapAuthError(error).message });
     } finally {
       setSubmitting(false);
     }
@@ -100,9 +100,10 @@ export default function VendorAuthPanel() {
           {mode === "signIn" ? "Sign in to upload products" : "Request access"}
         </h1>
         <p className="text-sm text-gray-600">
-          Use your vendor email credentials. New partners can request access via
-          the sign-up form below—we&apos;ll send a confirmation link to verify
-          your address.
+          Use your vendor email credentials to sign in. New partners can
+          register below, but vendor access is provisioned by an
+          administrator—signing up creates an account only and does not grant
+          vendor permissions.
         </p>
       </div>
 
@@ -177,8 +178,8 @@ export default function VendorAuthPanel() {
           {submitting
             ? "Processing..."
             : mode === "signIn"
-            ? "Sign in"
-            : "Request access"}
+              ? "Sign in"
+              : "Request access"}
         </button>
       </form>
 
@@ -195,10 +196,21 @@ export default function VendorAuthPanel() {
       )}
 
       {mode === "signIn" && (
-        <p className="mt-4 text-xs text-gray-500">
-          Need an account? Switch to &ldquo;Request access&rdquo; and we&apos;ll
-          guide you through onboarding with Supabase email auth.
-        </p>
+        <>
+          <p className="mt-4 text-xs text-gray-500">
+            Need an account? Switch to &ldquo;Request access&rdquo; to register.
+            An administrator will provision vendor access after reviewing your
+            request.
+          </p>
+          <p className="mt-2 text-xs">
+            <Link
+              href="/forgot-password"
+              className="font-medium text-gray-500 hover:text-gray-900 hover:underline"
+            >
+              Forgot your password?
+            </Link>
+          </p>
+        </>
       )}
     </div>
   );
