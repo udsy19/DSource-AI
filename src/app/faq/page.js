@@ -1,8 +1,11 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 import Reveal from "@/components/Reveal";
+
+export const metadata = {
+  title: "FAQ — DSource.AI",
+  description:
+    "Answers about DSource.AI's tools, brand partners, and how the platform works.",
+};
 
 // FAQ data organized by category
 const faqData = {
@@ -116,63 +119,29 @@ const faqData = {
   ],
 };
 
-const categories = ["All", ...Object.keys(faqData)];
+const categories = Object.keys(faqData);
 
-function AccordionItem({ question, answer, isOpen, onToggle }) {
-  return (
-    <div className="border-b border-[var(--viz-line)]">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-4 py-4 text-left transition-colors hover:text-[var(--viz-muted)]"
+const slugify = (name) => name.toLowerCase().replace(/\s+/g, "-");
+
+/** Ruled Q&A row: native details/summary — no state, no JS. */
+const QuestionRow = ({ question, answer }) => (
+  <details className="group border-b border-[var(--viz-line)]">
+    <summary className="flex cursor-pointer list-none items-baseline justify-between gap-4 py-4 text-sm transition-colors hover:text-[var(--viz-muted)] sm:text-base [&::-webkit-details-marker]:hidden">
+      {question}
+      <span
+        aria-hidden="true"
+        className="viz-mono shrink-0 text-sm text-[var(--viz-muted)] transition-transform duration-200 group-open:rotate-45"
       >
-        <span className="text-sm sm:text-base">{question}</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          aria-hidden="true"
-          className={`h-4 w-4 flex-shrink-0 text-[var(--viz-muted)] transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-          />
-        </svg>
-      </button>
-      {isOpen && (
-        <p className="max-w-2xl pb-5 text-sm leading-relaxed text-[var(--viz-ink)]/80 sm:text-base">
-          {answer}
-        </p>
-      )}
-    </div>
-  );
-}
+        +
+      </span>
+    </summary>
+    <p className="max-w-2xl pb-5 text-sm leading-relaxed text-[var(--viz-ink)]/80 sm:text-base">
+      {answer}
+    </p>
+  </details>
+);
 
 export default function FAQPage() {
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [openItems, setOpenItems] = useState({});
-
-  const toggleItem = (category, index) => {
-    const key = `${category}-${index}`;
-    setOpenItems((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const isItemOpen = (category, index) =>
-    openItems[`${category}-${index}`] || false;
-
-  const categoriesToDisplay =
-    selectedCategory === "All" ? Object.keys(faqData) : [selectedCategory];
-
   return (
     <div className="viz-scope min-h-screen w-full">
       <div className="mx-auto max-w-4xl px-4 pt-24 pb-16 sm:px-8 sm:pt-32 md:pt-36 md:pb-24">
@@ -188,74 +157,69 @@ export default function FAQPage() {
               aria-hidden="true"
             />
             <span className="viz-dots-rule" aria-hidden="true" />
-            <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
-              Frequently asked questions
-            </h1>
-            <p className="viz-serif mt-4 max-w-2xl text-lg italic text-[var(--viz-muted)] sm:text-xl">
-              Have questions about DSource AI tools or brand partners? Get
-              answers fast.
-            </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+              <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
+                Frequently asked questions
+              </h1>
+              <p className="viz-serif max-w-md pb-1 text-base italic text-[var(--viz-muted)] sm:text-lg lg:text-right">
+                Have questions about DSource AI tools or brand partners? Get
+                answers fast.
+              </p>
+            </div>
           </div>
         </Reveal>
 
-        {/* Topic filter — a typeset run, the selected word inked */}
-        <Reveal className="mt-10 sm:mt-12">
-          <fieldset>
-            <legend className="viz-label">Topic</legend>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setSelectedCategory(category)}
-                  aria-pressed={selectedCategory === category}
-                  className={`viz-mono px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
-                    selectedCategory === category
-                      ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
-                      : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
-                  }`}
+        {/* Topic index — a typeset run of anchors down the document */}
+        <nav aria-label="FAQ topics" className="mt-10 sm:mt-12">
+          <p className="viz-label">Topics</p>
+          <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+            {categories.map((category) => (
+              <li key={category}>
+                <a
+                  href={`#${slugify(category)}`}
+                  className="viz-mono text-[11px] uppercase tracking-[0.08em] text-[var(--viz-muted)] transition-colors hover:text-[var(--viz-ink)]"
                 >
-                  {category}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        </Reveal>
+                  {category} ↓
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         {/* Question sections */}
-        {categoriesToDisplay.map((category) => (
-          <Reveal key={category} className="mt-12 sm:mt-16">
+        {categories.map((category) => (
+          <section
+            key={category}
+            id={slugify(category)}
+            className="mt-12 scroll-mt-24 sm:mt-16"
+          >
             <div className="border-t border-[var(--viz-line)] pt-2">
-              <p className="viz-label">{category}</p>
+              <h2 className="viz-label">{category}</h2>
             </div>
             <div className="mt-2">
-              {faqData[category].map((item, index) => (
-                <AccordionItem
+              {faqData[category].map((item) => (
+                <QuestionRow
                   key={item.question}
                   question={item.question}
                   answer={item.answer}
-                  isOpen={isItemOpen(category, index)}
-                  onToggle={() => toggleItem(category, index)}
                 />
               ))}
             </div>
-          </Reveal>
+          </section>
         ))}
 
         {/* Hand-off */}
-        <Reveal className="mt-16 sm:mt-24">
-          <div className="border-t border-[var(--viz-line)] pt-6">
-            <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
-              Didn't find your answer?
-            </p>
-            <Link
-              href="/help-center"
-              className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
-            >
-              Visit the help center →
-            </Link>
-          </div>
-        </Reveal>
+        <div className="mt-16 border-t border-[var(--viz-line)] pt-6 sm:mt-24">
+          <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
+            Didn&rsquo;t find your answer?
+          </p>
+          <Link
+            href="/help-center"
+            className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
+          >
+            Visit the help center →
+          </Link>
+        </div>
       </div>
     </div>
   );

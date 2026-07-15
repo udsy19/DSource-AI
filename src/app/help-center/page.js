@@ -1,18 +1,14 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
 import Reveal from "@/components/Reveal";
 
 import contactImage from "../../../public/spacejoy.jpg";
 
-const CONTACT_FIELDS = [
-  { name: "firstName", label: "First name", type: "text" },
-  { name: "lastName", label: "Last name", type: "text" },
-  { name: "email", label: "Email", type: "email" },
-  { name: "country", label: "Country", type: "text" },
-];
+export const metadata = {
+  title: "Help center — DSource.AI",
+  description:
+    "Support for designers, architects, brands, and suppliers using DSource.AI — and how to reach the studio directly.",
+};
 
 const helpCategories = [
   {
@@ -74,54 +70,6 @@ const helpCategories = [
 ];
 
 export default function HelpCenterPage() {
-  const formRef = useRef(null);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    country: "",
-    message: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null);
-
-  const scrollToForm = () => {
-    formRef.current?.scrollIntoView({ behavior: "smooth" });
-    formRef.current?.querySelector("input")?.focus();
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setSubmitStatus("success");
-    setIsSubmitting(false);
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      country: "",
-      message: "",
-    });
-
-    // Clear status after 3 seconds
-    setTimeout(() => setSubmitStatus(null), 3000);
-  };
-
-  const inputClasses =
-    "w-full rounded-md border border-[var(--viz-line)] bg-transparent px-3 py-2.5 text-sm text-[var(--viz-ink)] focus:border-[var(--viz-ink)] focus:outline-none";
-
   return (
     <div className="viz-scope min-h-screen w-full">
       <div className="mx-auto max-w-4xl px-4 pt-24 pb-16 sm:px-8 sm:pt-32 md:pt-36 md:pb-24">
@@ -129,13 +77,12 @@ export default function HelpCenterPage() {
         <Reveal>
           <div className="flex items-baseline justify-between gap-4 pb-2">
             <p className="viz-label">Help center</p>
-            <button
-              type="button"
-              onClick={scrollToForm}
+            <a
+              href="#contact"
               className="viz-label hidden transition-colors hover:text-[var(--viz-ink)] sm:block"
             >
               Contact us →
-            </button>
+            </a>
           </div>
           <div className="relative pt-5">
             <span
@@ -143,17 +90,20 @@ export default function HelpCenterPage() {
               aria-hidden="true"
             />
             <span className="viz-dots-rule" aria-hidden="true" />
-            <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
-              Help center
-            </h1>
-            <p className="viz-serif mt-4 max-w-2xl text-lg italic text-[var(--viz-muted)] sm:text-xl">
-              Any questions you have can be resolved here.
-            </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+              <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
+                Help center
+              </h1>
+              <p className="viz-serif max-w-md pb-1 text-base italic text-[var(--viz-muted)] sm:text-lg lg:text-right">
+                Any questions you have can be resolved here.
+              </p>
+            </div>
           </div>
         </Reveal>
 
-        {/* Contact */}
-        <Reveal className="mt-12 sm:mt-16">
+        {/* Contact — an honest channel: mail goes straight to the studio.
+            (The old form only pretended to send; it was removed, not wired.) */}
+        <section id="contact" className="mt-12 sm:mt-16">
           <div className="border-t border-[var(--viz-line)] pt-2">
             <p className="viz-label">Contact</p>
           </div>
@@ -168,65 +118,36 @@ export default function HelpCenterPage() {
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
             </div>
-            <form
-              id="contact"
-              ref={formRef}
-              onSubmit={handleSubmit}
-              className="viz-panel p-6 sm:p-8"
-            >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {CONTACT_FIELDS.map(({ name, label, type }) => (
-                  <div key={name}>
-                    <label htmlFor={`contact-${name}`} className="viz-label">
-                      {label}*
-                    </label>
-                    <input
-                      id={`contact-${name}`}
-                      type={type}
-                      name={name}
-                      value={formData[name]}
-                      onChange={handleInputChange}
-                      required
-                      className={`mt-1.5 ${inputClasses}`}
-                    />
-                  </div>
-                ))}
+            <div className="viz-panel flex flex-col p-6 sm:p-8">
+              <p className="viz-serif text-xl italic text-[var(--viz-muted)] sm:text-2xl">
+                Write to the studio.
+              </p>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--viz-ink)]/85 sm:text-base">
+                Questions, feedback, requests for a brand you&rsquo;d like to
+                see on the platform — send them straight to our inbox. Include
+                your name and country if it helps us route your message.
+              </p>
+              <div className="mt-6 border-t border-[var(--viz-line)] pt-4">
+                <p className="viz-label">Email</p>
+                <a
+                  href="mailto:hello@dsource.ai"
+                  className="viz-mono mt-1 inline-block text-sm underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
+                >
+                  hello@dsource.ai
+                </a>
               </div>
-
-              <div className="mt-4">
-                <label htmlFor="contact-message" className="viz-label">
-                  Message*
-                </label>
-                <textarea
-                  id="contact-message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleInputChange}
-                  required
-                  rows={4}
-                  className={`mt-1.5 resize-none ${inputClasses}`}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-6 w-full rounded-full bg-[var(--viz-ink)] py-2.5 text-sm text-[var(--viz-paper)] transition-colors hover:bg-[var(--viz-well)] disabled:cursor-not-allowed disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)]"
+              <a
+                href="mailto:hello@dsource.ai"
+                className="mt-6 inline-block self-start rounded-full bg-[var(--viz-ink)] px-7 py-3 text-sm text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
               >
-                {isSubmitting ? "Submitting…" : "Submit"}
-              </button>
-
-              {submitStatus === "success" && (
-                <p className="viz-mono mt-4 text-xs text-[var(--viz-blue)]">
-                  Thank you! Your message has been sent successfully.
-                </p>
-              )}
-            </form>
+                Open your email app
+              </a>
+            </div>
           </div>
-        </Reveal>
+        </section>
 
         {/* Can we help? */}
-        <Reveal className="mt-14 sm:mt-20">
+        <section className="mt-14 sm:mt-20">
           <div className="border-t border-[var(--viz-line)] pt-2">
             <p className="viz-label">Topics</p>
           </div>
@@ -246,22 +167,20 @@ export default function HelpCenterPage() {
               </div>
             ))}
           </div>
-        </Reveal>
+        </section>
 
         {/* Hand-off */}
-        <Reveal className="mt-16 sm:mt-24">
-          <div className="border-t border-[var(--viz-line)] pt-6">
-            <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
-              Explore DSource.AI — watch the demo anytime.
-            </p>
-            <Link
-              href="#"
-              className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
-            >
-              Watch the demo →
-            </Link>
-          </div>
-        </Reveal>
+        <div className="mt-16 border-t border-[var(--viz-line)] pt-6 sm:mt-24">
+          <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
+            New to the studio? Start with how it works.
+          </p>
+          <Link
+            href="/ai-material-finder/tutorial"
+            className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
+          >
+            How the studio works →
+          </Link>
+        </div>
       </div>
     </div>
   );

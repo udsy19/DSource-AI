@@ -133,7 +133,6 @@ const BILLING_PERIODS = ["monthly", "yearly"];
 
 export default function PricingPage() {
   const [billingPeriod, setBillingPeriod] = useState("monthly");
-  const [openFaq, setOpenFaq] = useState(null);
 
   const currentPlans = pricingPlans[billingPeriod];
 
@@ -152,122 +151,99 @@ export default function PricingPage() {
               aria-hidden="true"
             />
             <span className="viz-dots-rule" aria-hidden="true" />
-            <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
-              Pricing
-            </h1>
-            <p className="viz-serif mt-4 max-w-2xl text-lg italic text-[var(--viz-muted)] sm:text-xl">
-              Step into the future of material sourcing.
-            </p>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--viz-ink)]/85">
-              Get access to AI-powered tools that help architects and interior
-              designers discover materials faster, visualize ideas instantly,
-              and generate project-ready details with ease.
-            </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+              <h1 className="viz-serif text-4xl leading-none sm:text-5xl">
+                Pricing
+              </h1>
+              <p className="viz-serif max-w-md pb-1 text-base italic text-[var(--viz-muted)] sm:text-lg lg:text-right">
+                Step into the future of material sourcing.
+              </p>
+            </div>
           </div>
+          <p className="mt-6 max-w-2xl text-base leading-relaxed text-[var(--viz-ink)]/85">
+            Get access to AI-powered tools that help architects and interior
+            designers discover materials faster, visualize ideas instantly, and
+            generate project-ready details with ease.
+          </p>
         </Reveal>
 
         {/* Billing toggle — a typeset pair, the selected word inked */}
-        <Reveal className="mt-10 sm:mt-12">
-          <fieldset>
-            <legend className="viz-label">Billing</legend>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              {BILLING_PERIODS.map((period) => (
-                <button
-                  key={period}
-                  type="button"
-                  onClick={() => setBillingPeriod(period)}
-                  aria-pressed={billingPeriod === period}
-                  className={`viz-mono px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
-                    billingPeriod === period
-                      ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
-                      : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
-                  }`}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        </Reveal>
-
-        {/* Plans */}
-        <Reveal className="mt-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {currentPlans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`flex flex-col p-6 sm:p-7 ${
-                  plan.featured
-                    ? "rounded-2xl bg-[var(--viz-well)]"
-                    : "viz-panel"
+        <fieldset className="mt-10 sm:mt-12">
+          <legend className="viz-label">Billing</legend>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {BILLING_PERIODS.map((period) => (
+              <button
+                key={period}
+                type="button"
+                onClick={() => setBillingPeriod(period)}
+                aria-pressed={billingPeriod === period}
+                className={`viz-mono px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
+                  billingPeriod === period
+                    ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                    : "cursor-pointer text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
                 }`}
               >
-                <p
-                  className={`viz-label ${plan.featured ? "text-stone-400" : ""}`}
-                >
-                  {plan.name}
-                </p>
-                <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
-                  <span
-                    className={`viz-serif text-3xl ${
-                      plan.featured ? "text-stone-100" : ""
-                    }`}
-                  >
-                    {plan.price}
-                  </span>
-                  {plan.priceSubtext && (
-                    <span
-                      className={`viz-mono text-[11px] ${
-                        plan.featured
-                          ? "text-stone-400"
-                          : "text-[var(--viz-muted)]"
-                      }`}
-                    >
-                      {plan.priceSubtext}
-                    </span>
-                  )}
-                </div>
-                <ul className="mt-6 flex-grow space-y-2.5">
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className={`flex gap-2 text-sm leading-relaxed ${
-                        plan.featured
-                          ? "text-stone-300"
-                          : "text-[var(--viz-ink)]/85"
-                      }`}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`viz-mono ${
-                          plan.featured
-                            ? "text-stone-500"
-                            : "text-[var(--viz-muted)]"
-                        }`}
-                      >
-                        –
-                      </span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/signup"
-                  className={`mt-8 rounded-full border py-2.5 text-center text-sm transition-colors ${
-                    plan.featured
-                      ? "border-stone-500 text-stone-100 hover:border-stone-300"
-                      : "border-[var(--viz-ink)] text-[var(--viz-ink)] hover:bg-[var(--viz-ink)] hover:text-[var(--viz-paper)]"
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
+                {period}
+              </button>
             ))}
           </div>
-        </Reveal>
+        </fieldset>
 
-        {/* Questions about pricing */}
-        <Reveal className="mt-14 sm:mt-20">
+        {/* Plans — one plate label, three cells with hairline dividers.
+            The Pro cell is marked in indigo, never a second dark surface. */}
+        <div className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)] md:grid-cols-3">
+          {currentPlans.map((plan) => (
+            <div
+              key={plan.name}
+              className="flex flex-col bg-[var(--viz-paper)] p-6 sm:p-7"
+            >
+              <p
+                className={`viz-label ${
+                  plan.featured ? "font-bold text-[var(--viz-blue)]" : ""
+                }`}
+              >
+                {plan.name}
+              </p>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+                <span className="viz-serif text-3xl">{plan.price}</span>
+                {plan.priceSubtext && (
+                  <span className="viz-mono text-[11px] text-[var(--viz-muted)]">
+                    {plan.priceSubtext}
+                  </span>
+                )}
+              </div>
+              <ul className="mt-6 flex-grow space-y-2.5">
+                {plan.features.map((feature) => (
+                  <li
+                    key={feature}
+                    className="flex gap-2 text-sm leading-relaxed text-[var(--viz-ink)]/85"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="viz-mono text-[var(--viz-muted)]"
+                    >
+                      –
+                    </span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className={`mt-8 rounded-full py-2.5 text-center text-sm transition-colors ${
+                  plan.featured
+                    ? "bg-[var(--viz-ink)] text-[var(--viz-paper)] hover:bg-[var(--viz-well)]"
+                    : "border border-[var(--viz-ink)] text-[var(--viz-ink)] hover:bg-[var(--viz-ink)] hover:text-[var(--viz-paper)]"
+                }`}
+              >
+                {plan.cta}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Questions about pricing — ruled Q&A, native details/summary */}
+        <section className="mt-14 sm:mt-20">
           <div className="border-t border-[var(--viz-line)] pt-2">
             <p className="viz-label">Questions</p>
           </div>
@@ -275,48 +251,30 @@ export default function PricingPage() {
             Questions about pricing?
           </h2>
           <div className="mt-4">
-            {faqItems.map((item, index) => (
-              <div
+            {faqItems.map((item) => (
+              <details
                 key={item.question}
-                className="border-b border-[var(--viz-line)]"
+                className="group border-b border-[var(--viz-line)]"
               >
-                <button
-                  type="button"
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  aria-expanded={openFaq === index}
-                  className="flex w-full items-center justify-between gap-4 py-4 text-left transition-colors hover:text-[var(--viz-muted)]"
-                >
-                  <span className="text-sm sm:text-base">{item.question}</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
+                <summary className="flex cursor-pointer list-none items-baseline justify-between gap-4 py-4 text-sm transition-colors hover:text-[var(--viz-muted)] sm:text-base [&::-webkit-details-marker]:hidden">
+                  {item.question}
+                  <span
                     aria-hidden="true"
-                    className={`h-4 w-4 flex-shrink-0 text-[var(--viz-muted)] transition-transform duration-200 ${
-                      openFaq === index ? "rotate-180" : ""
-                    }`}
+                    className="viz-mono shrink-0 text-sm text-[var(--viz-muted)] transition-transform duration-200 group-open:rotate-45"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </button>
-                {openFaq === index && (
-                  <p className="max-w-2xl pb-5 text-sm leading-relaxed text-[var(--viz-ink)]/80 sm:text-base">
-                    {item.answer}
-                  </p>
-                )}
-              </div>
+                    +
+                  </span>
+                </summary>
+                <p className="max-w-2xl pb-5 text-sm leading-relaxed text-[var(--viz-ink)]/80 sm:text-base">
+                  {item.answer}
+                </p>
+              </details>
             ))}
           </div>
-        </Reveal>
+        </section>
 
         {/* Made with DSource.AI */}
-        <Reveal className="mt-14 sm:mt-20">
+        <section className="mt-14 sm:mt-20">
           <div className="border-t border-[var(--viz-line)] pt-2">
             <p className="viz-label">Gallery</p>
           </div>
@@ -342,22 +300,20 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
-        </Reveal>
+        </section>
 
         {/* Hand-off */}
-        <Reveal className="mt-16 sm:mt-24">
-          <div className="border-t border-[var(--viz-line)] pt-6">
-            <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
-              Seven days on us. Bring a room.
-            </p>
-            <Link
-              href="/signup"
-              className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
-            >
-              Start your free trial →
-            </Link>
-          </div>
-        </Reveal>
+        <div className="mt-16 border-t border-[var(--viz-line)] pt-6 sm:mt-24">
+          <p className="viz-serif text-xl italic text-[var(--viz-muted)]">
+            Seven days on us. Bring a room.
+          </p>
+          <Link
+            href="/signup"
+            className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
+          >
+            Start your free trial →
+          </Link>
+        </div>
       </div>
     </div>
   );
