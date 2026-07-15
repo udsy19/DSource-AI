@@ -14,20 +14,26 @@ export default function UploadCanvas({
   onReset,
   canReset,
   emptyHint,
+  overlay = null,
 }) {
   const fileInputRef = useRef(null);
 
   return (
     <div className="flex-1 min-h-[24rem] sm:min-h-[30rem] flex items-center justify-center border-1 border-gray-700 rounded-2xl p-3 sm:p-4 bg-gray-50">
       {imagePreview
-        ? <div className="relative w-full h-full min-h-[24rem]">
-            {/* Data-URL / signed-URL images can't go through next/image optimization. */}
-            {/* biome-ignore lint/performance/noImgElement: data/signed URLs cannot use next/image */}
-            <img
-              src={imagePreview}
-              alt="Canvas"
-              className="absolute inset-0 w-full h-full object-contain rounded-lg"
-            />
+        ? <div className="relative w-full h-full min-h-[24rem] flex items-center justify-center">
+            {/* Shrink-wrapped wrapper: overlay children position in % of the
+                actual image, not the letterboxed container. */}
+            <div className="relative inline-block">
+              {/* Data-URL / signed-URL images can't go through next/image optimization. */}
+              {/* biome-ignore lint/performance/noImgElement: data/signed URLs cannot use next/image */}
+              <img
+                src={imagePreview}
+                alt="Canvas"
+                className="block max-w-full max-h-[34rem] object-contain rounded-lg"
+              />
+              {overlay}
+            </div>
             <button
               type="button"
               onClick={onRemove}

@@ -104,3 +104,60 @@ export const normalizeProductImages = async (products) => {
 
   return { images, errors };
 };
+
+/**
+ * Validates a Gemini-style bounding box: [ymin, xmin, ymax, xmax], each an
+ * integer in 0–1000 (coordinates on a virtual 1000×1000 image).
+ */
+export const isValidBox = (box) =>
+  Array.isArray(box) &&
+  box.length === 4 &&
+  box.every((v) => Number.isFinite(v) && v >= 0 && v <= 1000) &&
+  box[0] < box[2] &&
+  box[1] < box[3];
+
+/**
+ * Crops a normalized-box region out of a data-URI image with sharp and
+ * returns a PNG data URI, padded slightly and capped in size — the input to
+ * the query-side embedding.
+ */
+export const cropBoxToDataUri = async (
+  dataUri,
+  box,
+  { pad = 0.05, maxSize = 512 } = {}
+) => {
+  // Lazy-import: sharp is a native module only needed on this path.
+  const { default: sharp } = await import("sharp");
+
+  const matches = dataUri.match(/^data:[^;]+;base64,(.+)$/);
+  const buffer = Buffer.from(matches ? matches[1] : dataUri, "base64");
+
+  const image = sharp(buffer);
+  const { width, height } = await image.metadata();
+  if (!width || !height) {
+    throw new Error("Could not read image dimensions for cropping.");
+  }
+
+  const [ymin, xmin, ymax, xmax] = box;
+  const padX = Math.round(((xmax - xmin) / 1000) * width * pad);
+  const padY = Math.round(((ymax - ymin) / 1000) * height * pad);
+
+  const left = Math.max(0, Math.round((xmin / 1000) * width) - padX);
+  const top = Math.max(0, Math.round((ymin / 1000) * height) - padY);
+  const right = Math.min(width, Math.round((xmax / 1000) * width) + padX);
+  const bottom = Math.min(height, Math.round((ymax / 1000) * height) + padY);
+
+  const cropWidth = right - left;
+  const cropHeight = bottom - top;
+  if (cropWidth < 8 || cropHeight < 8) {
+    throw new Error("Selected region is too small to search.");
+  }
+
+  const out = await image
+    .extract({ left, top, width: cropWidth, height: cropHeight })
+    .resize({ width: maxSize, height: maxSize, fit: "inside" })
+    .png()
+    .toBuffer();
+
+  return `data:image/png;base64,${out.toString("base64")}`;
+};

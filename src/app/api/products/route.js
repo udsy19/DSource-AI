@@ -103,5 +103,21 @@ export async function POST(request) {
     );
   }
 
+  // Best-effort: embed the product image for reverse search. Failures are
+  // logged only — the backfill script picks up any rows left un-embedded.
+  // (CSV bulk uploads skip this; run scripts/backfill-embeddings.mjs after.)
+  if (data?.image_url && process.env.REPLICATE_API_TOKEN) {
+    try {
+      const { embedImage } = await import("@/utils/visualizer/embeddings");
+      const embedding = await embedImage(data.image_url);
+      await supabase
+        .from("scraped_product_list")
+        .update({ embedding })
+        .eq("id", data.id);
+    } catch (embedError) {
+      console.error("Product embedding skipped:", embedError.message);
+    }
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
