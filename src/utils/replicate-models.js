@@ -34,10 +34,17 @@ export const IMAGE_MODELS = {
     provider: "replicate",
     slug: "google/nano-banana",
     mode: "edit",
-    buildInput: (prompt, imageDataUrl) => ({
-      prompt,
-      image_input: [imageDataUrl],
-    }),
+    // Fuses up to 14 input images and supports explicit output aspect ratios —
+    // the only Replicate model here suited to multi-product mood boards.
+    multiImage: true,
+    buildInput: (prompt, imageDataUrl, opts = {}) => {
+      const images = opts.images ?? (imageDataUrl ? [imageDataUrl] : []);
+      return {
+        prompt,
+        ...(images.length ? { image_input: images } : {}),
+        ...(opts.aspectRatio ? { aspect_ratio: opts.aspectRatio } : {}),
+      };
+    },
   },
   "flux-kontext-max": {
     label: "Black Forest (Kontext Max)",
@@ -77,6 +84,8 @@ export const IMAGE_MODELS = {
     label: "Gemini (2.5 Flash Image)",
     provider: "gemini",
     mode: "edit",
+    // The Gemini backend passes any number of inline images natively.
+    multiImage: true,
   },
 };
 
@@ -93,3 +102,10 @@ export const MODEL_OPTIONS = Object.entries(IMAGE_MODELS).map(
     requiresImage: model.mode === "edit",
   }),
 );
+
+/** Models capable of multi-image fusion — the mood board's dropdown. */
+export const MOODBOARD_MODEL_OPTIONS = Object.entries(IMAGE_MODELS)
+  .filter(([, model]) => model.multiImage)
+  .map(([value, model]) => ({ value, label: model.label }));
+
+export const DEFAULT_MOODBOARD_MODEL = "nano-banana";

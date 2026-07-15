@@ -9,18 +9,32 @@ import {
   getResponseText,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
-import { DEFAULT_MODEL, getModel } from "@/utils/replicate-models";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_MOODBOARD_MODEL,
+  getModel,
+} from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
 import {
+  MAX_IMAGE_CHARS,
+  normalizeBaseImage,
+  normalizeProductImages,
+} from "@/utils/visualizer/images";
+import {
   hasDirectiveParams,
+  validateCadParams,
+  validateMoodboardParams,
   validateRenderParams,
 } from "@/utils/visualizer/params";
+import { saveRender } from "@/utils/visualizer/persist";
 import {
+  composeCadPrompt,
+  composeMoodboardPrompt,
   composeRenderPrompt,
+  strengthenCadPrompt,
   strengthenPrompt,
 } from "@/utils/visualizer/prompt-composer";
-import { saveRender } from "@/utils/visualizer/persist";
-import { verifyAdherence } from "@/utils/visualizer/verify";
+import { verifyAdherence, verifyCad } from "@/utils/visualizer/verify";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -34,10 +48,9 @@ const replicate = new Replicate({
 });
 
 const MAX_PROMPT_LENGTH = 2000;
-// Frontend caps uploads at 10MB; base64 inflates by ~4/3, so allow headroom.
-const MAX_IMAGE_CHARS = 20_000_000;
 const RATE_LIMIT = { windowMs: 60_000, max: 10 };
 const REPLICATE_TIMEOUT_MS = 120_000;
+const MODES = ["render", "moodboard", "cad"];
 
 // Dev-only escape hatch for local testing without a login/Gemini key.
 // Hard-disabled in production builds; enabled only via .env.local flag.
@@ -45,57 +58,16 @@ const DEV_BYPASS =
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH_BYPASS === "true";
 
-// Helper function to convert base64 data URL to base64 string and extract mime type
+// Split a data URI (or raw base64) into Gemini inlineData fields.
 const parseImageData = (imageData) => {
-  if (!imageData) return null;
-
-  // If it's already a base64 string without data URL prefix
   if (!imageData.includes(",")) {
     return { data: imageData, mimeType: "image/png" };
   }
-
-  // Extract mime type and base64 data from data URL
   const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
   if (matches) {
-    return {
-      data: matches[2],
-      mimeType: matches[1] || "image/png",
-    };
+    return { data: matches[2], mimeType: matches[1] || "image/png" };
   }
-
-  // If it's just base64 data
   return { data: imageData, mimeType: "image/png" };
-};
-
-/**
- * Normalizes the edit-base image to a data URI. Accepts data URIs / raw
- * base64 as-is; https URLs are downloaded server-side ONLY when they point at
- * our own Supabase storage (history items use short-lived signed URLs) —
- * anything else is rejected to prevent SSRF.
- */
-const normalizeBaseImage = async (image) => {
-  if (!image.startsWith("http")) {
-    return { image, error: null };
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl || !image.startsWith(`${supabaseUrl}/storage/`)) {
-    return {
-      image: null,
-      error: "Image URLs are not accepted — upload the photo directly.",
-    };
-  }
-
-  const res = await fetch(image);
-  if (!res.ok) {
-    return {
-      image: null,
-      error: "That render is no longer available — please re-select or re-upload it.",
-    };
-  }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const mime = res.headers.get("content-type") || "image/png";
-  return { image: `data:${mime};base64,${buffer.toString("base64")}`, error: null };
 };
 
 // Normalize the many shapes replicate.run() can return into a single URL string.
@@ -159,10 +131,14 @@ const mapGenerationError = (error) => {
 
 // --- Generation backends ---------------------------------------------------
 
-const generateWithGemini = async (instruction, image, seed) => {
-  const imageData = parseImageData(image);
+const generateWithGemini = async (instruction, images, seed) => {
   const contents = [
-    { inlineData: { data: imageData.data, mimeType: imageData.mimeType } },
+    ...images.map((img) => {
+      const parsed = parseImageData(img);
+      return {
+        inlineData: { data: parsed.data, mimeType: parsed.mimeType },
+      };
+    }),
     { text: instruction },
   ];
 
@@ -191,8 +167,16 @@ const generateWithGemini = async (instruction, image, seed) => {
   return null;
 };
 
-const generateWithReplicate = async (modelConfig, instruction, image, seed) => {
-  const input = modelConfig.buildInput(instruction, image, { seed });
+const generateWithReplicate = async (
+  modelConfig,
+  instruction,
+  images,
+  opts,
+) => {
+  const input = modelConfig.buildInput(instruction, images[0] ?? null, {
+    ...opts,
+    images,
+  });
   const output = await callWithRetry(
     () => replicate.run(modelConfig.slug, { input }),
     {
@@ -217,10 +201,10 @@ const generateWithReplicate = async (modelConfig, instruction, image, seed) => {
   };
 };
 
-const generateOnce = (modelConfig, instruction, image, seed) =>
+const generateOnce = (modelConfig, instruction, images, opts = {}) =>
   modelConfig.provider === "gemini"
-    ? generateWithGemini(instruction, image, seed)
-    : generateWithReplicate(modelConfig, instruction, image, seed);
+    ? generateWithGemini(instruction, images, opts.seed)
+    : generateWithReplicate(modelConfig, instruction, images, opts);
 
 // --- Topic guard -----------------------------------------------------------
 
@@ -228,12 +212,10 @@ const generateOnce = (modelConfig, instruction, image, seed) =>
  * Checks a free-text prompt is interior/architecture related. Only runs when
  * the user actually typed one — params-only requests are intrinsically
  * on-topic. Fail-open: a guard outage must not block generation.
- *
- * @returns {{ allowed: boolean, notice: string|null }}
  */
 const runTopicGuard = async (prompt) => {
   const guardPrompt = `
-    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, or similar architectural contexts.
+    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, mood boards for interior projects, or similar architectural contexts.
 
     Prompt: "${prompt}"
 
@@ -259,6 +241,142 @@ const runTopicGuard = async (prompt) => {
     console.error("Topic guard skipped:", error.message);
     return { allowed: true, notice: "Prompt topic check was unavailable." };
   }
+};
+
+// --- Per-mode request preparation -------------------------------------------
+// Each prepares: input images, composed instruction, verify + strengthen fns.
+// Returns { error, status } on invalid input.
+
+const prepareRender = async (body, prompt) => {
+  if (!body.image || typeof body.image !== "string") {
+    return {
+      error: "Upload a room photo first — every model edits your image.",
+      status: 400,
+    };
+  }
+  const normalized = await normalizeBaseImage(body.image);
+  if (!normalized.image) return { error: normalized.error, status: 400 };
+
+  const validation = validateRenderParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
+
+  if (!prompt && !hasDirectiveParams(params)) {
+    return {
+      error:
+        "Describe a change or set at least one parameter (style, lighting, space, or palette).",
+      status: 400,
+    };
+  }
+
+  const composeInput = { prompt, params };
+  return {
+    params,
+    images: [normalized.image],
+    requiresImage: true,
+    defaultModel: DEFAULT_MODEL,
+    instruction: composeRenderPrompt(composeInput).instruction,
+    verify: (image) => verifyAdherence(ai, image, params),
+    strengthen: (failures) =>
+      strengthenPrompt(
+        composeInput,
+        failures.map((f) => f.param),
+      ),
+  };
+};
+
+const prepareMoodboard = async (body, prompt, notices) => {
+  const validation = validateMoodboardParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
+
+  let inspiration = null;
+  if (body.image && typeof body.image === "string") {
+    const normalized = await normalizeBaseImage(body.image);
+    if (!normalized.image) return { error: normalized.error, status: 400 };
+    inspiration = normalized.image;
+  }
+
+  const { images: productImages, errors: productErrors } =
+    await normalizeProductImages(body.products);
+  notices.push(...productErrors);
+
+  if (
+    !prompt &&
+    !hasDirectiveParams(params) &&
+    !inspiration &&
+    productImages.length === 0
+  ) {
+    return {
+      error:
+        "Add products, upload an inspiration photo, or set at least one parameter to generate a mood board.",
+      status: 400,
+    };
+  }
+
+  // Order contract with the composer: inspiration first, then products.
+  const images = [...(inspiration ? [inspiration] : []), ...productImages];
+  const composeInput = {
+    prompt,
+    params,
+    productCount: productImages.length,
+    hasInspiration: Boolean(inspiration),
+  };
+
+  return {
+    params,
+    images,
+    requiresImage: false,
+    requiresMultiImage: true,
+    defaultModel: DEFAULT_MOODBOARD_MODEL,
+    aspectRatio: params.aspectRatio,
+    instruction: composeMoodboardPrompt(composeInput).instruction,
+    verify: (image) => verifyAdherence(ai, image, params),
+    strengthen: (failures) =>
+      strengthenPrompt(
+        composeInput,
+        failures.map((f) => f.param),
+        composeMoodboardPrompt,
+      ),
+  };
+};
+
+const prepareCad = async (body, prompt) => {
+  if (!body.image || typeof body.image !== "string") {
+    return {
+      error: "Upload a photo or floor plan to convert to CAD.",
+      status: 400,
+    };
+  }
+  const normalized = await normalizeBaseImage(body.image);
+  if (!normalized.image) return { error: normalized.error, status: 400 };
+
+  const validation = validateCadParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
+  const composeInput = { prompt, params };
+
+  return {
+    params,
+    images: [normalized.image],
+    requiresImage: true,
+    defaultModel: DEFAULT_MODEL,
+    instruction: composeCadPrompt(composeInput).instruction,
+    verify: (image) => verifyCad(ai, image, params.view),
+    strengthen: () => strengthenCadPrompt(composeInput),
+  };
+};
+
+const PREPARERS = {
+  render: prepareRender,
+  moodboard: prepareMoodboard,
+  cad: prepareCad,
 };
 
 // --- Route -----------------------------------------------------------------
@@ -299,97 +417,81 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // --- Input validation ---
+  const mode = typeof body.mode === "string" ? body.mode : "render";
+  if (!MODES.includes(mode)) {
+    return NextResponse.json({ error: "Unknown mode." }, { status: 400 });
+  }
+
   const prompt =
     typeof body.prompt === "string" && body.prompt.trim().length > 0
       ? body.prompt.trim()
       : null;
-
   if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
     return NextResponse.json(
       { error: `Prompt is too long (max ${MAX_PROMPT_LENGTH} characters).` },
       { status: 400 },
     );
   }
-
-  if (!body.image || typeof body.image !== "string") {
-    return NextResponse.json(
-      { error: "Upload a room photo first — every model edits your image." },
-      { status: 400 },
-    );
-  }
-  if (body.image.length > MAX_IMAGE_CHARS) {
+  if (typeof body.image === "string" && body.image.length > MAX_IMAGE_CHARS) {
     return NextResponse.json(
       { error: "Image is too large. Please use an image under 10MB." },
       { status: 413 },
     );
-  }
-
-  const normalized = await normalizeBaseImage(body.image);
-  if (!normalized.image) {
-    return NextResponse.json({ error: normalized.error }, { status: 400 });
-  }
-  const image = normalized.image;
-  if (image.length > MAX_IMAGE_CHARS) {
-    return NextResponse.json(
-      { error: "Image is too large. Please use an image under 10MB." },
-      { status: 413 },
-    );
-  }
-
-  const validation = validateRenderParams(body.params);
-  if (!validation.ok) {
-    return NextResponse.json(
-      { error: validation.errors.join(" ") },
-      { status: 400 },
-    );
-  }
-  const params = validation.params;
-
-  if (!prompt && !hasDirectiveParams(params)) {
-    return NextResponse.json(
-      {
-        error:
-          "Describe a change or set at least one parameter (style, lighting, space, or palette).",
-      },
-      { status: 400 },
-    );
-  }
-
-  // --- Model resolution ---
-  const modelKey =
-    typeof body.model === "string" && body.model ? body.model : DEFAULT_MODEL;
-  const modelConfig = getModel(modelKey);
-  if (!modelConfig) {
-    return NextResponse.json(
-      { error: "Unknown model selected." },
-      { status: 400 },
-    );
-  }
-  if (modelConfig.provider === "replicate") {
-    if (!modelConfig.slug) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `The ${modelConfig.label} model isn't configured yet.`,
-        },
-        { status: 503 },
-      );
-    }
-    if (!process.env.REPLICATE_API_TOKEN) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Image generation is not configured. Please contact support.",
-        },
-        { status: 500 },
-      );
-    }
   }
 
   const notices = [];
 
   try {
+    const prepared = await PREPARERS[mode](body, prompt, notices);
+    if (prepared.error) {
+      return NextResponse.json(
+        { error: prepared.error },
+        { status: prepared.status ?? 400 },
+      );
+    }
+
+    // --- Model resolution ---
+    const modelKey =
+      typeof body.model === "string" && body.model
+        ? body.model
+        : prepared.defaultModel;
+    const modelConfig = getModel(modelKey);
+    if (!modelConfig) {
+      return NextResponse.json(
+        { error: "Unknown model selected." },
+        { status: 400 },
+      );
+    }
+    if (prepared.requiresMultiImage && !modelConfig.multiImage) {
+      return NextResponse.json(
+        {
+          error: `${modelConfig.label} can't combine multiple images — pick Nano Banana or Gemini for mood boards.`,
+        },
+        { status: 400 },
+      );
+    }
+    if (modelConfig.provider === "replicate") {
+      if (!modelConfig.slug) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `The ${modelConfig.label} model isn't configured yet.`,
+          },
+          { status: 503 },
+        );
+      }
+      if (!process.env.REPLICATE_API_TOKEN) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Image generation is not configured. Please contact support.",
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     // --- Topic guard (typed prompts only; params are whitelisted enums) ---
     if (prompt && !DEV_BYPASS) {
       const guard = await runTopicGuard(prompt);
@@ -406,15 +508,18 @@ export async function POST(request) {
       }
     }
 
-    // --- Compose the instruction (single source of truth for the prompt) ---
-    const { instruction } = composeRenderPrompt({ prompt, params });
-
     // "Different renders every time" off → fixed seed (models that support it).
     const seed =
       body.variedSeed === false && modelConfig.supportsSeed ? 42 : undefined;
+    const generateOpts = { seed, aspectRatio: prepared.aspectRatio };
 
     // --- Generate ---
-    let result = await generateOnce(modelConfig, instruction, image, seed);
+    let result = await generateOnce(
+      modelConfig,
+      prepared.instruction,
+      prepared.images,
+      generateOpts,
+    );
     if (!result) {
       return NextResponse.json(
         {
@@ -427,33 +532,32 @@ export async function POST(request) {
     }
 
     // --- Verify adherence, retry once with strengthened directives ---
-    let adherence = { checked: [], failures: [], skipped: false, retried: false };
+    let adherence = {
+      checked: [],
+      failures: [],
+      skipped: false,
+      retried: false,
+    };
     if (!DEV_BYPASS) {
-      const check = await verifyAdherence(
-        ai,
-        { data: result.image, mimeType: result.mimeType },
-        params,
-      );
+      const check = await prepared.verify({
+        data: result.image,
+        mimeType: result.mimeType,
+      });
       adherence = { ...check, retried: false };
 
       if (check.failures.length > 0) {
-        const strengthened = strengthenPrompt(
-          { prompt, params },
-          check.failures.map((f) => f.param),
-        );
         try {
           const retryResult = await generateOnce(
             modelConfig,
-            strengthened,
-            image,
-            seed,
+            prepared.strengthen(check.failures),
+            prepared.images,
+            generateOpts,
           );
           if (retryResult) {
-            const recheck = await verifyAdherence(
-              ai,
-              { data: retryResult.image, mimeType: retryResult.mimeType },
-              params,
-            );
+            const recheck = await prepared.verify({
+              data: retryResult.image,
+              mimeType: retryResult.mimeType,
+            });
             // Keep the retry only if it did not get worse.
             if (
               recheck.skipped ||
@@ -462,19 +566,14 @@ export async function POST(request) {
               result = retryResult;
               adherence = { ...recheck, retried: true };
             }
-            if (adherence.failures.length > 0 && !adherence.skipped) {
-              notices.push(
-                `The model may not have fully applied: ${adherence.failures
-                  .map((f) => `${f.param} (${f.expected})`)
-                  .join(", ")}.`,
-              );
-            }
           }
         } catch (retryError) {
           // Retry is best-effort; deliver the first result.
           console.error("Adherence retry failed:", retryError.message);
+        }
+        if (adherence.failures.length > 0 && !adherence.skipped) {
           notices.push(
-            `The model may not have fully applied: ${check.failures
+            `The model may not have fully applied: ${adherence.failures
               .map((f) => `${f.param} (${f.expected})`)
               .join(", ")}.`,
           );
@@ -495,9 +594,10 @@ export async function POST(request) {
           mimeType: result.mimeType,
           model: modelKey,
           prompt,
-          composedPrompt: instruction,
-          params,
+          composedPrompt: prepared.instruction,
+          params: prepared.params,
           adherence,
+          mode,
         });
         renderId = saved.renderId;
       } catch (persistError) {
@@ -511,7 +611,8 @@ export async function POST(request) {
         success: true,
         images: [result],
         model: modelConfig.label,
-        composedPrompt: instruction,
+        mode,
+        composedPrompt: prepared.instruction,
         adherence,
         renderId,
         notices,

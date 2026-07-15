@@ -100,12 +100,121 @@ export const composeRenderPrompt = ({ prompt, params }) => {
   return { instruction: parts.join(" "), directives };
 };
 
+// --- Mood board -------------------------------------------------------------
+
+const MOODBOARD_CREATIVITY_CLAUSES = {
+  precise:
+    "Stay strictly faithful to the provided products, palette, and references — do not invent unrelated items.",
+  balanced:
+    "Complement the provided elements with a few tasteful, coordinated additions.",
+  creative:
+    "Freely add complementary materials, textures, and decor ideas that elevate the concept.",
+};
+
+const ASPECT_LABELS = {
+  "4:3": "landscape 4:3",
+  "3:4": "portrait 3:4",
+  "1:1": "square 1:1",
+  "16:9": "widescreen 16:9",
+};
+
+/**
+ * Compose the mood-board generation instruction.
+ * Image order contract: the inspiration photo (if any) is FIRST in the image
+ * array, followed by product photos — the wording below relies on that.
+ */
+export const composeMoodboardPrompt = ({
+  prompt,
+  params,
+  productCount = 0,
+  hasInspiration = false,
+}) => {
+  const { spaceKind, roomType, colorPalette, aspectRatio, creativity } = params;
+
+  const directives = [];
+  if (roomType) {
+    directives.push({
+      param: "roomType",
+      value: roomType,
+      text: `The board is for a ${roomType.toLowerCase()} ${
+        spaceKind === "exterior" ? "exterior" : "interior"
+      } project.`,
+    });
+  }
+  if (colorPalette) {
+    directives.push({
+      param: "colorPalette",
+      value: colorPalette,
+      text: `Build the board around a ${colorPalette.toLowerCase()} color palette.`,
+    });
+  }
+
+  const parts = [
+    "Create a professional interior design mood board.",
+    hasInspiration
+      ? "Use the first provided photo as the overall inspiration reference for the board's direction."
+      : null,
+    productCount > 0
+      ? `Feature the ${productCount} provided product photo${
+          productCount > 1 ? "s" : ""
+        } as the hero elements of the board, complemented by coordinated material swatches, textures, and color chips.`
+      : "Compose the board from coordinated material swatches, textures, furniture pieces, and color chips.",
+    prompt ? sentence(prompt) : null,
+    ...directives.map((d) => d.text),
+    MOODBOARD_CREATIVITY_CLAUSES[creativity] ??
+      MOODBOARD_CREATIVITY_CLAUSES.balanced,
+    `Compose the board in a ${ASPECT_LABELS[aspectRatio] ?? "landscape 4:3"} format.`,
+    "Flat-lay collage composition on a clean neutral background, magazine-quality, with balanced spacing between elements.",
+  ].filter(Boolean);
+
+  return { instruction: parts.join(" "), directives };
+};
+
+// --- Image to CAD -----------------------------------------------------------
+
+const CAD_VIEW_DIRECTIVES = {
+  "floor-plan":
+    "Produce a top-down 2D floor plan view with accurate wall lines, door swings, window symbols, and simplified furniture symbols.",
+  "2d-view":
+    "Produce a front-facing 2D elevation view with clean orthographic line work.",
+};
+
+/**
+ * Compose the image→CAD conversion instruction. Deliberately precise-only:
+ * a technical drawing must not take creative liberties.
+ */
+export const composeCadPrompt = ({ prompt, params }) => {
+  const parts = [
+    "Convert this photograph into a precise, black-and-white 2D architectural CAD drawing.",
+    CAD_VIEW_DIRECTIVES[params.view] ?? CAD_VIEW_DIRECTIVES["floor-plan"],
+    prompt ? sentence(prompt) : null,
+    "Preserve the real layout and proportions of the source photo exactly.",
+    "Pure white background, uniform thin black linework, no colors, no shading, no photorealistic textures — drafting-standard output.",
+  ].filter(Boolean);
+
+  return { instruction: parts.join(" "), directives: [] };
+};
+
+/**
+ * Retry emphasis for CAD conversions whose output still looked photographic
+ * or showed the wrong view.
+ */
+export const strengthenCadPrompt = ({ prompt, params }) => {
+  const { instruction } = composeCadPrompt({ prompt, params });
+  return `CRITICAL REQUIREMENT (was ignored last time): the output MUST be a black-and-white technical line drawing with zero photographic content. ${instruction}`;
+};
+
 /**
  * Rebuild the instruction with hard emphasis on directives the verification
- * step found ignored. Used for the single automatic retry.
+ * step found ignored. Used for the single automatic retry. Works for any
+ * mode: pass that mode's compose function (defaults to render).
  */
-export const strengthenPrompt = ({ prompt, params }, failedParams) => {
-  const { instruction, directives } = composeRenderPrompt({ prompt, params });
+export const strengthenPrompt = (
+  input,
+  failedParams,
+  composeFn = composeRenderPrompt,
+) => {
+  const { instruction, directives } = composeFn(input);
 
   const emphasized = failedParams
     .map((param) => {

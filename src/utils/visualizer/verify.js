@@ -38,7 +38,10 @@ export const verifyAdherence = async (ai, image, params) => {
   }
 
   const questions = requested
-    .map((p) => `- "${p}" (expected: ${params[p]}): ${PARAM_QUESTIONS[p](params[p])}`)
+    .map(
+      (p) =>
+        `- "${p}" (expected: ${params[p]}): ${PARAM_QUESTIONS[p](params[p])}`,
+    )
     .join("\n");
 
   const prompt = `
@@ -67,16 +70,14 @@ Be lenient on subjective calls — only mark "matches": false when the attribute
             { text: prompt },
           ],
         }),
-      { label: "Adherence verification", timeoutMs: 20_000, retries: 0 }
+      { label: "Adherence verification", timeoutMs: 20_000, retries: 0 },
     );
 
     const parsed = extractJsonResponse(await getResponseText(response));
     const results = Array.isArray(parsed?.results) ? parsed.results : [];
 
     const failures = results
-      .filter(
-        (r) => r?.matches === false && requested.includes(r?.param)
-      )
+      .filter((r) => r?.matches === false && requested.includes(r?.param))
       .map((r) => ({
         param: r.param,
         expected: params[r.param],
@@ -87,5 +88,62 @@ Be lenient on subjective calls — only mark "matches": false when the attribute
   } catch (error) {
     console.error("Adherence verification skipped:", error.message);
     return { checked: requested, failures: [], skipped: true };
+  }
+};
+
+const CAD_VIEW_QUESTIONS = {
+  "floor-plan": "Is it a top-down floor plan view (not a perspective photo)?",
+  "2d-view":
+    "Is it a front-facing 2D elevation view (not a perspective photo)?",
+};
+
+/**
+ * CAD-specific verification: the output must be a technical line drawing in
+ * the requested view. Same fail-open contract as verifyAdherence.
+ */
+export const verifyCad = async (ai, image, view) => {
+  const prompt = `
+You are auditing an image that is supposed to be a technical architectural CAD drawing.
+
+Judge these two attributes:
+- "drawingStyle": Is the image a clean black-and-white technical line drawing with no photographic textures or colors?
+- "view" (expected: ${view}): ${CAD_VIEW_QUESTIONS[view] ?? CAD_VIEW_QUESTIONS["floor-plan"]}
+
+Respond with pure JSON (no markdown fencing):
+{
+  "results": [
+    { "param": string, "matches": boolean, "observed": string }
+  ]
+}
+Be lenient on subjective calls — only mark "matches": false when clearly wrong.
+`;
+
+  try {
+    const response = await callWithRetry(
+      () =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            { inlineData: { mimeType: image.mimeType, data: image.data } },
+            { text: prompt },
+          ],
+        }),
+      { label: "CAD verification", timeoutMs: 20_000, retries: 0 },
+    );
+
+    const parsed = extractJsonResponse(await getResponseText(response));
+    const results = Array.isArray(parsed?.results) ? parsed.results : [];
+    const failures = results
+      .filter((r) => r?.matches === false)
+      .map((r) => ({
+        param: r.param,
+        expected: r.param === "view" ? view : "technical line drawing",
+        observed: typeof r.observed === "string" ? r.observed : "",
+      }));
+
+    return { checked: ["drawingStyle", "view"], failures, skipped: false };
+  } catch (error) {
+    console.error("CAD verification skipped:", error.message);
+    return { checked: ["drawingStyle", "view"], failures: [], skipped: true };
   }
 };

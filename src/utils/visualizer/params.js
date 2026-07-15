@@ -52,6 +52,21 @@ export const COLOR_PALETTES = [
 
 export const CREATIVITY_LEVELS = ["precise", "balanced", "creative"];
 
+// Mood board output formats — values are nano-banana aspect_ratio enums.
+export const ASPECT_RATIOS = [
+  { value: "4:3", label: "Landscape (4:3)" },
+  { value: "3:4", label: "Portrait (3:4)" },
+  { value: "1:1", label: "Square (1:1)" },
+  { value: "16:9", label: "Widescreen (16:9)" },
+];
+
+export const CAD_VIEWS = [
+  { value: "floor-plan", label: "Floor plan" },
+  { value: "2d-view", label: "2D View" },
+];
+
+export const MAX_MOODBOARD_PRODUCTS = 6;
+
 const optionalEnum = (value, allowed, field, errors) => {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string" || !allowed.includes(value)) {
@@ -72,27 +87,26 @@ export const validateRenderParams = (raw = {}) => {
   const errors = [];
 
   const spaceKind =
-    optionalEnum(raw.spaceKind, SPACE_KINDS, "spaceKind", errors) ??
-    "interior";
+    optionalEnum(raw.spaceKind, SPACE_KINDS, "spaceKind", errors) ?? "interior";
 
   const roomType = optionalEnum(
     raw.roomType,
     ROOM_TYPES[spaceKind] ?? [],
     "roomType",
-    errors
+    errors,
   );
   const style = optionalEnum(raw.style, STYLES, "style", errors);
   const lighting = optionalEnum(
     raw.lighting,
     LIGHTING_OPTIONS,
     "lighting",
-    errors
+    errors,
   );
   const colorPalette = optionalEnum(
     raw.colorPalette,
     COLOR_PALETTES,
     "colorPalette",
-    errors
+    errors,
   );
   const creativity =
     optionalEnum(raw.creativity, CREATIVITY_LEVELS, "creativity", errors) ??
@@ -110,4 +124,59 @@ export const validateRenderParams = (raw = {}) => {
  * params-only generation (no typed prompt).
  */
 export const hasDirectiveParams = (params) =>
-  Boolean(params.roomType || params.style || params.lighting || params.colorPalette);
+  Boolean(
+    params.roomType || params.style || params.lighting || params.colorPalette,
+  );
+
+/**
+ * Mood board params: space kind/room, palette, output aspect ratio.
+ */
+export const validateMoodboardParams = (raw = {}) => {
+  const errors = [];
+
+  const spaceKind =
+    optionalEnum(raw.spaceKind, SPACE_KINDS, "spaceKind", errors) ?? "interior";
+  const roomType = optionalEnum(
+    raw.roomType,
+    ROOM_TYPES[spaceKind] ?? [],
+    "roomType",
+    errors,
+  );
+  const colorPalette = optionalEnum(
+    raw.colorPalette,
+    COLOR_PALETTES,
+    "colorPalette",
+    errors,
+  );
+  const aspectRatio =
+    optionalEnum(
+      raw.aspectRatio,
+      ASPECT_RATIOS.map((a) => a.value),
+      "aspectRatio",
+      errors,
+    ) ?? "4:3";
+  const creativity =
+    optionalEnum(raw.creativity, CREATIVITY_LEVELS, "creativity", errors) ??
+    "balanced";
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    params: { spaceKind, roomType, colorPalette, aspectRatio, creativity },
+  };
+};
+
+/**
+ * Image-to-CAD params: which drawing view to produce.
+ */
+export const validateCadParams = (raw = {}) => {
+  const errors = [];
+  const view =
+    optionalEnum(
+      raw.view,
+      CAD_VIEWS.map((v) => v.value),
+      "view",
+      errors,
+    ) ?? "floor-plan";
+  return { ok: errors.length === 0, errors, params: { view } };
+};

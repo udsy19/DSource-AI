@@ -26,7 +26,16 @@ const EXT_BY_MIME = {
 export const saveRender = async (
   supabase,
   userId,
-  { imageBase64, mimeType, model, prompt, composedPrompt, params, adherence }
+  {
+    imageBase64,
+    mimeType,
+    model,
+    prompt,
+    composedPrompt,
+    params,
+    adherence,
+    mode = "render",
+  },
 ) => {
   const ext = EXT_BY_MIME[mimeType] ?? "png";
   const renderId = crypto.randomUUID();
@@ -47,7 +56,7 @@ export const saveRender = async (
     .insert({
       id: renderId,
       created_by: userId,
-      mode: "render",
+      mode,
       model,
       prompt: prompt ?? null,
       composed_prompt: composedPrompt,
@@ -67,12 +76,19 @@ export const saveRender = async (
 /**
  * Lists the user's renders (newest first) with short-lived signed URLs.
  */
-export const listRenders = async (supabase, { limit = 24 } = {}) => {
-  const { data: rows, error } = await supabase
+export const listRenders = async (
+  supabase,
+  { limit = 24, mode = null } = {},
+) => {
+  let query = supabase
     .from("visualizer_renders")
     .select("id, created_at, model, prompt, params, image_path")
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (mode) {
+    query = query.eq("mode", mode);
+  }
+  const { data: rows, error } = await query;
   if (error) {
     throw new Error(`History query failed: ${error.message}`);
   }
@@ -90,7 +106,7 @@ export const listRenders = async (supabase, { limit = 24 } = {}) => {
         params: row.params,
         imageUrl: signed?.signedUrl ?? null,
       };
-    })
+    }),
   );
 
   // Rows whose storage object went missing get filtered rather than shown broken.

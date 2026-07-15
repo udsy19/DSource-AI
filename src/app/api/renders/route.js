@@ -8,7 +8,9 @@ const DEV_BYPASS =
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH_BYPASS === "true";
 
-export async function GET() {
+const MODES = ["render", "moodboard", "cad"];
+
+export async function GET(request) {
   if (DEV_BYPASS) {
     return NextResponse.json({
       renders: [],
@@ -22,10 +24,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const modeParam = searchParams.get("mode");
+  const mode = MODES.includes(modeParam) ? modeParam : null;
+
   try {
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
-    const renders = await listRenders(supabase);
+    const renders = await listRenders(supabase, { mode });
     return NextResponse.json({ renders });
   } catch (error) {
     // Degrade gracefully (e.g. migration not applied yet) — history is

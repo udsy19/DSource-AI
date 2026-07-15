@@ -33,8 +33,14 @@ const withTimeout = (promise, ms, label) =>
     );
   });
 
+// Providers answer 429s with retry-after ≈1s; retrying instantly just hits
+// the same limit, so back off briefly before each retry attempt.
+const RETRY_BACKOFF_MS = 2000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Runs an async Gemini call with a hard timeout and a bounded retry on
+ * Runs an async model call with a hard timeout and a bounded retry on
  * transient failures (429/5xx/timeout). Non-retryable errors surface immediately.
  */
 export const callWithRetry = async (
@@ -52,6 +58,7 @@ export const callWithRetry = async (
     } catch (error) {
       lastError = error;
       if (attempt < retries && isRetryableError(error)) {
+        await sleep(RETRY_BACKOFF_MS * (attempt + 1));
         continue;
       }
       throw error;
@@ -69,7 +76,7 @@ export const extractJsonResponse = (rawText) => {
 
   try {
     return JSON.parse(trimmed);
-  } catch (error) {
+  } catch {
     const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i);
     if (fencedMatch) {
       return JSON.parse(fencedMatch[1]);

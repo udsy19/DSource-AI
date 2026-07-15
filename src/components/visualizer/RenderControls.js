@@ -50,8 +50,8 @@ export default function RenderControls({
     <div className="border-1 border-gray-700 rounded-2xl p-4 sm:p-5">
       <h2 className="text-lg font-bold">AI Render</h2>
       <p className="mt-1 text-xs text-gray-600">
-        Upload a room photo, set your parameters, and watch your space
-        transform into a fully rendered design.
+        Upload a room photo, set your parameters, and watch your space transform
+        into a fully rendered design.
       </p>
 
       {/* Define your Space */}

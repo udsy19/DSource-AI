@@ -33,7 +33,7 @@ export default function HistoryStrip({ items, activeId, onSelect, onDelete }) {
               title={item.prompt || item.model || "Render"}
             >
               {/* Thumbnails come from data URLs or short-lived signed URLs — next/image can't optimize either. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* biome-ignore lint/performance/noImgElement: data/signed URLs cannot use next/image */}
               <img
                 src={item.imageUrl}
                 alt={item.prompt || "Previous render"}
