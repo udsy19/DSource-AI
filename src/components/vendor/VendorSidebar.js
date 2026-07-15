@@ -4,15 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 
+// Only routes that exist. Orders / AI Visualizer / Settings had no pages
+// behind them — dead links are removed, not disabled, until they ship.
 const navigationItems = [
-  { name: "Dashboard", href: "/vendor" },
-  { name: "Products", href: "/vendor/products" },
-  { name: "Orders", href: "/vendor/orders" },
-  { name: "AI Visualizer", href: "/vendor/ai-visualizer" },
+  { index: "01", name: "Dashboard", href: "/vendor" },
+  { index: "02", name: "Products", href: "/vendor/products" },
 ];
 
 const navItemClasses = (active) =>
-  `viz-mono block border-l-2 px-4 py-2.5 text-xs uppercase tracking-[0.08em] transition-colors duration-200 ${
+  `viz-mono flex items-baseline gap-3 border-l-2 px-4 py-2.5 text-xs uppercase tracking-[0.08em] transition-colors duration-200 ${
     active
       ? "border-[var(--viz-ink)] font-semibold text-[var(--viz-ink)]"
       : "border-transparent text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
@@ -42,11 +42,12 @@ export default function VendorSidebar() {
         <Link href="/vendor" className="viz-serif block text-xl">
           DSource.AI
         </Link>
-        <p className="viz-label mt-1">Vendor studio</p>
+        <p className="viz-label mt-1">The workshop office</p>
       </div>
 
-      {/* Navigation Items */}
+      {/* Navigation: an index of sheets, folio-numbered. */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
+        <p className="viz-label px-4 pb-2">Index</p>
         {navigationItems.map((item) => {
           const active = isActive(item.href);
           return (
@@ -56,6 +57,12 @@ export default function VendorSidebar() {
               aria-current={active ? "page" : undefined}
               className={navItemClasses(active)}
             >
+              <span
+                className="text-[10px] text-[var(--viz-muted)]"
+                aria-hidden="true"
+              >
+                {item.index}
+              </span>
               {item.name}
             </Link>
           );
@@ -63,14 +70,7 @@ export default function VendorSidebar() {
       </nav>
 
       {/* Bottom Section */}
-      <div className="space-y-1 border-t border-[var(--viz-line)] px-3 py-5">
-        <Link
-          href="/vendor/settings"
-          aria-current={pathname === "/vendor/settings" ? "page" : undefined}
-          className={navItemClasses(pathname === "/vendor/settings")}
-        >
-          Settings
-        </Link>
+      <div className="border-t border-[var(--viz-line)] px-3 py-5">
         <button
           type="button"
           onClick={handleSignOut}

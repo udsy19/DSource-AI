@@ -18,9 +18,7 @@ export default async function VendorPage() {
   const [
     {
       data: { user },
-      error: userError,
     },
-    { data: sessionData },
   ] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
 
   let totalProducts = 0;
@@ -50,21 +48,17 @@ export default async function VendorPage() {
   const userRole = user ? getUserRoleFromUser(user) : null;
   const isVendor = userRole === ROLES.VENDOR;
 
-  // Prepare dashboard stats
+  // Dashboard stats: real queries only — orders/sales have no source yet
+  // and render as em-dash cells in the dashboard, never invented numbers.
   const dashboardStats = {
     totalProducts: productsError ? 0 : (totalProducts ?? 0),
-    // These would ideally come from a sales/orders table - using placeholder for now
-    totalSales: 1000, // Would be fetched from orders table
-    totalOrders: 300, // Would be fetched from orders table
-    productsSold: 5, // Would be calculated from orders
-    newCustomers: 8, // Would be fetched from users table
-    recentProducts: recentProducts || [],
+    recentProducts: recentError ? [] : (recentProducts ?? []),
   };
 
   return (
     <>
       {user && isVendor
-        ? <VendorDashboard user={user} dashboardStats={dashboardStats} />
+        ? <VendorDashboard dashboardStats={dashboardStats} />
         : <div className="viz-scope viz-grain flex min-h-svh items-center justify-center px-4 pt-24 pb-14 sm:px-6">
             <div className="w-full max-w-4xl">
               <VendorAuthPanel />

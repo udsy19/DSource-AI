@@ -77,14 +77,7 @@ export default function VendorAuthPanel() {
         });
       } else {
         // After sign in, refresh the session to get updated user data
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session?.user) {
-          console.log("Session after login:", session.user);
-          console.log("User metadata:", session.user.user_metadata);
-          console.log("App metadata:", session.user.app_metadata);
-        }
+        await supabase.auth.getSession();
         router.refresh();
       }
     } catch (error) {

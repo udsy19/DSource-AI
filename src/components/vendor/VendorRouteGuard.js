@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function VendorRouteGuard({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isVendor, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
     if (!loading) {

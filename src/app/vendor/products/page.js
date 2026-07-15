@@ -33,6 +33,11 @@ export default function ProductsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [togglingActive, setTogglingActive] = useState(null);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  // Inline feedback (no browser alert/confirm dialogs on this surface).
+  const [pageNotice, setPageNotice] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [filters, setFilters] = useState({
     category: "",
     brand: "",
@@ -78,6 +83,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (showProductModal) {
+      setFormError(null);
       if (editingProduct) {
         setProductForm({
           product_name: editingProduct.product_name || "",
@@ -237,7 +243,7 @@ export default function ProductsPage() {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return "—";
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       month: "2-digit",
@@ -268,6 +274,7 @@ export default function ProductsPage() {
   const handleToggleActive = async (product) => {
     if (!user) return;
     setTogglingActive(product.id);
+    setPageNotice(null);
     try {
       const response = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
@@ -278,11 +285,11 @@ export default function ProductsPage() {
         await refreshProducts();
       } else {
         const err = await response.json().catch(() => ({}));
-        alert(err.error || "Failed to update status");
+        setPageNotice(err.error || "Failed to update status");
       }
     } catch (err) {
       console.error("Error toggling active:", err);
-      alert("Failed to update status");
+      setPageNotice("Failed to update status");
     } finally {
       setTogglingActive(null);
     }
@@ -291,6 +298,7 @@ export default function ProductsPage() {
   const handleConfirmDelete = async () => {
     if (!productToDelete || !user) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       const response = await fetch(`/api/products/${productToDelete.id}`, {
         method: "DELETE",
@@ -300,23 +308,26 @@ export default function ProductsPage() {
         await refreshProducts();
       } else {
         const err = await response.json().catch(() => ({}));
-        alert(err.error || "Failed to delete product");
+        setDeleteError(err.error || "Failed to delete product");
       }
     } catch (err) {
       console.error("Error deleting product:", err);
-      alert("Failed to delete product");
+      setDeleteError("Failed to delete product");
     } finally {
       setDeleting(false);
     }
   };
 
-  const handleBulkDelete = async () => {
+  // Opens the inline confirmation dialog; the deletion itself runs from it.
+  const handleBulkDelete = () => {
     if (selectedProducts.length === 0 || !user) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${selectedProducts.length} selected product(s)? This action cannot be undone.`,
-    );
-    if (!confirmed) return;
+    setShowBulkConfirm(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedProducts.length === 0 || !user) return;
     setBulkDeleting(true);
+    setPageNotice(null);
     try {
       const results = await Promise.allSettled(
         selectedProducts.map((id) =>
@@ -328,7 +339,7 @@ export default function ProductsPage() {
           r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
       );
       if (failed.length > 0) {
-        alert(
+        setPageNotice(
           `${failed.length} of ${selectedProducts.length} product(s) could not be deleted.`,
         );
       }
@@ -336,9 +347,10 @@ export default function ProductsPage() {
       await refreshProducts();
     } catch (err) {
       console.error("Error bulk deleting products:", err);
-      alert("Failed to delete products.");
+      setPageNotice("Failed to delete products.");
     } finally {
       setBulkDeleting(false);
+      setShowBulkConfirm(false);
     }
   };
 
@@ -351,14 +363,15 @@ export default function ProductsPage() {
     if (!user) return;
     const productId = Number(productForm.product_id);
     if (!productForm.product_name?.trim()) {
-      alert("Product name is required");
+      setFormError("Product name is required");
       return;
     }
     if (!Number.isFinite(productId)) {
-      alert("Product ID is required and must be a number");
+      setFormError("Product ID is required and must be a number");
       return;
     }
     setSubmitting(true);
+    setFormError(null);
     try {
       const toArray = (v) => {
         if (!v || typeof v !== "string") return null;
@@ -398,7 +411,7 @@ export default function ProductsPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        alert(data.error || "Failed to save product");
+        setFormError(data.error || "Failed to save product");
         return;
       }
       setShowProductModal(false);
@@ -406,7 +419,7 @@ export default function ProductsPage() {
       await refreshProducts();
     } catch (err) {
       console.error("Error saving product:", err);
-      alert("Failed to save product");
+      setFormError("Failed to save product");
     } finally {
       setSubmitting(false);
     }
@@ -446,6 +459,7 @@ export default function ProductsPage() {
 
     try {
       setUploading(true);
+      setPageNotice(null);
       const formData = new FormData();
       formData.append("file", file);
 
@@ -458,14 +472,16 @@ export default function ProductsPage() {
 
       if (!response.ok) {
         console.error("CSV upload failed:", result);
-        alert(result.error || "Failed to upload CSV file.");
+        setPageNotice(result.error || "Failed to upload CSV file.");
         return;
       }
 
       await refreshProducts();
     } catch (error) {
       console.error("Error uploading CSV:", error);
-      alert("An unexpected error occurred while uploading the CSV file.");
+      setPageNotice(
+        "An unexpected error occurred while uploading the CSV file.",
+      );
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -787,26 +803,22 @@ export default function ProductsPage() {
                 : `Bulk delete${selectedProducts.length > 0 ? ` (${selectedProducts.length})` : ""}`}
             </span>
           </button>
-
-          <button type="button" className={quietButtonClasses}>
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            <span>Export</span>
-          </button>
         </div>
       </div>
+
+      {/* Inline feedback — errors explain and direct, never a browser alert. */}
+      {pageNotice && (
+        <div className="flex items-start justify-between gap-4 rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm text-red-700">{pageNotice}</p>
+          <button
+            type="button"
+            onClick={() => setPageNotice(null)}
+            className="viz-mono shrink-0 cursor-pointer text-xs uppercase tracking-[0.08em] text-red-700 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Products Table */}
       <div className="viz-panel overflow-hidden">
@@ -858,15 +870,6 @@ export default function ProductsPage() {
                 </th>
                 <th
                   className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
-                  onClick={() => handleSort("id")}
-                >
-                  <div className="viz-label flex items-center">
-                    QTY
-                    <SortIcon columnKey="id" />
-                  </div>
-                </th>
-                <th
-                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
                   onClick={() => handleSort("created_at")}
                 >
                   <div className="viz-label flex items-center">
@@ -874,14 +877,8 @@ export default function ProductsPage() {
                     <SortIcon columnKey="created_at" />
                   </div>
                 </th>
-                <th
-                  className="cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--viz-ground)]"
-                  onClick={() => handleSort("id")}
-                >
-                  <div className="viz-label flex items-center">
-                    Status
-                    <SortIcon columnKey="id" />
-                  </div>
+                <th className="px-4 py-3 text-left">
+                  <span className="viz-label">Status</span>
                 </th>
                 <th className="px-4 py-3 text-left">
                   <span className="viz-label">Action</span>
@@ -891,7 +888,7 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-[var(--viz-line)]">
               {currentProducts.length === 0
                 ? <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center">
+                    <td colSpan={8} className="px-4 py-8 text-center">
                       <span className="viz-mono text-sm text-[var(--viz-muted)]">
                         No products found — adjust the filters or upload a CSV.
                       </span>
@@ -938,13 +935,10 @@ export default function ProductsPage() {
                               </div>}
                         </td>
                         <td className="px-4 py-4 text-sm font-medium text-[var(--viz-ink)]">
-                          {product.product_name || "N/A"}
+                          {product.product_name || "—"}
                         </td>
                         <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
-                          {product.product_id || "N/A"}
-                        </td>
-                        <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
-                          40
+                          {product.product_id || "—"}
                         </td>
                         <td className="viz-mono px-4 py-4 text-sm text-[var(--viz-muted)]">
                           {formatDate(product.created_at)}
@@ -1013,7 +1007,10 @@ export default function ProductsPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setProductToDelete(product)}
+                              onClick={() => {
+                                setDeleteError(null);
+                                setProductToDelete(product);
+                              }}
                               className="cursor-pointer text-[var(--viz-muted)] transition-colors hover:text-red-700"
                               title="Delete"
                             >
@@ -1347,6 +1344,11 @@ export default function ProductsPage() {
                     className={fieldClasses}
                   />
                 </div>
+                {formError && (
+                  <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formError}
+                  </p>
+                )}
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
@@ -1386,10 +1388,18 @@ export default function ProductsPage() {
               {productToDelete.product_name || "this product"}&quot;? This
               action cannot be undone.
             </p>
+            {deleteError && (
+              <p className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {deleteError}
+              </p>
+            )}
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setProductToDelete(null)}
+                onClick={() => {
+                  setProductToDelete(null);
+                  setDeleteError(null);
+                }}
                 disabled={deleting}
                 className={`${quietButtonClasses} disabled:opacity-60`}
               >
@@ -1402,6 +1412,37 @@ export default function ProductsPage() {
                 className="cursor-pointer rounded-full bg-red-700 px-5 py-2 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Dialog */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2A261E]/60 backdrop-blur-sm">
+          <div className="viz-panel mx-4 w-full max-w-md p-6 shadow-xl">
+            <h3 className="viz-serif mb-2 text-xl">Delete selected products</h3>
+            <p className="mb-6 text-sm text-[var(--viz-muted)]">
+              Are you sure you want to delete {selectedProducts.length} selected
+              product(s)? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowBulkConfirm(false)}
+                disabled={bulkDeleting}
+                className={`${quietButtonClasses} disabled:opacity-60`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                disabled={bulkDeleting}
+                className="cursor-pointer rounded-full bg-red-700 px-5 py-2 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {bulkDeleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>
