@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@google/genai": "^1.26.0",
+    "@salusoft89/planegcs": "^1.2.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.1",
+    "@tarikjabiri/dxf": "^2.8.9",
+    "clipper2-wasm": "^0.4.0",
     "csv-parse": "^6.1.0",
     "next": "15.5.8",
     "react": "19.1.0",
