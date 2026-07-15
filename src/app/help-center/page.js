@@ -36,22 +36,34 @@ const HelpCenterPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
+        setSubmitStatus(null);
 
-        // Simulate form submission
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+            const response = await fetch("/api/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
 
-        setSubmitStatus("success");
-        setIsSubmitting(false);
-        setFormData({
-            firstName: "",
-            lastName: "",
-            email: "",
-            country: "",
-            message: "",
-        });
+            if (!response.ok) {
+                throw new Error("Request failed");
+            }
 
-        // Clear status after 3 seconds
-        setTimeout(() => setSubmitStatus(null), 3000);
+            setSubmitStatus("success");
+            setFormData({
+                firstName: "",
+                lastName: "",
+                email: "",
+                country: "",
+                message: "",
+            });
+        } catch {
+            setSubmitStatus("error");
+        } finally {
+            setIsSubmitting(false);
+            // Clear status after 3 seconds
+            setTimeout(() => setSubmitStatus(null), 3000);
+        }
     };
 
     const helpCategories = [
@@ -226,6 +238,11 @@ const HelpCenterPage = () => {
                             {submitStatus === "success" && (
                                 <p className="text-green-600 text-center text-sm">
                                     Thank you! Your message has been sent successfully.
+                                </p>
+                            )}
+                            {submitStatus === "error" && (
+                                <p className="text-red-600 text-center text-sm">
+                                    Something went wrong. Please try again.
                                 </p>
                             )}
                         </form>
