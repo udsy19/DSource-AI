@@ -39,10 +39,11 @@ export default function MatchResultsModal({ result, onClose }) {
           </p>
         )}
 
-        <div className="mt-4 flex-1 overflow-y-auto">
+        {/* min-h-0 lets this flex child shrink so overflow-y actually scrolls. */}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="flex gap-4 items-start">
             {croppedImage && (
-              <div className="w-32 shrink-0">
+              <div className="sticky top-0 w-32 shrink-0">
                 <div className="viz-label mb-1">Searched region</div>
                 {/* biome-ignore lint/performance/noImgElement: data URI cannot use next/image */}
                 <img
