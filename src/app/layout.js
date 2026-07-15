@@ -1,11 +1,11 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import Header from "../components/header";
 import ConditionalFooter from "../components/ConditionalFooter";
-import { SpecProvider } from "../contexts/SpecContext";
+import Header from "../components/header";
 import { AuthProvider } from "../contexts/AuthContext";
 import { PathnameProvider } from "../contexts/PathnameContext";
+import { SpecProvider } from "../contexts/SpecContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,10 +17,43 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// NOTE: Set NEXT_PUBLIC_SITE_URL to the production origin (e.g. https://dsource.ai)
+// in the prod environment so metadataBase, OpenGraph, and canonical URLs resolve
+// correctly. Config/.env is owned by another branch — do not add it here.
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://dsource.ai";
+
+const siteTitle = "DSource — AI Interior Materials Marketplace";
+const siteDescription =
+  "Browse interior materials, match them from a room photo with AI, visualize swaps, and build product specs.";
+
 export const metadata = {
-  title: "DSource — AI Interior Materials Marketplace",
-  description:
-    "Browse interior materials, match them from a room photo with AI, visualize swaps, and build product specs.",
+  metadataBase: new URL(siteUrl),
+  title: siteTitle,
+  description: siteDescription,
+  keywords: [
+    "interior materials",
+    "AI interior design",
+    "material sourcing",
+    "room photo matching",
+    "interior visualizer",
+    "product specifications",
+    "materials marketplace",
+    "designers",
+    "architects",
+    "DSource",
+  ],
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    type: "website",
+    siteName: "DSource.AI",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
 };
 
 export default function RootLayout({ children }) {
