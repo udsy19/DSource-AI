@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # NEXT_PUBLIC_* vars are inlined at build time, so the build needs them.
+      # For real deployments configure these as repository secrets under
+      # Settings → Secrets and variables → Actions:
+      #   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, GOOGLE_GENAI_API_KEY
+      # The placeholders below let the build/type-check pass in CI without
+      # touching any live services.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+      GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY || 'placeholder-genai-key' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Advisory only: the repo carries ~330 pre-existing Biome findings
+      # (formatting, import order, a11y, etc.). Surfacing them without blocking
+      # lets Build + Test gate correctness now. TODO: burn down the backlog
+      # (biome check --write for the auto-fixable majority, then manual passes)
+      # and flip continue-on-error back to false to make lint a hard gate.
+      - name: Lint (Biome, advisory)
+        run: npx @biomejs/biome check
+        continue-on-error: true
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
