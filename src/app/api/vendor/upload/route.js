@@ -30,6 +30,10 @@ const REQUIRED_COLUMNS = [
 
 const MULTI_VALUE_COLUMNS = ["sub_category", "application", "tags"];
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_ROWS = 5000;
+const UPSERT_CHUNK_SIZE = 500;
+
 const transformRow = (row) => {
   const multiValueFields = Object.fromEntries(
     MULTI_VALUE_COLUMNS.map((column) => [column, parseMultiValue(row[column])])
@@ -85,14 +89,41 @@ export async function POST(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
+  let csvText;
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
 
-  if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "Missing CSV file." }, { status: 400 });
+    if (!file || !(file instanceof File)) {
+      return NextResponse.json({ error: "Missing CSV file." }, { status: 400 });
+    }
+
+    // Validate MIME type / extension is CSV
+    const isCsv =
+      file.type === "text/csv" || file.name?.toLowerCase().endsWith(".csv");
+    if (!isCsv) {
+      return NextResponse.json(
+        { error: "Invalid file type. Please upload a .csv file." },
+        { status: 400 }
+      );
+    }
+
+    // Reject oversized files before reading them into memory
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 5 MB." },
+        { status: 413 }
+      );
+    }
+
+    csvText = await file.text();
+  } catch (_error) {
+    return NextResponse.json(
+      { error: "Could not read the uploaded file." },
+      { status: 400 }
+    );
   }
 
-  const csvText = await file.text();
   if (!csvText.trim()) {
     return NextResponse.json({ error: "The file is empty." }, { status: 400 });
   }
@@ -107,6 +138,13 @@ export async function POST(request) {
   } catch (_error) {
     return NextResponse.json(
       { error: "CSV parse error. Ensure the file uses commas and UTF-8." },
+      { status: 400 }
+    );
+  }
+
+  if (rows.length > MAX_ROWS) {
+    return NextResponse.json(
+      { error: `Too many rows. Maximum is ${MAX_ROWS} rows per upload.` },
       { status: 400 }
     );
   }
@@ -144,21 +182,28 @@ export async function POST(request) {
     );
   }
 
-  const { data, error } = await supabase
-    .from("scraped_product_list")
-    .upsert(transformedRows, { onConflict: "product_id" })
-    .select("id");
+  // Upsert in chunks to avoid a single oversized statement
+  let inserted = 0;
+  for (let i = 0; i < transformedRows.length; i += UPSERT_CHUNK_SIZE) {
+    const chunk = transformedRows.slice(i, i + UPSERT_CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from("scraped_product_list")
+      .upsert(chunk, { onConflict: "product_id" })
+      .select("id");
 
-  if (error) {
-    return NextResponse.json(
-      { error: error.message ?? "Failed to import CSV." },
-      { status: 500 }
-    );
+    if (error) {
+      return NextResponse.json(
+        { error: error.message ?? "Failed to import CSV." },
+        { status: 500 }
+      );
+    }
+
+    inserted += data?.length ?? 0;
   }
 
   return NextResponse.json({
     message: "Import complete",
-    inserted: data?.length ?? 0,
+    inserted,
     totalRows: transformedRows.length,
   });
 }
