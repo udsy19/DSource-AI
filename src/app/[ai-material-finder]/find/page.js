@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { AiProcessingNotice } from "@/components/legal-page";
 
 import uploadIcon from "../../../../public/upload-icon.png";
 import identifyIcon from "../../../../public/identify-icon.png";
@@ -581,6 +582,9 @@ const AiMaterialFinder = () => {
                 <p className="text-gray-500 text-sm">
                   Image format: JPG, PNG, & SVG. Max 10MB.
                 </p>
+                <div className="mt-4 max-w-md mx-auto">
+                  <AiProcessingNotice />
+                </div>
               </div>
             )}
           </div>

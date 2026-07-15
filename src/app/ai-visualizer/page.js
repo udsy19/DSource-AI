@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
+import { AiProcessingNotice } from "@/components/legal-page";
 
 import visualizerIcon from "../../../public/visualizer-icon.png";
 
@@ -444,6 +445,9 @@ const AiMaterialFinder = () => {
                   >
                     Generate
                   </button>
+                  <div className="mt-3">
+                    <AiProcessingNotice />
+                  </div>
                 </div>
               </div>
             )}

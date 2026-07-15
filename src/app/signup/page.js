@@ -11,6 +11,7 @@ export default function SignUpPage() {
   const router = useRouter();
   const supabase = createClient();
   const [form, setForm] = useState({ email: "", password: "", confirmPassword: "" });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -56,6 +57,16 @@ export default function SignUpPage() {
         return;
       }
 
+      if (!agreedToTerms) {
+        setFeedback({
+          type: "error",
+          message:
+            "You must confirm you are 18 or older and agree to the Terms of Service and Privacy Policy.",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       const response = await supabase.auth.signUp({
         email: trimmedEmail,
         password: parsedPassword,
@@ -63,6 +74,8 @@ export default function SignUpPage() {
           emailRedirectTo: emailRedirect,
           data: {
             user_type: "user", // Set as regular user by default
+            terms_accepted_version: "1.0",
+            terms_accepted_at: new Date().toISOString(),
           },
         },
       });
@@ -154,6 +167,34 @@ export default function SignUpPage() {
                 required
               />
             </div>
+            <label className="flex items-start gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(event) => setAgreedToTerms(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-gray-900"
+                required
+              />
+              <span>
+                I am at least 18 years old and agree to the{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="font-semibold text-gray-900 underline underline-offset-2"
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  className="font-semibold text-gray-900 underline underline-offset-2"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
             <button
               type="submit"
               disabled={submitting}

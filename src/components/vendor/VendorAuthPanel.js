@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
 const EMAIL_REDIRECT_FALLBACK = "/vendor";
@@ -13,6 +14,7 @@ export default function VendorAuthPanel() {
   const router = useRouter();
   const [mode, setMode] = useState("signIn");
   const [form, setForm] = useState({ email: "", password: "" });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -43,6 +45,15 @@ export default function VendorAuthPanel() {
 
       let response;
       if (mode === "signUp") {
+        if (!agreedToTerms) {
+          setFeedback({
+            type: "error",
+            message:
+              "You must agree to the Terms of Service and Privacy Policy to request access.",
+          });
+          setSubmitting(false);
+          return;
+        }
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
@@ -50,6 +61,8 @@ export default function VendorAuthPanel() {
             emailRedirectTo: emailRedirect,
             data: {
               user_type: "vendor",
+              terms_accepted_version: "1.0",
+              terms_accepted_at: new Date().toISOString(),
             },
           },
         });
@@ -169,6 +182,36 @@ export default function VendorAuthPanel() {
             required
           />
         </div>
+        {mode === "signUp" && (
+          <label className="flex items-start gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(event) => setAgreedToTerms(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-gray-900"
+              required
+            />
+            <span>
+              I am authorized to act for my business and agree to the{" "}
+              <Link
+                href="/terms"
+                target="_blank"
+                className="font-semibold text-gray-900 underline underline-offset-2"
+              >
+                Terms of Service
+              </Link>{" "}
+              (including the vendor terms) and{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="font-semibold text-gray-900 underline underline-offset-2"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+        )}
         <button
           type="submit"
           disabled={submitting}
