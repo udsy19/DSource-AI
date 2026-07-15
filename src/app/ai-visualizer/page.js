@@ -193,23 +193,11 @@ const AiMaterialFinder = () => {
         );
         setIsAnalyzing({ state: false, message: "" });
       }
-    } else if (type === "cad") {
-      // Keep the mock behavior for CAD converter
-      setIsAnalyzing({
-        state: true,
-        message: "Generating CAD drawing",
-      });
-
-      const timer = setTimeout(() => {
-        setImagePreview("/api/images/cad-drawing.jpeg");
-        setIsAnalyzing({
-          state: false,
-          message: "CAD drawing generated successfully",
-        });
-      }, 5000);
-
-      return () => clearTimeout(timer);
     }
+    // Image to CAD conversion has no real backend yet, so it is intentionally
+    // not handled here. The CAD tab surfaces an honest "Coming soon" state
+    // instead of a fabricated result.
+    // TODO: wire to real CAD conversion endpoint
   };
 
   return (
@@ -889,11 +877,20 @@ const AiMaterialFinder = () => {
                   )}
                 </div>
                 <div className="mt-4">
-                  <button
-                    className="w-full bg-black text-white rounded-lg p-2 text-sm cursor-pointer"
-                    onClick={() => handleGenerate("cad")}
+                  <p
+                    role="status"
+                    className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 text-center"
                   >
-                    Generate
+                    Image to CAD conversion is coming soon.
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    title="Image to CAD conversion is coming soon"
+                    className="w-full bg-gray-200 text-gray-500 rounded-lg p-2 text-sm cursor-not-allowed"
+                  >
+                    Coming Soon
                   </button>
                 </div>
               </div>

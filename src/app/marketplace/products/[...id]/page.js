@@ -51,22 +51,31 @@ const ProductDetailsContent = () => {
         }
 
         const data = await response.json();
-        setProduct(data.product);
+        const fetchedProduct = data?.product;
+
+        // The response was ok but the payload is missing the product; treat it
+        // as not found rather than dereferencing an undefined product.
+        if (!fetchedProduct) {
+          setError("Product not found");
+          return;
+        }
+
+        setProduct(fetchedProduct);
 
         // Set up images array (main image + related product images)
         const imageArray = [];
-        if (data.product.image_url) {
+        if (fetchedProduct.image_url) {
           imageArray.push({
-            url: data.product.image_url,
-            color: data.product.color,
-            id: data.product.id,
+            url: fetchedProduct.image_url,
+            color: fetchedProduct.color,
+            id: fetchedProduct.id,
           });
         }
 
         // Add related product images as thumbnails
         if (data.relatedProducts && data.relatedProducts.length > 0) {
           data.relatedProducts.forEach((p) => {
-            if (p.image_url && p.id !== data.product.id) {
+            if (p.image_url && p.id !== fetchedProduct.id) {
               imageArray.push({
                 url: p.image_url,
                 color: p.color,
@@ -77,16 +86,16 @@ const ProductDetailsContent = () => {
         }
 
         setImages(imageArray);
-        setSelectedColor(data.product.color_code || null);
+        setSelectedColor(fetchedProduct.color_code || null);
 
         // Set initial pattern from series_name or sub_category
-        if (data.product.series_name) {
-          setSelectedPattern(data.product.series_name);
+        if (fetchedProduct.series_name) {
+          setSelectedPattern(fetchedProduct.series_name);
         } else if (
-          Array.isArray(data.product.sub_category) &&
-          data.product.sub_category.length > 0
+          Array.isArray(fetchedProduct.sub_category) &&
+          fetchedProduct.sub_category.length > 0
         ) {
-          setSelectedPattern(data.product.sub_category[0]);
+          setSelectedPattern(fetchedProduct.sub_category[0]);
         }
 
         setRelatedProducts(data.relatedProducts || []);
