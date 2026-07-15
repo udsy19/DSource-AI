@@ -1,32 +1,14 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { extractJsonResponse, getResponseText } from "@/utils/gemini";
+import {
+  extractJsonResponse,
+  getResponseText,
+  parseImageData,
+} from "@/utils/gemini";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
-
-// Helper function to convert base64 data URL to base64 string and extract mime type
-const parseImageData = (imageData) => {
-  if (!imageData) return null;
-
-  // If it's already a base64 string without data URL prefix
-  if (!imageData.includes(",")) {
-    return { data: imageData, mimeType: "image/png" };
-  }
-
-  // Extract mime type and base64 data from data URL
-  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
-  if (matches) {
-    return {
-      data: matches[2],
-      mimeType: matches[1] || "image/png",
-    };
-  }
-
-  // If it's just base64 data
-  return { data: imageData, mimeType: "image/png" };
-};
 
 export async function POST(request) {
   try {
