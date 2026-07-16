@@ -21,9 +21,9 @@ export async function GET(_request, { params }) {
     const [profile, gen, ana, designs, activity, products] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
       supabase
-        .from("ai_generation_events")
-        .select("*")
-        .eq("user_id", id)
+        .from("visualizer_renders")
+        .select("id, created_by, created_at, prompt, composed_prompt, model")
+        .eq("created_by", id)
         .order("created_at", { ascending: false })
         .limit(50),
       supabase
@@ -33,10 +33,11 @@ export async function GET(_request, { params }) {
         .order("created_at", { ascending: false })
         .limit(50),
       supabase
-        .from("generated_designs")
-        .select("*")
-        .eq("user_id", id)
-        .eq("is_deleted", false)
+        .from("visualizer_renders")
+        .select(
+          "id, created_by, created_at, prompt, composed_prompt, image_path",
+        )
+        .eq("created_by", id)
         .order("created_at", { ascending: false })
         .limit(60),
       supabase
@@ -56,8 +57,8 @@ export async function GET(_request, { params }) {
     const designRows = designs.data ?? [];
     const signed = await signPaths(
       supabase,
-      "generated-designs",
-      designRows.map((d) => d.storage_path),
+      "visualizer-renders",
+      designRows.map((d) => d.image_path),
     );
 
     return NextResponse.json({
@@ -72,11 +73,20 @@ export async function GET(_request, { params }) {
         app_metadata: u.app_metadata ?? {},
       },
       profile: profile.data ?? null,
-      generationEvents: gen.data ?? [],
+      generationEvents: (gen.data ?? []).map((r) => ({
+        id: r.id,
+        prompt: r.prompt || r.composed_prompt,
+        model: r.model,
+        status: "success",
+        latency_ms: null,
+        created_at: r.created_at,
+      })),
       analysisEvents: ana.data ?? [],
       designs: designRows.map((d) => ({
-        ...d,
-        url: signed[d.storage_path] ?? null,
+        id: d.id,
+        prompt: d.prompt || d.composed_prompt,
+        created_at: d.created_at,
+        url: signed[d.image_path] ?? null,
       })),
       activity: activity.data ?? [],
       products: products.data ?? [],

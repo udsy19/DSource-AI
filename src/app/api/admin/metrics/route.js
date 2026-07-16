@@ -30,11 +30,12 @@ export async function GET() {
       count("profiles", (q) => q.eq("role", "vendor")),
       count("profiles", (q) => q.eq("role", "admin")),
       count("profiles", (q) => q.eq("banned", true)),
-      count("ai_generation_events"),
-      count("ai_generation_events", (q) => q.gte("created_at", iso(7 * DAY))),
+      count("visualizer_renders"),
+      count("visualizer_renders", (q) => q.gte("created_at", iso(7 * DAY))),
+      // visualizer_renders only stores successful renders (errors aren't saved).
       count("ai_generation_events", (q) => q.neq("status", "success")),
       count("ai_analysis_events"),
-      count("generated_designs", (q) => q.eq("is_deleted", false)),
+      count("visualizer_renders"),
       count("activity_events", (q) => q.gte("created_at", iso(DAY))),
     ]);
 

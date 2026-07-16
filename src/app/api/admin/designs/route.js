@@ -19,13 +19,16 @@ export async function GET(request) {
       Number.parseInt(searchParams.get("page") || "1", 10),
     );
 
+    // Canonical render store is visualizer_renders (written by the generate-image
+    // route via saveRender). Admin reads it with the service-role client.
     let query = supabase
-      .from("generated_designs")
-      .select("*")
-      .eq("is_deleted", false)
+      .from("visualizer_renders")
+      .select(
+        "id, created_by, created_at, prompt, composed_prompt, image_path, model",
+      )
       .order("created_at", { ascending: false })
       .range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
-    if (userId) query = query.eq("user_id", userId);
+    if (userId) query = query.eq("created_by", userId);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -34,19 +37,23 @@ export async function GET(request) {
     const [emailById, signed] = await Promise.all([
       emailsForIds(
         supabase,
-        rows.map((d) => d.user_id),
+        rows.map((d) => d.created_by),
       ),
       signPaths(
         supabase,
-        "generated-designs",
-        rows.map((d) => d.storage_path),
+        "visualizer-renders",
+        rows.map((d) => d.image_path),
       ),
     ]);
 
     const designs = rows.map((d) => ({
-      ...d,
-      email: emailById[d.user_id] ?? null,
-      url: signed[d.storage_path] ?? null,
+      id: d.id,
+      user_id: d.created_by,
+      created_at: d.created_at,
+      prompt: d.prompt || d.composed_prompt,
+      model: d.model,
+      email: emailById[d.created_by] ?? null,
+      url: signed[d.image_path] ?? null,
     }));
 
     return NextResponse.json({ designs, page });
