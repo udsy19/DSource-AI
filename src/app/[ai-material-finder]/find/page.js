@@ -225,100 +225,91 @@ const AiMaterialFinder = () => {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: analysis must run only when a new image is uploaded; checkCategoryAvailability is recreated each render and would retrigger it
   useEffect(() => {
-    // Create fake analysis loading component
-    // Add fake product categories
     if (uploadedImage) {
       setIsAnalyzing({
         state: true,
         message: "Analysing uploaded image for possible categories",
       });
-      const timer = setTimeout(() => {
-        const formData = new FormData();
-        formData.append(
-          "image",
-          uploadedImage,
-          uploadedImage.name || "uploaded-image",
-        );
+      const formData = new FormData();
+      formData.append(
+        "image",
+        uploadedImage,
+        uploadedImage.name || "uploaded-image",
+      );
 
-        fetch("/api/analyze-image", {
-          method: "POST",
-          body: formData,
-        })
-          .then((res) => res.json())
-          .then(async (data) => {
-            if (data.success) {
-              console.log(data);
-              const normalizedCategories = Array.isArray(data.categories)
-                ? data.categories.map((category) => {
-                    const x =
-                      typeof category?.position?.x === "number"
-                        ? Math.round(category.position.x * 100)
-                        : null;
-                    const y =
-                      typeof category?.position?.y === "number"
-                        ? Math.round(category.position.y * 100)
-                        : null;
+      fetch("/api/analyze-image", {
+        method: "POST",
+        body: formData,
+      })
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.success) {
+            const normalizedCategories = Array.isArray(data.categories)
+              ? data.categories.map((category) => {
+                  const x =
+                    typeof category?.position?.x === "number"
+                      ? Math.round(category.position.x * 100)
+                      : null;
+                  const y =
+                    typeof category?.position?.y === "number"
+                      ? Math.round(category.position.y * 100)
+                      : null;
 
-                    return {
-                      label: category?.label ?? "Unknown",
-                      selected: false,
-                      hovered: false,
-                      confidence: category?.confidence ?? null,
-                      reasoning: category?.reasoning ?? "",
-                      position:
-                        x !== null && y !== null
-                          ? {
-                              x: `${x}%`,
-                              y: `${y}%`,
-                            }
-                          : null,
-                      available: false, // Will be updated after checking
-                    };
-                  })
-                : [];
+                  return {
+                    label: category?.label ?? "Unknown",
+                    selected: false,
+                    hovered: false,
+                    confidence: category?.confidence ?? null,
+                    reasoning: category?.reasoning ?? "",
+                    position:
+                      x !== null && y !== null
+                        ? {
+                            x: `${x}%`,
+                            y: `${y}%`,
+                          }
+                        : null,
+                    available: false, // Will be updated after checking
+                  };
+                })
+              : [];
 
-              // Check which categories are available in the database
-              setCheckingAvailability(true);
-              const categoryLabels = normalizedCategories.map(
-                (cat) => cat.label,
-              );
-              const availableCategories =
-                await checkCategoryAvailability(categoryLabels);
+            // Check which categories are available in the database
+            setCheckingAvailability(true);
+            const categoryLabels = normalizedCategories.map((cat) => cat.label);
+            const availableCategories =
+              await checkCategoryAvailability(categoryLabels);
 
-              // Update categories with availability status
-              const categoriesWithAvailability = normalizedCategories.map(
-                (category) => ({
-                  ...category,
-                  available: availableCategories.includes(category.label),
-                }),
-              );
+            // Update categories with availability status
+            const categoriesWithAvailability = normalizedCategories.map(
+              (category) => ({
+                ...category,
+                available: availableCategories.includes(category.label),
+              }),
+            );
 
-              setCategories(categoriesWithAvailability);
-              setError(null);
-              setCheckingAvailability(false);
-            } else {
-              setError(
-                data?.error ||
-                  "We couldn't understand this image. Please try another interior photo.",
-              );
-              setCategories([]);
-              setCheckingAvailability(false);
-            }
-          })
-          .catch((err) => {
-            console.error(err);
+            setCategories(categoriesWithAvailability);
+            setError(null);
+            setCheckingAvailability(false);
+          } else {
             setError(
-              "Something went wrong while analyzing the image. Please try again.",
+              data?.error ||
+                "We couldn't understand this image. Please try another interior photo.",
             );
             setCategories([]);
             setCheckingAvailability(false);
-          })
-          .finally(() => {
-            setIsAnalyzing({ state: false, message: "" });
-          });
-      }, 5000);
-
-      return () => clearTimeout(timer);
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          setError(
+            "Something went wrong while analyzing the image. Please try again.",
+          );
+          setCategories([]);
+          setCheckingAvailability(false);
+        })
+        .finally(() => {
+          setIsAnalyzing({ state: false, message: "" });
+        });
     }
   }, [uploadedImage]);
 
@@ -326,9 +317,6 @@ const AiMaterialFinder = () => {
   useEffect(() => {
     handleProductCategorySelection("All");
   }, [products]);
-
-  console.log(imagePreview);
-  console.log(uploadedImage);
 
   return (
     <div className="viz-scope w-full">
@@ -551,7 +539,7 @@ const AiMaterialFinder = () => {
                                   {product.title}
                                 </h3>
                                 <p className="viz-mono mt-1 text-[11px] text-[var(--viz-muted)]">
-                                  $$$ · {product.brand}
+                                  {product.brand || "—"}
                                 </p>
                                 <p className="viz-mono text-[11px] text-[var(--viz-muted)]">
                                   Colour · {product.color}

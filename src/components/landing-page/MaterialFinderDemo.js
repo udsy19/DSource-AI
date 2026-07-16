@@ -239,7 +239,7 @@ export default function MaterialFinderDemo() {
         {/* Live status line */}
         <p className="viz-mono mt-3 text-[11px] tracking-[0.08em] text-[var(--viz-muted)] uppercase">
           {scanning
-            ? `Scanning the room… ${detected}/${ITEMS.length} pieces found`
+            ? `Scanning the demo room… ${detected}/${ITEMS.length} pieces found`
             : "Hover a dot, or a product below — the room follows"}
         </p>
       </div>
@@ -313,6 +313,9 @@ export default function MaterialFinderDemo() {
             Add to spec
           </span>
         </div>
+        <p className="viz-mono mt-3 text-[10px] tracking-[0.08em] text-[var(--viz-muted)] uppercase">
+          Illustration · sample pieces and prices, not a live scan
+        </p>
       </div>
     </div>
   );
