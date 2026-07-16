@@ -35,6 +35,14 @@ import { useEffect } from "react";
  * @param {(self:object)=>void}          [o.onLeave]
  * @param {object}  [o.stRef]      ref filled with the live ScrollTrigger so a
  *                                 caller can scrollTo a point in the film
+ * @param {object}  [o.pinRef]     element to pin. Defaults to pinning the
+ *                                 trigger itself (pin: true). Pass an *inner*
+ *                                 element when the component can unmount (e.g.
+ *                                 a toggled tab): pinning the trigger reparents
+ *                                 it into a pin-spacer, and React then throws
+ *                                 "removeChild … not a child" trying to remove
+ *                                 the moved node. Pinning an inner element keeps
+ *                                 the React-owned root removable.
  */
 export function useScrubFilm({
   rootRef,
@@ -45,6 +53,7 @@ export function useScrubFilm({
   onProgress,
   onLeave,
   stRef,
+  pinRef,
 }) {
   // Set up once on mount, like the hero: refs and primitive config are stable
   // for the component's life, and overlays read live values off refs each tick.
@@ -138,7 +147,7 @@ export function useScrubFilm({
         trigger: rootRef.current,
         start: "top top",
         end: `+=${window.innerHeight * pinVh}`,
-        pin: true,
+        pin: pinRef?.current ?? true,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {

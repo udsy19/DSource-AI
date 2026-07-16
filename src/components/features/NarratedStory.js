@@ -12,10 +12,11 @@ import { useScrubFilm } from "@/components/useScrubFilm";
 // elevation, and it settles on the spec sheet. Chapter copy and product
 // callouts are pinned over the film and swap in at scroll checkpoints.
 //
-// 242 frames extracted at 8fps from six chained Higgsfield morphs (bespoke
-// to this page — distinct from the homepage hero film). Desktop reads the
-// 1920px set; phones read a lighter 1280px set.
-const FRAME_COUNT = 242;
+// 303 frames extracted at 10fps from six chained Higgsfield morphs (bespoke
+// to this page — distinct from the homepage hero film), shot with slow, gentle
+// camera motion so the frames stay sharp and the scrub reads smooth. Desktop
+// reads the 1920px set; phones read a lighter 1280px set.
+const FRAME_COUNT = 303;
 const frameName = (i) => `frame_${String(i + 1).padStart(4, "0")}.webp`;
 const framePath = (i) => `/story-frames/${frameName(i)}`;
 const framePathM = (i) => `/story-frames-m/${frameName(i)}`;
@@ -97,13 +98,16 @@ const CHAPTERS = [
  */
 export default function NarratedStory() {
   const rootRef = useRef(null);
+  const pinRef = useRef(null);
   const canvasRef = useRef(null);
   const fillRef = useRef(null);
+  const hintRef = useRef(null);
   const stRef = useRef(null);
   const [active, setActive] = useState(0);
 
   useScrubFilm({
     rootRef,
+    pinRef,
     canvasRef,
     frameCount: FRAME_COUNT,
     stRef,
@@ -112,18 +116,21 @@ export default function NarratedStory() {
         query:
           "(min-width: 1024px) and (prefers-reduced-motion: no-preference)",
         srcOf: framePath,
-        pinVh: 6,
+        pinVh: 8,
       },
       {
         query:
           "(max-width: 1023px) and (prefers-reduced-motion: no-preference)",
         srcOf: framePathM,
-        pinVh: 4.5,
+        pinVh: 6,
       },
     ],
     onProgress: (p) => {
-      // Rail fill is driven imperatively so scrolling never re-renders React.
+      // Rail fill + the opening scroll hint are driven imperatively so
+      // scrolling never re-renders React.
       if (fillRef.current) fillRef.current.style.transform = `scaleX(${p})`;
+      if (hintRef.current)
+        hintRef.current.style.opacity = `${Math.max(0, 1 - p * 14)}`;
       let idx = 0;
       for (let i = 0; i < CHAPTERS.length; i++)
         if (p >= CHAPTERS[i].at) idx = i;
@@ -149,97 +156,118 @@ export default function NarratedStory() {
           except reduced-motion, which reads the static block below instead. */}
       <section
         ref={rootRef}
-        className="viz-scope relative hidden h-svh w-full overflow-hidden bg-[var(--viz-well)] motion-safe:block"
+        className="viz-scope relative hidden w-full bg-[var(--viz-well)] motion-safe:block"
       >
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0"
-          aria-hidden="true"
-          tabIndex={-1}
-        />
+        {/* Pin an inner element, never the section itself — pinning the
+            section reparents it into a GSAP pin-spacer, and React then crashes
+            trying to removeChild it when the tab toggles. */}
+        <div ref={pinRef} className="relative h-svh w-full overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
 
-        {/* Legibility scrim — darkest at the bottom where the copy sits. */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to top, rgba(26,22,16,0.78) 0%, rgba(26,22,16,0.22) 38%, transparent 62%)",
-          }}
-          aria-hidden="true"
-        />
+          {/* Legibility scrims — a soft top wash for the counter and a stronger
+              bottom wash under the copy, so text holds over bright frames. */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(26,22,16,0.84) 0%, rgba(26,22,16,0.30) 42%, rgba(26,22,16,0) 66%), linear-gradient(to bottom, rgba(26,22,16,0.34) 0%, transparent 22%)",
+            }}
+            aria-hidden="true"
+          />
 
-        {/* Product callout — floats over the frame on chapters that carry one. */}
-        {ch.pin
-          ? <button
-              key={`pin-${active}`}
-              type="button"
-              onClick={() => jumpTo(active)}
-              className="mf-fade absolute z-10 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${ch.pin.x}%`, top: `${ch.pin.y}%` }}
-              aria-label={`${ch.pin.label} — ${ch.pin.meta}`}
-            >
-              <span className="relative flex h-3.5 w-3.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--viz-paper)] opacity-60" />
-                <span className="relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-[var(--viz-paper)] bg-[var(--viz-blue)]" />
-              </span>
-              <span className="absolute top-5 left-1/2 w-max max-w-[68vw] -translate-x-1/2 rounded-lg border border-white/15 bg-[var(--viz-well)]/85 px-3 py-2 text-left backdrop-blur-sm sm:top-1/2 sm:left-6 sm:max-w-none sm:translate-x-0 sm:-translate-y-1/2">
-                <span className="viz-mono block text-[10px] tracking-[0.06em] text-white/60 uppercase">
-                  {ch.pin.meta}
-                </span>
-                <span className="viz-serif block text-sm text-white">
-                  {ch.pin.label}
-                </span>
-              </span>
-            </button>
-          : null}
-
-        {/* Chapter copy — lower third, cross-fading in on each checkpoint. */}
-        <div className="absolute inset-x-0 bottom-0 px-6 pb-16 sm:px-10 sm:pb-20 lg:px-16">
-          <div key={`copy-${active}`} className="mf-fade max-w-2xl">
-            <p className="viz-mono text-[11px] tracking-[0.28em] text-white/70 uppercase">
-              {String(active + 1).padStart(2, "0")} /{" "}
-              {String(CHAPTERS.length).padStart(2, "0")}
-              <span className="mx-3 text-white/30">·</span>
-              {ch.eyebrow}
+          {/* Opening cue — makes it obvious the film is scroll-driven; fades
+              imperatively as soon as you start moving. */}
+          <div
+            ref={hintRef}
+            className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center gap-3 text-center transition-opacity duration-300"
+          >
+            <p className="viz-mono text-xs tracking-[0.28em] text-white/85 uppercase">
+              Scroll to walk the project
             </p>
-            <h2 className="viz-serif mt-3 text-3xl leading-[1.1] text-white sm:text-4xl md:text-5xl">
-              {ch.title}
-            </h2>
-            <p className="viz-serif mt-3 max-w-xl text-base text-white/75 italic sm:text-lg">
-              {ch.line}
-            </p>
-            <Link
-              href={ch.href}
-              className="viz-mono mt-5 inline-block rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-[0.08em] text-white uppercase transition-colors hover:bg-white hover:text-[var(--viz-ink)]"
-            >
-              Open {ch.eyebrow.split(" · ")[0]} →
-            </Link>
+            <span className="animate-bounce text-2xl leading-none text-white/70">
+              ↓
+            </span>
           </div>
 
-          {/* Progress rail — marks each chapter, fills with scroll, jumps on tap. */}
-          <div className="mt-8 flex items-center gap-4">
-            <div className="relative h-px flex-1 bg-white/20">
-              <div
-                ref={fillRef}
-                className="h-full origin-left bg-white"
-                style={{ transform: "scaleX(0)" }}
-              />
-              {CHAPTERS.map((c, i) => (
-                <button
-                  key={c.title}
-                  type="button"
-                  onClick={() => jumpTo(i)}
-                  aria-label={`Jump to ${c.eyebrow}`}
-                  className={`absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors ${
-                    i <= active ? "bg-white" : "bg-white/30 hover:bg-white/60"
-                  }`}
-                  style={{ left: `${c.at * 100}%` }}
-                />
-              ))}
+          {/* Product callout — floats over the frame on chapters that carry
+              one; clearly tappable, links to the feature behind it. */}
+          {ch.pin
+            ? <button
+                key={`pin-${active}`}
+                type="button"
+                onClick={() => jumpTo(active)}
+                className="mf-fade group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+                style={{ left: `${ch.pin.x}%`, top: `${ch.pin.y}%` }}
+                aria-label={`${ch.pin.label} — ${ch.pin.meta}`}
+              >
+                <span className="relative flex h-4 w-4">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--viz-paper)] opacity-70" />
+                  <span className="relative inline-flex h-4 w-4 rounded-full border-2 border-[var(--viz-paper)] bg-[var(--viz-blue)] transition-transform group-hover:scale-110" />
+                </span>
+                <span className="absolute top-6 left-1/2 w-max max-w-[68vw] -translate-x-1/2 rounded-lg border border-white/15 bg-[var(--viz-well)]/85 px-3 py-2 text-left shadow-lg backdrop-blur-sm sm:top-1/2 sm:left-7 sm:max-w-none sm:translate-x-0 sm:-translate-y-1/2">
+                  <span className="viz-mono block text-[10px] tracking-[0.06em] text-white/60 uppercase">
+                    {ch.pin.meta}
+                  </span>
+                  <span className="viz-serif block text-sm text-white">
+                    {ch.pin.label}
+                  </span>
+                </span>
+              </button>
+            : null}
+
+          {/* Chapter copy — lower third, cross-fading in on each checkpoint. */}
+          <div className="absolute inset-x-0 bottom-0 px-6 pb-14 sm:px-10 sm:pb-16 lg:px-16">
+            <div key={`copy-${active}`} className="mf-fade max-w-2xl">
+              <p className="viz-mono text-[11px] tracking-[0.28em] text-white/70 uppercase">
+                {String(active + 1).padStart(2, "0")} /{" "}
+                {String(CHAPTERS.length).padStart(2, "0")}
+                <span className="mx-3 text-white/30">·</span>
+                {ch.eyebrow}
+              </p>
+              <h2 className="viz-serif mt-3 text-3xl leading-[1.1] text-white sm:text-4xl md:text-5xl">
+                {ch.title}
+              </h2>
+              <p className="viz-serif mt-3 max-w-xl text-base text-white/80 italic sm:text-lg">
+                {ch.line}
+              </p>
+              <Link
+                href={ch.href}
+                className="viz-mono mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[11px] tracking-[0.08em] text-[var(--viz-ink)] uppercase transition-colors hover:bg-[var(--viz-blue)] hover:text-white"
+              >
+                Open {ch.eyebrow.split(" · ")[0]} →
+              </Link>
             </div>
-            <p className="viz-mono shrink-0 text-[10px] tracking-[0.28em] text-white/50 uppercase">
-              Scroll
-            </p>
+
+            {/* Progress rail — fills with scroll, jumps on tap, counts beats. */}
+            <div className="mt-7 flex items-center gap-4">
+              <div className="relative h-px flex-1 bg-white/20">
+                <div
+                  ref={fillRef}
+                  className="h-full origin-left bg-white"
+                  style={{ transform: "scaleX(0)" }}
+                />
+                {CHAPTERS.map((c, i) => (
+                  <button
+                    key={c.title}
+                    type="button"
+                    onClick={() => jumpTo(i)}
+                    aria-label={`Jump to ${c.eyebrow}`}
+                    className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--viz-well)] transition-colors ${
+                      i <= active ? "bg-white" : "bg-white/40 hover:bg-white"
+                    }`}
+                    style={{ left: `${c.at * 100}%` }}
+                  />
+                ))}
+              </div>
+              <p className="viz-mono shrink-0 text-[10px] tracking-[0.28em] text-white/50 uppercase">
+                {active + 1} / {CHAPTERS.length}
+              </p>
+            </div>
           </div>
         </div>
       </section>

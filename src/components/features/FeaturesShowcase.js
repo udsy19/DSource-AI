@@ -22,8 +22,8 @@ import mbSofa from "../../../public/material-finder-images/Sofa 1.png";
 import lib1 from "../../../public/popular-1.jpg";
 import lib2 from "../../../public/popular-2.jpg";
 import lib4 from "../../../public/popular-4.jpg";
-import renderAfter from "../../../public/render-after.webp";
-import renderBefore from "../../../public/render-before.webp";
+import storyEmpty from "../../../public/story/empty.webp";
+import storyFurnished from "../../../public/story/furnished.webp";
 
 /** Cursor-driven 3D tilt. Writes the transform straight to the node so it
  *  never re-renders; respects reduced-motion by staying flat. */
@@ -112,12 +112,12 @@ function BeforeAfter() {
   return (
     <div ref={wrapRef} className="relative overflow-hidden rounded-xl">
       <Image
-        src={renderAfter}
+        src={storyFurnished}
         alt="The room, fully designed"
         className="h-auto w-full"
       />
       <Image
-        src={renderBefore}
+        src={storyEmpty}
         alt="The same room, empty, before designing"
         className="pointer-events-none absolute inset-0 h-full w-full"
         style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
