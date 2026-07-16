@@ -44,7 +44,7 @@ const Tutorial = () => {
             <div className="flex items-baseline justify-between gap-4 pb-2">
               <p className="viz-label">DSource Studio</p>
               <Link
-                href="/ai-material-finder"
+                href="/material-finder"
                 className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
               >
                 ← Material finder

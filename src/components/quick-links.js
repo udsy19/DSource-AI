@@ -25,7 +25,7 @@ const QuickLinks = () => {
     {
       heading: "Product",
       links: [
-        { label: "SnapFind", href: "/ai-material-finder/find" },
+        { label: "SnapFind", href: "/material-finder/find" },
         { label: "RenderRoom", href: "/ai-visualizer" },
         { label: "QuoteBoard", href: "/spec-builder" },
         { label: "Vendor Directory", href: "/marketplace" },
@@ -34,7 +34,7 @@ const QuickLinks = () => {
     {
       heading: "Support",
       links: [
-        { label: "How it Works", href: "/ai-material-finder" },
+        { label: "How it Works", href: "/material-finder" },
         { label: "FAQ", href: "/faq" },
         { label: "Help Center", href: "/help-center" },
         { label: "Contact Us", href: "/help-center#contact" },

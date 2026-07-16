@@ -12,7 +12,7 @@ export default function sitemap() {
     "/privacy",
     "/terms",
     "/marketplace",
-    "/ai-material-finder",
+    "/material-finder",
     "/ai-visualizer",
   ];
 
