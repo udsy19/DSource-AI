@@ -1,5 +1,5 @@
-import Replicate from "replicate";
 import { callWithRetry } from "@/utils/gemini";
+import { getReplicateClient } from "@/utils/replicate";
 
 /**
  * Monocular depth-map generation for the 3D parallax view.
@@ -13,16 +13,12 @@ import { callWithRetry } from "@/utils/gemini";
 export const DEPTH_MODEL =
   "chenxwh/depth-anything-v2:b239ea33cff32bb7abb5db39ffe9a09c14cbc2894331d1ef66fe096eed88ebd4";
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false,
-});
-
 /**
  * Generates a grayscale depth map for one image (data URI).
  * Returns { depth: dataUri, mimeType }. Throws on failure.
  */
 export const generateDepthMap = async (imageDataUri) => {
+  const replicate = getReplicateClient();
   const output = await callWithRetry(
     () => replicate.run(DEPTH_MODEL, { input: { image: imageDataUri } }),
     { label: "Depth map generation", timeoutMs: 60_000 },

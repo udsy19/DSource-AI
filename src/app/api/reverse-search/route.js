@@ -142,12 +142,8 @@ reason of AT MOST 6 words, e.g. "same conical shade, slender base" or
  * Used when MATERIAL_BANK_API_URL is not configured.
  */
 const matchViaSupabase = async (crop, category) => {
-  if (!process.env.REPLICATE_API_TOKEN) {
-    return {
-      error: "Reverse search is not configured. Please contact support.",
-      status: 500,
-    };
-  }
+  // A missing REPLICATE_API_TOKEN throws here (via utils/env) and is mapped
+  // to a "not configured" response by the stream's catch below.
   const embedding = await embedImage(crop);
 
   const cookieStore = await cookies();
@@ -364,12 +360,18 @@ export async function POST(request) {
       } catch (error) {
         console.error("Reverse search failed:", error);
         const message = String(error?.message ?? "");
+        let safeMessage = "Reverse search failed. Please try again.";
+        if (message.includes("too small")) {
+          safeMessage = message;
+        } else if (message.includes("Missing required environment variable")) {
+          // utils/env throws this when a required server secret is unset.
+          safeMessage =
+            "Reverse search is not configured. Please contact support.";
+        }
         emit({
           done: true,
           success: false,
-          error: message.includes("too small")
-            ? message
-            : "Reverse search failed. Please try again.",
+          error: safeMessage,
         });
       }
       controller.close();

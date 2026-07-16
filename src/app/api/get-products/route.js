@@ -19,6 +19,12 @@ function normalizeCategoryName(name) {
   return name.toLowerCase().trim();
 }
 
+// Strip characters meaningful to the PostgREST filter DSL (, ( ) quotes \)
+// so user-supplied categories cannot inject extra .or() clauses.
+function sanitizeOrFilterValue(value) {
+  return value.replace(/[,()'"\\]/g, "").trim();
+}
+
 // Helper function to find matching database categories
 function getMatchingDatabaseCategories(uiCategory) {
   const normalized = normalizeCategoryName(uiCategory);
@@ -90,17 +96,22 @@ export async function GET(request) {
         // Supabase .or() format: 'column.operator.value,column.operator.value'
         // For ilike with wildcards, use: category_name.ilike.*value*
         const orConditions = uniqueDbCategories
+          .map((cat) => sanitizeOrFilterValue(cat))
+          .filter(Boolean)
           .map((cat) => `category_name.ilike.*${cat}*`)
           .join(",");
-        query = query.or(orConditions);
+        if (orConditions) {
+          query = query.or(orConditions);
+        }
       }
     }
 
-    // Execute query
-    const { data: products, error } = await query;
+    // Execute query — capped: the finder renders these in short per-category
+    // carousels, so 200 rows is more than the UI can surface.
+    const { data: products, error } = await query.limit(200);
 
     if (error) {
-      console.error("Supabase error:", error);
+      console.error("get-products: fetch failed", error);
       return NextResponse.json(
         { error: "Failed to fetch products from database" },
         { status: 500 },
@@ -132,7 +143,7 @@ export async function GET(request) {
             title: product.product_name || "Untitled Product",
             brand: product.brand_name || "Unknown Brand",
             color: product.color || "N/A",
-            image: product.image_url || "/api/images/placeholder.png",
+            image: product.image_url || "/placeholder.png",
             link: `/marketplace/products/${product.product_id || product.id}`,
           })),
         });

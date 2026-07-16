@@ -198,8 +198,9 @@ export async function POST(request) {
       .select("id");
 
     if (error) {
+      console.error("vendor/upload: CSV import failed", error);
       return NextResponse.json(
-        { error: error.message ?? "Failed to import CSV." },
+        { error: "Failed to import CSV." },
         { status: 500 },
       );
     }

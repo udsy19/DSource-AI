@@ -3,11 +3,22 @@
 import Link from "next/link";
 import { useState } from "react";
 import AuthShell from "@/components/auth/AuthShell";
+import { PASSWORD_MIN_LENGTH, validatePassword } from "@/utils/auth-validation";
 import { createClient } from "@/utils/supabase/client";
 
 // Confirmation emails land on the OTP confirm route, which reads `next` and
 // sends the freshly confirmed user into the studio.
 const EMAIL_REDIRECT_FALLBACK = "/auth/confirm?next=/studio";
+
+// Client-side UX gate only — a DB trigger enforces the allowlist server-side.
+// Unset means signup stays open.
+const ALLOWED_DOMAINS = (process.env.NEXT_PUBLIC_SIGNUP_ALLOWED_DOMAINS ?? "")
+  .split(",")
+  .map((domain) => domain.trim().toLowerCase())
+  .filter(Boolean);
+
+const INVITE_ONLY_MESSAGE =
+  "DSource is currently invite-only. Ask an admin to add your email.";
 
 export default function SignUpPage() {
   const supabase = createClient();
@@ -43,10 +54,21 @@ export default function SignUpPage() {
         return;
       }
 
-      if (parsedPassword.length < 6) {
+      const emailDomain = trimmedEmail.split("@")[1] ?? "";
+      if (
+        ALLOWED_DOMAINS.length > 0 &&
+        !ALLOWED_DOMAINS.includes(emailDomain)
+      ) {
+        setFeedback({ type: "error", message: INVITE_ONLY_MESSAGE });
+        setSubmitting(false);
+        return;
+      }
+
+      const passwordCheck = validatePassword(parsedPassword);
+      if (!passwordCheck.valid) {
         setFeedback({
           type: "error",
-          message: "Password must be at least 6 characters long.",
+          message: passwordCheck.message,
         });
         setSubmitting(false);
         return;
@@ -82,9 +104,17 @@ export default function SignUpPage() {
           "Check your inbox to confirm your email address before signing in.",
       });
     } catch (error) {
+      // The DB trigger rejects non-allowlisted emails that bypass the client
+      // gate; surface the same friendly invite-only message.
+      const raw = (error?.message ?? "").toLowerCase();
+      const rejectedByAllowlist =
+        raw.includes("not allowed") ||
+        raw.includes("database error saving new user");
       setFeedback({
         type: "error",
-        message: error?.message ?? "Something went wrong. Please try again.",
+        message: rejectedByAllowlist
+          ? INVITE_ONLY_MESSAGE
+          : (error?.message ?? "Something went wrong. Please try again."),
       });
     } finally {
       setSubmitting(false);
@@ -148,9 +178,9 @@ export default function SignUpPage() {
               setForm((prev) => ({ ...prev, password: event.target.value }))
             }
             className="mt-1.5 w-full rounded-md border border-[var(--viz-line)] bg-white px-3 py-2.5 text-sm focus:border-[var(--viz-ink)] focus:outline-none"
-            placeholder="At least 6 characters"
+            placeholder={`At least ${PASSWORD_MIN_LENGTH} characters, with a letter and a number`}
             autoComplete="new-password"
-            minLength={6}
+            minLength={PASSWORD_MIN_LENGTH}
             required
           />
         </div>
@@ -172,7 +202,7 @@ export default function SignUpPage() {
             className="mt-1.5 w-full rounded-md border border-[var(--viz-line)] bg-white px-3 py-2.5 text-sm focus:border-[var(--viz-ink)] focus:outline-none"
             placeholder="Same password again"
             autoComplete="new-password"
-            minLength={6}
+            minLength={PASSWORD_MIN_LENGTH}
             required
           />
         </div>

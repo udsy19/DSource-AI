@@ -1,5 +1,5 @@
-import Replicate from "replicate";
 import { callWithRetry } from "@/utils/gemini";
+import { getReplicateClient } from "@/utils/replicate";
 
 /**
  * Room photo → 360° equirectangular panorama for the immersive viewer.
@@ -18,16 +18,12 @@ const PANO_PROMPT =
   "must match perfectly. Equirectangular projection, consistent lighting " +
   "and materials.";
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false,
-});
-
 /**
  * Expands one room image (data URI) into an equirectangular panorama.
  * Returns { pano: dataUri, mimeType }. Throws on failure.
  */
 export const generatePanorama = async (imageDataUri) => {
+  const replicate = getReplicateClient();
   const output = await callWithRetry(
     () =>
       replicate.run(PANO_MODEL, {

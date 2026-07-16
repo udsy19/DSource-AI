@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
-import Replicate from "replicate";
 import { requireAuth } from "@/utils/api-auth";
 import {
   callWithRetry,
@@ -10,6 +9,7 @@ import {
   parseImageData,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
+import { getReplicateClient } from "@/utils/replicate";
 import { getModel } from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -52,13 +52,6 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
 
-// useFileOutput: false → run() returns plain URL strings instead of FileOutput
-// streams, which we can fetch and re-encode uniformly.
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false,
-});
-
 const MAX_PROMPT_LENGTH = 2000;
 const RATE_LIMIT = { windowMs: 60_000, max: 10 };
 const REPLICATE_TIMEOUT_MS = 120_000;
@@ -90,6 +83,17 @@ const toImageUrl = (output) => {
 const mapGenerationError = (error) => {
   const status = error?.status ?? error?.code ?? error?.response?.status;
   const message = String(error?.message ?? "").toLowerCase();
+
+  // utils/env throws this when a required server secret is unset.
+  if (message.includes("missing required environment variable")) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Image generation is not configured. Please contact support.",
+      },
+      { status: 500 },
+    );
+  }
 
   if (
     message.includes("safety") ||
@@ -183,6 +187,7 @@ const generateWithReplicate = async (
     ...opts,
     images,
   });
+  const replicate = getReplicateClient();
   const output = await callWithRetry(
     () => replicate.run(modelConfig.slug, { input }),
     {
@@ -622,16 +627,6 @@ export async function POST(request) {
             error: `The ${modelConfig.label} model isn't configured yet.`,
           },
           { status: 503 },
-        );
-      }
-      if (!process.env.REPLICATE_API_TOKEN) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Image generation is not configured. Please contact support.",
-          },
-          { status: 500 },
         );
       }
     }
