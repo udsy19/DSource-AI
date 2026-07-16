@@ -28,17 +28,27 @@ import { getModel } from "@/utils/replicate-models";
 const ROUTES = {
   render: {
     modelKey: "flux-kontext-pro",
-    io: { aspectRatio: "match_input_image", outputFormat: "png" },
+    // JPG over PNG end-to-end: ~6× smaller payload through download →
+    // verification → storage → client, visually identical for photo renders
+    // (profiled 2026-07: PNG made persist alone cost 1.6s).
+    io: { aspectRatio: "match_input_image", outputFormat: "jpg" },
   },
   swap: {
     modelKey: "seedream-4",
     io: { size: "2K" }, // aspectRatio computed from the room photo per-request
   },
+  // Reference-guided render ("add the flooring from this image"): needs a
+  // multi-image editor — same routing rationale as swap.
+  reference: {
+    modelKey: "seedream-4",
+    io: { size: "2K" }, // aspectRatio computed from the room photo per-request
+  },
   moodboard: {
     modelKey: "nano-banana",
-    io: { outputFormat: "png" }, // aspectRatio comes from the user's format param
+    io: { outputFormat: "jpg" }, // aspectRatio comes from the user's format param
   },
   cad: {
+    // CAD line drawings compress poorly as JPG (edge ringing) — keep PNG.
     modelKey: "flux-kontext-pro",
     io: { aspectRatio: "match_input_image", outputFormat: "png" },
   },

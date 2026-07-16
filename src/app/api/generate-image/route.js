@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import Replicate from "replicate";
 import { requireAuth } from "@/utils/api-auth";
 import {
@@ -35,6 +35,7 @@ import { saveRender } from "@/utils/visualizer/persist";
 import {
   composeCadPrompt,
   composeMoodboardPrompt,
+  composeReferencePrompt,
   composeRenderPrompt,
   composeSwapPrompt,
   locationHintFromBox,
@@ -229,6 +230,9 @@ const runTopicGuard = async (prompt) => {
       () =>
         ai.models.generateContent({
           model: "gemini-2.5-flash",
+          // Yes/no classification — no chain-of-thought needed; a zero
+          // thinking budget cuts the call from ~2.4s to well under 1s.
+          config: { thinkingConfig: { thinkingBudget: 0 } },
           contents: [{ text: guardPrompt }],
         }),
       { label: "Prompt validation", timeoutMs: 15_000, retries: 0 },
@@ -336,6 +340,44 @@ const prepareRender = async (body, prompt) => {
       error:
         "Describe a change or set at least one parameter (style, lighting, space, or palette).",
       status: 400,
+    };
+  }
+
+  // Reference-guided render: the user attached an inspiration image to their
+  // words ("add the flooring from this image"). Data URIs only — same intake
+  // contract as the room photo.
+  if (body.referenceImage && typeof body.referenceImage === "string") {
+    if (body.referenceImage.length > MAX_IMAGE_CHARS) {
+      return {
+        error: "The reference image is too large (max 10MB).",
+        status: 413,
+      };
+    }
+    const reference = await normalizeBaseImage(body.referenceImage);
+    if (!reference.image) return { error: reference.error, status: 400 };
+
+    const composeInput = { prompt, params };
+    const aspectRatio = await aspectRatioFromImage(
+      normalized.image,
+      getModel("seedream-4")?.aspectRatios ?? [],
+    );
+    return {
+      task: "reference",
+      params,
+      // Order contract (same as swap): reference FIRST, room LAST — the
+      // multi-image editor treats the last image as the canvas.
+      images: [reference.image, normalized.image],
+      requiresImage: true,
+      requiresMultiImage: true,
+      io: aspectRatio ? { aspectRatio } : {},
+      instruction: composeReferencePrompt(composeInput).instruction,
+      verify: (image) => verifyAdherence(ai, image, params),
+      strengthen: (failures) =>
+        strengthenPrompt(
+          composeInput,
+          failures.map((f) => f.param),
+          composeReferencePrompt,
+        ),
     };
   }
 
@@ -450,6 +492,18 @@ const PREPARERS = {
 // --- Route -----------------------------------------------------------------
 
 export async function POST(request) {
+  // Stage timing: one structured log line per request so slow renders can be
+  // attributed to a specific hop (auth / prepare / guard / generate / verify /
+  // retry / persist) instead of guessed at.
+  const t0 = Date.now();
+  let tPrev = t0;
+  const timings = {};
+  const mark = (stage) => {
+    const now = Date.now();
+    timings[stage] = now - tPrev;
+    tPrev = now;
+  };
+
   // Step 0: Require an authenticated user (also keys rate limiting).
   let user;
   if (DEV_BYPASS) {
@@ -508,9 +562,11 @@ export async function POST(request) {
   }
 
   const notices = [];
+  mark("auth+parse");
 
   try {
     const prepared = await PREPARERS[mode](body, prompt, notices);
+    mark("prepare");
     if (prepared.error) {
       return NextResponse.json(
         { error: prepared.error },
@@ -555,35 +611,45 @@ export async function POST(request) {
       }
     }
 
-    // --- Topic guard (typed prompts only; params are whitelisted enums) ---
-    if (prompt && GEMINI_READY) {
-      const guard = await runTopicGuard(prompt);
-      if (guard.notice) notices.push(guard.notice);
-      if (!guard.allowed) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Your request must be about interior redesign, architecture, or home improvement. Please provide a prompt related to these topics.",
-          },
-          { status: 400 },
-        );
-      }
-    }
-
     // "Different renders every time" off → fixed seed (models that support it).
     const seed =
       body.variedSeed === false && modelConfig.supportsSeed ? 42 : undefined;
     // IO policy: router defaults, then task-specific values from the preparer.
     const generateOpts = { seed, ...route.io, ...(prepared.io ?? {}) };
 
-    // --- Generate ---
-    let result = await generateOnce(
-      modelConfig,
-      prepared.instruction,
-      prepared.images,
-      generateOpts,
-    );
+    // --- Generate, with the topic guard racing alongside ---
+    // The guard (typed prompts only; params are whitelisted enums) used to
+    // gate generation serially, adding its full latency to every prompted
+    // render. Running it concurrently hides that cost; on the rare rejection
+    // the generated image is simply discarded.
+    const guardPromise =
+      prompt && GEMINI_READY
+        ? runTopicGuard(prompt)
+        : Promise.resolve({ allowed: true, notice: null });
+    const [result0, guard] = await Promise.all([
+      generateOnce(
+        modelConfig,
+        prepared.instruction,
+        prepared.images,
+        generateOpts,
+      ),
+      guardPromise,
+    ]);
+    let result = result0;
+    mark("generate+guard");
+
+    if (guard.notice) notices.push(guard.notice);
+    if (!guard.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Your request must be about interior redesign, architecture, or home improvement. Please provide a prompt related to these topics.",
+        },
+        { status: 400 },
+      );
+    }
+
     if (!result) {
       return NextResponse.json(
         {
@@ -607,6 +673,7 @@ export async function POST(request) {
         data: result.image,
         mimeType: result.mimeType,
       });
+      mark("verify");
       adherence = { ...check, retried: false };
 
       if (check.failures.length > 0) {
@@ -635,6 +702,7 @@ export async function POST(request) {
           // Retry is best-effort; deliver the first result.
           console.error("Adherence retry failed:", retryError.message);
         }
+        mark("adherenceRetry");
         if (adherence.failures.length > 0 && !adherence.skipped) {
           notices.push(
             `The model may not have fully applied: ${adherence.failures
@@ -645,31 +713,46 @@ export async function POST(request) {
       }
     }
 
-    // --- Persist to history (best-effort) ---
+    // --- Persist to history (best-effort, after the response is sent) ---
+    // The upload + insert used to cost ~1.6s of user-visible latency for a
+    // fire-and-forget write. The id is minted here so the client gets it
+    // immediately; after() runs the save once the response has flushed.
+    // (cookies() is captured now — request APIs aren't available inside after.)
     let renderId = null;
     if (DEV_BYPASS) {
       notices.push("History is not saved in dev bypass mode.");
     } else {
-      try {
-        const cookieStore = await cookies();
-        const supabase = await createClient(cookieStore);
-        const saved = await saveRender(supabase, user.id, {
-          imageBase64: result.image,
-          mimeType: result.mimeType,
-          model: modelKey,
-          prompt,
-          composedPrompt: prepared.instruction,
-          params: prepared.params,
-          adherence,
-          mode,
-          layers: sanitizeLayers(body.layers),
-        });
-        renderId = saved.renderId;
-      } catch (persistError) {
-        console.error("Render persistence failed:", persistError.message);
-        notices.push("This render could not be saved to your history.");
-      }
+      renderId = crypto.randomUUID();
+      const savedImage = result.image;
+      const savedMime = result.mimeType;
+      const savedAdherence = adherence;
+      const cookieStore = await cookies();
+      after(async () => {
+        try {
+          const supabase = await createClient(cookieStore);
+          await saveRender(supabase, user.id, {
+            renderId,
+            imageBase64: savedImage,
+            mimeType: savedMime,
+            model: modelKey,
+            prompt,
+            composedPrompt: prepared.instruction,
+            params: prepared.params,
+            adherence: savedAdherence,
+            mode,
+            layers: sanitizeLayers(body.layers),
+          });
+        } catch (persistError) {
+          console.error("Render persistence failed:", persistError.message);
+        }
+      });
     }
+    mark("persist");
+    console.log(
+      `[generate-image] mode=${mode} model=${modelKey} total=${
+        Date.now() - t0
+      }ms stages=${JSON.stringify(timings)}`,
+    );
 
     return NextResponse.json(
       {

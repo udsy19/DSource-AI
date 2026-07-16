@@ -3,6 +3,11 @@ import {
   extractJsonResponse,
   getResponseText,
 } from "@/utils/gemini";
+import { shrinkForVision } from "@/utils/visualizer/images";
+
+// Structured yes/no judging needs no chain-of-thought; a zero thinking
+// budget cuts flash latency from ~5s to ~1.5s (profiled 2026-07).
+const NO_THINKING = { thinkingConfig: { thinkingBudget: 0 } };
 
 /**
  * Post-generation adherence verification.
@@ -73,12 +78,14 @@ Be lenient on subjective calls — only mark "matches": false when the attribute
 `;
 
   try {
+    const small = await shrinkForVision(image);
     const response = await callWithRetry(
       () =>
         ai.models.generateContent({
           model: "gemini-2.5-flash",
+          config: NO_THINKING,
           contents: [
-            { inlineData: { mimeType: image.mimeType, data: image.data } },
+            { inlineData: { mimeType: small.mimeType, data: small.data } },
             { text: prompt },
           ],
         }),
@@ -131,12 +138,14 @@ Be lenient on subjective calls — only mark "matches": false when clearly wrong
 `;
 
   try {
+    const small = await shrinkForVision(image);
     const response = await callWithRetry(
       () =>
         ai.models.generateContent({
           model: "gemini-2.5-flash",
+          config: NO_THINKING,
           contents: [
-            { inlineData: { mimeType: image.mimeType, data: image.data } },
+            { inlineData: { mimeType: small.mimeType, data: small.data } },
             { text: prompt },
           ],
         }),

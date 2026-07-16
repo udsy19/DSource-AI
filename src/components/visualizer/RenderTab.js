@@ -41,6 +41,7 @@ export default function RenderTab() {
     wallFinish: null,
     furnitureDensity: null,
     prompt: "",
+    referenceImage: null,
     variedSeed: true,
   });
 
@@ -145,6 +146,7 @@ export default function RenderTab() {
       body: {
         image: tab.imagePreview,
         prompt: controls.prompt.trim() || undefined,
+        referenceImage: controls.referenceImage || undefined,
         variedSeed: controls.variedSeed,
         layers: buildLayers(edit),
         params: {

@@ -271,6 +271,27 @@ export const locationHintFromBox = (box) => {
  * room photo LAST — the model treats the last image as the canvas; the
  * reverse order produced a product hero shot with the room discarded.
  */
+/**
+ * Reference-guided render: the user attached an inspiration image alongside
+ * their words ("add the flooring from this image"). Image order contract
+ * (same as swap): reference FIRST, room LAST — the multi-image editor treats
+ * the last image as the canvas.
+ */
+export const composeReferencePrompt = ({ prompt, params }) => {
+  const rendered = composeRenderPrompt({ prompt: null, params });
+  const parts = [
+    "The first image is a reference for materials, colors, or furnishings.",
+    "The last image is a photograph of a room — that photograph is the one to edit.",
+    prompt
+      ? `Apply this instruction, taking whatever it mentions from the reference image: ${sentence(prompt)}`
+      : "Transfer the dominant materials and palette of the reference image onto the room's surfaces and furnishings.",
+    ...rendered.directives.map((d) => d.text),
+    "Keep the room photograph's camera angle, architecture, and layout exactly the same. Do not copy the reference image's room or composition — only take the elements the instruction asks for.",
+    "The result must be a photorealistic, professional interior visualization.",
+  ].filter(Boolean);
+  return { instruction: parts.join(" "), directives: rendered.directives };
+};
+
 export const composeSwapPrompt = ({
   productName,
   componentLabel,

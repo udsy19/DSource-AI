@@ -27,6 +27,7 @@ export const saveRender = async (
   supabase,
   userId,
   {
+    renderId: presetId = null,
     imageBase64,
     mimeType,
     model,
@@ -39,7 +40,8 @@ export const saveRender = async (
   },
 ) => {
   const ext = EXT_BY_MIME[mimeType] ?? "png";
-  const renderId = crypto.randomUUID();
+  // The route may pre-mint the id so it can respond before the save runs.
+  const renderId = presetId ?? crypto.randomUUID();
   const imagePath = `${userId}/${renderId}.${ext}`;
 
   const { error: uploadError } = await supabase.storage

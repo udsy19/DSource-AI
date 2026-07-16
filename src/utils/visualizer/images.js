@@ -165,6 +165,30 @@ export const cropBoxToDataUri = async (
 };
 
 /**
+ * Shrinks a generated image before a vision-model judgement call. Adherence
+ * verification doesn't need megapixels — a 640px JPEG uploads in a fraction
+ * of the time of the full render and judges identically. Fail-open: on any
+ * sharp error the original image is returned untouched.
+ */
+export const shrinkForVision = async ({ data, mimeType }, maxDim = 640) => {
+  try {
+    const { default: sharp } = await import("sharp");
+    const out = await sharp(Buffer.from(data, "base64"))
+      .resize({
+        width: maxDim,
+        height: maxDim,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    return { data: out.toString("base64"), mimeType: "image/jpeg" };
+  } catch {
+    return { data, mimeType };
+  }
+};
+
+/**
  * Picks the closest supported aspect-ratio enum ("3:2", "4:3", ...) for an
  * image. Needed for multi-input models where "match_input_image" is
  * ambiguous (it caused cropped swap outputs).
