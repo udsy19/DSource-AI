@@ -1,17 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import AuthShell from "@/components/auth/AuthShell";
+import { safeNextPath } from "@/utils/auth-validation";
 import { createClient } from "@/utils/supabase/client";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [form, setForm] = useState({ email: "", password: "" });
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  // The auth routes (/auth/callback, /auth/confirm) land here with ?error=
+  // when a link is invalid or expired — surface it in the standard error box.
+  const errorParam = searchParams.get("error");
+  useEffect(() => {
+    if (errorParam) {
+      setFeedback({ type: "error", message: errorParam });
+    }
+  }, [errorParam]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -40,8 +51,9 @@ export default function LoginPage() {
         throw response.error;
       }
 
-      // Redirect to home page after successful login
-      router.push("/");
+      // Return the user where they were headed (middleware sets ?redirect=);
+      // otherwise the studio is the signed-in front door.
+      router.push(safeNextPath(searchParams.get("redirect"), "/studio"));
       router.refresh();
     } catch (error) {
       setFeedback({
@@ -137,5 +149,14 @@ export default function LoginPage() {
         </p>
       )}
     </AuthShell>
+  );
+}
+
+// useSearchParams requires a Suspense boundary for prerendering.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

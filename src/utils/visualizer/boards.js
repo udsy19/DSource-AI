@@ -35,12 +35,25 @@ export const isUndefinedTable = (error) =>
 
 /**
  * An item image may be: a data URI (small — pinned render covers), an https
- * URL on a whitelisted catalog host, or our own Supabase storage. Anything
- * else is rejected so the table can't be used to smuggle arbitrary URLs.
+ * URL on a whitelisted host, or our own Supabase storage. Catalog products
+ * (items carrying a bank productId) may reference any https host — the
+ * material bank spans hundreds of supplier CDNs, these URLs are only ever
+ * rendered by the owner's own browser, and the server never fetches them
+ * (generation resolves the canonical image by productId instead).
  */
-export const isAllowedItemImageUrl = (url) => {
+export const isAllowedItemImageUrl = (
+  url,
+  { isCatalogProduct = false } = {},
+) => {
   if (typeof url !== "string" || !url) return false;
   if (url.startsWith("data:image/")) return url.length <= MAX_ITEM_IMAGE_CHARS;
+  if (isCatalogProduct) {
+    try {
+      return new URL(url).protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
   if (isAllowedImageHost(url)) return true;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return Boolean(supabaseUrl && url.startsWith(`${supabaseUrl}/storage/`));
@@ -93,7 +106,8 @@ export const sanitizeBoardItem = (raw, index) => {
 
   let imageUrl = null;
   if (raw.imageUrl !== undefined && raw.imageUrl !== null) {
-    if (!isAllowedItemImageUrl(raw.imageUrl)) {
+    const isCatalogProduct = raw.kind === "product" && productId !== null;
+    if (!isAllowedItemImageUrl(raw.imageUrl, { isCatalogProduct })) {
       return { error: `${at} has an image from an unrecognized source.` };
     }
     imageUrl = raw.imageUrl;

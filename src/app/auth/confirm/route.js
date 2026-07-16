@@ -12,7 +12,7 @@ export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const next = safeNextPath(searchParams.get("next"), "/");
+  const next = safeNextPath(searchParams.get("next"), "/studio");
 
   const loginError = (message) =>
     NextResponse.redirect(

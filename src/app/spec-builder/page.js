@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Reveal from "@/components/Reveal";
-import { useSpec } from "../../contexts/SpecContext";
+import { UNFILED_BUCKET_ID, useSpec } from "../../contexts/SpecContext";
 
 /** One mono spec cell: label over value, TitleBlock vernacular. */
 const SpecCell = ({ label, children, grow = 1 }) => (
@@ -15,12 +16,43 @@ const SpecCell = ({ label, children, grow = 1 }) => (
   </div>
 );
 
-const SpecBuilder = () => {
-  const { specProducts, projectName, setProjectName } = useSpec();
+const SpecSheet = () => {
+  const {
+    specProducts,
+    projectName,
+    setProjectName,
+    buckets,
+    activeProjectId,
+    setActiveProject,
+    hydrated,
+  } = useSpec();
+  const searchParams = useSearchParams();
+  const projectParam = searchParams.get("project");
   const [expandedCategories, setExpandedCategories] = useState({});
   const [productStatuses, setProductStatuses] = useState({});
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+
+  // Deep link (?project=<folio id>): activate that folio's bucket once the
+  // stored spec has hydrated. Unknown ids are ignored by setActiveProject.
+  useEffect(() => {
+    if (hydrated && projectParam) setActiveProject(projectParam);
+  }, [hydrated, projectParam, setActiveProject]);
+
+  // Folio buckets carry their folio's name — only the unfiled sheet's
+  // name is editable here.
+  const isFolioBucket = activeProjectId !== UNFILED_BUCKET_ID;
+
+  // Unfiled first, folios after, each by name — a stable, quiet order.
+  const bucketList = useMemo(
+    () =>
+      Object.entries(buckets).sort(([aId, a], [bId, b]) => {
+        if (aId === UNFILED_BUCKET_ID) return -1;
+        if (bId === UNFILED_BUCKET_ID) return 1;
+        return a.projectName.localeCompare(b.projectName);
+      }),
+    [buckets],
+  );
 
   /** Generate the spec-sheet PDF server-side from the live spec data. */
   const handleDownload = async () => {
@@ -214,6 +246,36 @@ const SpecBuilder = () => {
           </Reveal>
         </header>
 
+        {/* Bucket switcher: one spec sheet per folio, plus the unfiled one.
+            Only shown once a second bucket exists. */}
+        {bucketList.length > 1 && (
+          <div className="mt-8 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-b border-[var(--viz-line)] pb-3">
+            <p className="viz-label">Sheets</p>
+            {bucketList.map(([bucketId, bucket]) => (
+              <button
+                key={bucketId}
+                type="button"
+                onClick={() => setActiveProject(bucketId)}
+                aria-pressed={bucketId === activeProjectId}
+                className={`viz-mono cursor-pointer text-xs uppercase tracking-[0.08em] transition-colors ${
+                  bucketId === activeProjectId
+                    ? "text-[var(--viz-ink)]"
+                    : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
+                }`}
+              >
+                {bucket.projectName}
+                <span
+                  className={`ml-1.5 font-bold ${
+                    bucketId === activeProjectId ? "text-[var(--viz-blue)]" : ""
+                  }`}
+                >
+                  {String(bucket.products.length).padStart(2, "0")}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Sheet header: project meta as a plate label. */}
         <div className="mt-8 flex flex-wrap gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
           <SpecCell label="Sheet">SP-01</SpecCell>
@@ -221,21 +283,32 @@ const SpecBuilder = () => {
             className="min-w-52 bg-[var(--viz-paper)] px-3 py-2"
             style={{ flex: "3 1 0%" }}
           >
-            <label className="viz-label" htmlFor="spec-project-name">
-              Project
-            </label>
-            <input
-              id="spec-project-name"
-              type="text"
-              value={projectName}
-              maxLength={80}
-              onChange={(e) => setProjectName(e.target.value)}
-              onBlur={(e) => {
-                if (!e.target.value.trim()) setProjectName("Untitled Project");
-              }}
-              className="viz-mono mt-0.5 w-full border-b border-transparent bg-transparent text-xs uppercase outline-none transition-colors focus:border-[var(--viz-ink)]"
-              aria-label="Project name"
-            />
+            {isFolioBucket
+              ? // Folio buckets take their folio's name — not editable here.
+                <>
+                  <div className="viz-label">Project</div>
+                  <div className="viz-mono mt-0.5 truncate text-xs uppercase">
+                    {projectName}
+                  </div>
+                </>
+              : <>
+                  <label className="viz-label" htmlFor="spec-project-name">
+                    Project
+                  </label>
+                  <input
+                    id="spec-project-name"
+                    type="text"
+                    value={projectName}
+                    maxLength={80}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    onBlur={(e) => {
+                      if (!e.target.value.trim())
+                        setProjectName("Untitled Project");
+                    }}
+                    className="viz-mono mt-0.5 w-full border-b border-transparent bg-transparent text-xs uppercase outline-none transition-colors focus:border-[var(--viz-ink)]"
+                    aria-label="Project name"
+                  />
+                </>}
           </div>
           <SpecCell label="Items">
             <span className="font-bold text-[var(--viz-blue)]">
@@ -407,5 +480,12 @@ const SpecBuilder = () => {
     </div>
   );
 };
+
+// useSearchParams requires a Suspense boundary in a client page.
+const SpecBuilder = () => (
+  <Suspense fallback={null}>
+    <SpecSheet />
+  </Suspense>
+);
 
 export default SpecBuilder;

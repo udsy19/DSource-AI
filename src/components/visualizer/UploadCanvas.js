@@ -38,6 +38,8 @@ export default function UploadCanvas({
   const [comparing, setComparing] = useState(false);
   const [comparePos, setComparePos] = useState(50); // % from the left
 
+  const [roomRatio, setRoomRatio] = useState(null); // original W/H
+
   const canCompare = Boolean(
     originalImage && imagePreview && imagePreview !== originalImage,
   );
@@ -47,6 +49,25 @@ export default function UploadCanvas({
     if (imagePreview) setDevKey((k) => k + 1);
     setComparing(false);
   }, [imagePreview]);
+
+  // Measure the ORIGINAL photo's aspect so compare mode can pin both layers
+  // to one shared box — legacy renders with a snapped ratio would otherwise
+  // letterbox differently and slide out of register under the divider.
+  useEffect(() => {
+    setRoomRatio(null);
+    if (!originalImage) return undefined;
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (!cancelled && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setRoomRatio(probe.naturalWidth / probe.naturalHeight);
+      }
+    };
+    probe.src = originalImage;
+    return () => {
+      cancelled = true;
+    };
+  }, [originalImage]);
 
   const toUnits = (event) => {
     const rect = wrapperRef.current?.getBoundingClientRect();
@@ -92,6 +113,17 @@ export default function UploadCanvas({
     }
   };
 
+  // Compare mode: one aspect box at the ROOM photo's ratio; both layers fill
+  // it with identical object-contain letterboxing, so the divider stays in
+  // register even when a render's stored ratio differs from the original.
+  const compareBox =
+    comparing && canCompare && roomRatio
+      ? {
+          aspectRatio: String(roomRatio),
+          width: `min(100%, calc(75vh * ${roomRatio}))`,
+        }
+      : null;
+
   const dragRect = drag
     ? {
         left: `${Math.min(drag.x0, drag.x1) / 10}%`,
@@ -117,11 +149,14 @@ export default function UploadCanvas({
               <div
                 ref={wrapperRef}
                 key={devKey}
-                className={`viz-develop relative inline-block ${
+                className={`viz-develop relative ${
+                  compareBox ? "block" : "inline-block"
+                } ${
                   onRegionSelect && !comparing
                     ? "cursor-crosshair touch-none"
                     : ""
                 }`}
+                style={compareBox ?? undefined}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -133,7 +168,11 @@ export default function UploadCanvas({
                   src={imagePreview}
                   alt="Canvas"
                   draggable={false}
-                  className="block max-h-[75vh] max-w-full select-none rounded-lg object-contain"
+                  className={
+                    compareBox
+                      ? "absolute inset-0 h-full w-full select-none rounded-lg object-contain"
+                      : "block max-h-[75vh] max-w-full select-none rounded-lg object-contain"
+                  }
                 />
                 <span className="viz-develop-screen" aria-hidden="true" />
                 {!comparing && overlay}

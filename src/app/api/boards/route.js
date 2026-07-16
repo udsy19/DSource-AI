@@ -22,12 +22,18 @@ const NOT_PROVISIONED = {
   notice: "Boards storage is not provisioned yet.",
 };
 
-export async function GET() {
+export async function GET(request) {
   let user;
   try {
     user = await requireAuth();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Optional folio filter: ?project=<uuid> lists one folio's boards.
+  const projectParam = request.nextUrl.searchParams.get("project");
+  if (projectParam && !isUuid(projectParam)) {
+    return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   }
 
   const limit = checkRateLimit(`boards:${user.id}`, RATE_LIMIT);
@@ -42,11 +48,15 @@ export async function GET() {
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from("visualizer_boards")
-      .select("id, name, aspect, palette, updated_at, cover_path")
+      .select("id, name, aspect, palette, project_id, updated_at, cover_path")
       .order("updated_at", { ascending: false })
       .limit(50);
+    if (projectParam) {
+      query = query.eq("project_id", projectParam);
+    }
+    const { data: rows, error } = await query;
     if (error) {
       if (isUndefinedTable(error)) return NextResponse.json(NOT_PROVISIONED);
       throw new Error(error.message);
@@ -79,6 +89,7 @@ export async function GET() {
           name: row.name,
           aspect: row.aspect,
           palette: row.palette ?? null,
+          projectId: row.project_id ?? null,
           updatedAt: row.updated_at,
           coverUrl,
           itemCount: counts.get(row.id) ?? 0,
@@ -140,7 +151,7 @@ export async function POST(request) {
         aspect,
         project_id: body.projectId ?? null,
       })
-      .select("id, name, aspect, palette, updated_at")
+      .select("id, name, aspect, palette, project_id, updated_at")
       .single();
     if (error) {
       if (isUndefinedTable(error)) {
@@ -158,6 +169,7 @@ export async function POST(request) {
           name: row.name,
           aspect: row.aspect,
           palette: row.palette ?? null,
+          projectId: row.project_id ?? null,
           updatedAt: row.updated_at,
           coverUrl: null,
           itemCount: 0,

@@ -19,8 +19,22 @@ const EXT_BY_MIME = {
 };
 
 /**
+ * Storage path of a render's ORIGINAL room upload. Shared with the
+ * generate-image route, which must predict the path before the deferred
+ * save runs so the client can echo it on chained edits.
+ */
+export const renderBaseImagePath = (userId, renderId, mimeType) =>
+  `${userId}/${renderId}-base.${EXT_BY_MIME[mimeType] ?? "png"}`;
+
+/**
  * Uploads the render image and inserts its metadata row.
  * Runs under the user's own session (RLS scopes everything to auth.uid()).
+ *
+ * The original room upload (base image) rides along in one of two forms:
+ * `baseImagePath` — an already-stored path echoed by the client for chained
+ * edits (caller validates ownership) — or `baseImageBase64`/`baseImageMime`,
+ * uploaded here once. Base persistence is best-effort: its failure (or a
+ * pre-20260719 DB without the column) never sinks the render save.
  *
  * @returns {Promise<{ renderId: string, imagePath: string }>}
  */
@@ -38,6 +52,9 @@ export const saveRender = async (
     adherence,
     mode = "render",
     layers = null,
+    baseImagePath: presetBasePath = null,
+    baseImageBase64 = null,
+    baseImageMime = null,
   },
 ) => {
   const ext = EXT_BY_MIME[mimeType] ?? "png";
@@ -55,9 +72,26 @@ export const saveRender = async (
     throw new Error(`Storage upload failed: ${uploadError.message}`);
   }
 
-  const { error: insertError } = await supabase
-    .from("visualizer_renders")
-    .insert({
+  let basePath = presetBasePath;
+  let uploadedBase = false;
+  if (!basePath && baseImageBase64) {
+    const candidatePath = renderBaseImagePath(userId, renderId, baseImageMime);
+    const { error: baseError } = await supabase.storage
+      .from(RENDERS_BUCKET)
+      .upload(candidatePath, Buffer.from(baseImageBase64, "base64"), {
+        contentType: baseImageMime ?? "image/png",
+        upsert: false,
+      });
+    if (baseError) {
+      console.error("Base image upload skipped:", baseError.message);
+    } else {
+      basePath = candidatePath;
+      uploadedBase = true;
+    }
+  }
+
+  const insertRow = (withBase) =>
+    supabase.from("visualizer_renders").insert({
       id: renderId,
       created_by: userId,
       mode,
@@ -70,10 +104,22 @@ export const saveRender = async (
       // Only sent when present so inserts keep working on databases where
       // the 20260716_render_layers migration hasn't been applied yet.
       ...(layers ? { layers } : {}),
+      ...(withBase && basePath ? { base_image_path: basePath } : {}),
     });
+
+  let { error: insertError } = await insertRow(true);
+  // Pre-20260719 DBs have no base_image_path column — retry without it and
+  // drop the base object nothing can reference.
+  if (insertError && basePath && isMissingColumnError(insertError)) {
+    if (uploadedBase) {
+      await supabase.storage.from(RENDERS_BUCKET).remove([basePath]);
+    }
+    ({ error: insertError } = await insertRow(false));
+  }
   if (insertError) {
-    // Don't leave an orphaned object behind.
-    await supabase.storage.from(RENDERS_BUCKET).remove([imagePath]);
+    // Don't leave orphaned objects behind.
+    const orphans = [imagePath, ...(uploadedBase ? [basePath] : [])];
+    await supabase.storage.from(RENDERS_BUCKET).remove(orphans);
     throw new Error(`History insert failed: ${insertError.message}`);
   }
 
@@ -142,59 +188,138 @@ export const listRenders = async (
     return query;
   };
 
-  let hasFolioColumns = true;
-  let { data: rows, error } = await buildQuery(
-    `${BASE_RENDER_COLUMNS}, layers, ${FOLIO_RENDER_COLUMNS}`,
-    true,
-  );
-  // Databases that predate the 20260717_projects migration have no filing
-  // columns — history must keep working without them. A pre-migration DB
-  // cannot have filed or favorited renders, so those filters return empty.
-  if (error && isMissingColumnError(error)) {
-    hasFolioColumns = false;
-    if (favorites || (projectId && projectId !== "none")) return [];
-    ({ data: rows, error } = await buildQuery(
-      `${BASE_RENDER_COLUMNS}, layers`,
-      false,
-    ));
-    // Same again for DBs that predate 20260716_render_layers.
-    if (error && isMissingColumnError(error)) {
-      ({ data: rows, error } = await buildQuery(BASE_RENDER_COLUMNS, false));
+  // Column sets to try, newest migration first — each fallback drops the
+  // most recent migration's columns so history keeps working pre-migration.
+  const attempts = [
+    {
+      columns: `${BASE_RENDER_COLUMNS}, layers, base_image_path, ${FOLIO_RENDER_COLUMNS}`,
+      folio: true,
+    },
+    // Pre-20260719 (no base image column).
+    {
+      columns: `${BASE_RENDER_COLUMNS}, layers, ${FOLIO_RENDER_COLUMNS}`,
+      folio: true,
+    },
+    // Pre-20260717 (no filing columns). A pre-migration DB cannot have filed
+    // or favorited renders, so those filters return empty.
+    { columns: `${BASE_RENDER_COLUMNS}, layers`, folio: false },
+    // Pre-20260716 (no layers).
+    { columns: BASE_RENDER_COLUMNS, folio: false },
+  ];
+
+  let rows = null;
+  let error = null;
+  let used = null;
+  for (const attempt of attempts) {
+    if (!attempt.folio && (favorites || (projectId && projectId !== "none"))) {
+      return [];
     }
+    ({ data: rows, error } = await buildQuery(attempt.columns, attempt.folio));
+    if (!error) {
+      used = attempt;
+      break;
+    }
+    if (!isMissingColumnError(error)) break;
   }
   if (error) {
     throw new Error(`History query failed: ${error.message}`);
   }
 
   const renders = await Promise.all(
-    (rows ?? []).map(async (row) => {
-      const { data: signed } = await supabase.storage
-        .from(RENDERS_BUCKET)
-        .createSignedUrl(row.image_path, SIGNED_URL_TTL_SECONDS);
-      return {
-        id: row.id,
-        createdAt: row.created_at,
-        model: row.model,
-        prompt: row.prompt,
-        params: row.params,
-        layers: row.layers ?? null,
-        imageUrl: signed?.signedUrl ?? null,
-        // Folio fields stay absent pre-migration so the UI can hide filing
-        // actions instead of showing controls that would fail.
-        ...(hasFolioColumns
-          ? {
-              projectId: row.project_id ?? null,
-              roomId: row.room_id ?? null,
-              isFavorite: Boolean(row.is_favorite),
-              archived: Boolean(row.archived_at),
-            }
-          : {}),
-      };
-    }),
+    (rows ?? []).map(async (row) => signRenderRow(supabase, row, used.folio)),
   );
 
   // Rows whose storage object went missing get filtered rather than shown broken.
   return renders.filter((r) => r.imageUrl);
+};
+
+/** Signs storage URLs and maps a visualizer_renders row to API shape. */
+const signRenderRow = async (supabase, row, hasFolioColumns) => {
+  const [{ data: signed }, { data: signedBase }] = await Promise.all([
+    supabase.storage
+      .from(RENDERS_BUCKET)
+      .createSignedUrl(row.image_path, SIGNED_URL_TTL_SECONDS),
+    row.base_image_path
+      ? supabase.storage
+          .from(RENDERS_BUCKET)
+          .createSignedUrl(row.base_image_path, SIGNED_URL_TTL_SECONDS)
+      : Promise.resolve({ data: null }),
+  ]);
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    model: row.model,
+    prompt: row.prompt,
+    params: row.params,
+    layers: row.layers ?? null,
+    imageUrl: signed?.signedUrl ?? null,
+    // Original room upload (20260719+). Consumers fall back to imageUrl.
+    baseImagePath: row.base_image_path ?? null,
+    baseImageUrl: signedBase?.signedUrl ?? null,
+    // Mode/adherence only reach this shape via getRender's wider select.
+    ...("mode" in row ? { mode: row.mode } : {}),
+    ...("adherence" in row ? { adherence: row.adherence ?? null } : {}),
+    // Folio fields stay absent pre-migration so the UI can hide filing
+    // actions instead of showing controls that would fail.
+    ...(hasFolioColumns
+      ? {
+          projectId: row.project_id ?? null,
+          roomId: row.room_id ?? null,
+          isFavorite: Boolean(row.is_favorite),
+          archived: Boolean(row.archived_at),
+        }
+      : {}),
+  };
+};
+
+// getRender selects everything a resumed session needs (listRenders stays
+// slimmer — mode is its filter, adherence is per-render detail).
+const SESSION_RENDER_COLUMNS = `${BASE_RENDER_COLUMNS}, mode, adherence`;
+
+/**
+ * Fetches one render with everything needed to resume the session: params,
+ * prompt, layers, adherence, folio filing, and signed URLs for both the
+ * render and its original upload. RLS scopes the lookup to the owner.
+ *
+ * @returns {Promise<object|null>} null when not found / not owned / the
+ *   storage object is gone.
+ */
+export const getRender = async (supabase, renderId) => {
+  const attempts = [
+    {
+      columns: `${SESSION_RENDER_COLUMNS}, layers, base_image_path, ${FOLIO_RENDER_COLUMNS}`,
+      folio: true,
+    },
+    {
+      columns: `${SESSION_RENDER_COLUMNS}, layers, ${FOLIO_RENDER_COLUMNS}`,
+      folio: true,
+    },
+    { columns: `${SESSION_RENDER_COLUMNS}, layers`, folio: false },
+    { columns: SESSION_RENDER_COLUMNS, folio: false },
+  ];
+
+  let row = null;
+  let error = null;
+  let used = null;
+  for (const attempt of attempts) {
+    ({ data: row, error } = await supabase
+      .from("visualizer_renders")
+      .select(attempt.columns)
+      .eq("id", renderId)
+      .maybeSingle());
+    if (!error) {
+      used = attempt;
+      break;
+    }
+    if (!isMissingColumnError(error)) break;
+  }
+  if (error) {
+    throw new Error(`Render query failed: ${error.message}`);
+  }
+  if (!row) return null;
+
+  const render = await signRenderRow(supabase, row, used.folio);
+  return render.imageUrl ? render : null;
 };
 
 /**
@@ -281,17 +406,34 @@ export const listProjects = async (supabase) => {
  * @returns {Promise<boolean>} false when the row wasn't found / not owned.
  */
 export const deleteRender = async (supabase, renderId) => {
-  const { data: row, error } = await supabase
-    .from("visualizer_renders")
-    .delete()
-    .eq("id", renderId)
-    .select("image_path")
-    .maybeSingle();
+  const del = (columns) =>
+    supabase
+      .from("visualizer_renders")
+      .delete()
+      .eq("id", renderId)
+      .select(columns)
+      .maybeSingle();
+
+  let { data: row, error } = await del("image_path, base_image_path");
+  // Pre-20260719 DBs have no base column.
+  if (error && isMissingColumnError(error)) {
+    ({ data: row, error } = await del("image_path"));
+  }
   if (error) {
     throw new Error(`History delete failed: ${error.message}`);
   }
   if (!row) return false;
 
-  await supabase.storage.from(RENDERS_BUCKET).remove([row.image_path]);
+  // The base object is only removed when no other render references it —
+  // chained edits share one base path across several rows.
+  const paths = [row.image_path];
+  if (row.base_image_path) {
+    const { count } = await supabase
+      .from("visualizer_renders")
+      .select("id", { count: "exact", head: true })
+      .eq("base_image_path", row.base_image_path);
+    if (!count) paths.push(row.base_image_path);
+  }
+  await supabase.storage.from(RENDERS_BUCKET).remove(paths);
   return true;
 };

@@ -10,19 +10,20 @@ import specSheetIcon from "../../public/spec-sheet-icon.png";
 import { useAuth } from "../contexts/AuthContext";
 import { useSpec } from "../contexts/SpecContext";
 
-// Public wayfinding shows only the brochure; the studio tools (Product,
-// Get Inspired, Folios) appear once the user is signed in.
+// Public wayfinding shows only the brochure; signed-in users get the studio
+// tools instead (the middleware sends them from "/" to /studio anyway).
 const PUBLIC_NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/ai-material-finder", label: "Features" },
-  { href: "/marketplace/products", label: "Shop sample" },
+  { href: "/features", label: "Features" },
+  { href: "/marketplace/products", label: "Digital Library" },
 ];
 
 const AUTHED_NAV_LINKS = [
-  ...PUBLIC_NAV_LINKS,
+  { href: "/studio", label: "Studio" },
   { href: "/ai-visualizer", label: "Product" },
   { href: "/get-inspired", label: "Get inspired" },
   { href: "/folios", label: "Folios" },
+  { href: "/marketplace/products", label: "Digital Library" },
 ];
 
 /**
@@ -79,7 +80,10 @@ const Header = ({ currentPath = "" }) => {
         <div className="mx-auto flex max-w-[1728px] items-center justify-between gap-6 px-4 py-4 sm:px-6 lg:px-10">
           {/* Wordmark */}
           {!onVendorRoute
-            ? <Link href="/" className="flex shrink-0 items-center gap-2.5">
+            ? <Link
+                href={isAuthenticated ? "/studio" : "/"}
+                className="flex shrink-0 items-center gap-2.5"
+              >
                 <Image
                   src={logo}
                   alt="DSource.AI logo"

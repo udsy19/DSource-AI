@@ -1,6 +1,8 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { UUID_PATTERN } from "@/utils/visualizer/folios";
 import {
   ASPECT_RATIOS,
   MAX_MOODBOARD_PRODUCTS,
@@ -61,12 +63,41 @@ export default function MoodboardTab() {
   const paletteFileRef = useRef(null);
   const openedOnce = useRef(false);
 
-  // Open the most recent board once the ledger arrives.
+  // Deep links: ?board=<id> opens that board; ?folio=<id> files new boards
+  // into that folio (set when arriving from a folio page).
+  const searchParams = useSearchParams();
+  const boardParam = searchParams.get("board");
+  const folioParam = searchParams.get("folio");
+  const deepLinkBoardId =
+    boardParam && UUID_PATTERN.test(boardParam) ? boardParam : null;
+  const folioContext =
+    folioParam && UUID_PATTERN.test(folioParam) ? folioParam : null;
+
+  // Folio names for the ledger tags + the filing control.
+  const [folios, setFolios] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/projects")
+      .then((res) => (res.ok ? res.json() : { projects: [] }))
+      .then((data) => {
+        if (!cancelled) setFolios(data.projects ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const folioName = (id) => folios.find((f) => f.id === id)?.name ?? null;
+
+  // Open the deep-linked board, else the most recent, once the ledger arrives.
   useEffect(() => {
     if (loading || openedOnce.current || board || boards.length === 0) return;
     openedOnce.current = true;
-    openBoard(boards[0].id);
-  }, [loading, board, boards, openBoard]);
+    const target =
+      (deepLinkBoardId && boards.find((b) => b.id === deepLinkBoardId)) ||
+      boards[0];
+    openBoard(target.id);
+  }, [loading, board, boards, openBoard, deepLinkBoardId]);
 
   const maxZ = () => items.reduce((m, i) => Math.max(m, i.z ?? 0), 0);
 
@@ -245,7 +276,12 @@ export default function MoodboardTab() {
         body: JSON.stringify({
           mode: "moodboard",
           prompt: promptParts.join(" ").slice(0, 2000),
-          products: products.map((p) => ({ imageUrl: p.imageUrl })),
+          // Bank id lets the server resolve the canonical product image
+          // itself; the raw URL stays as a fallback for whitelisted hosts.
+          products: products.map((p) => ({
+            id: p.productId ?? undefined,
+            imageUrl: p.imageUrl,
+          })),
           params: { aspectRatio: board.aspect, creativity: "balanced" },
         }),
       });
@@ -319,7 +355,9 @@ export default function MoodboardTab() {
             <button
               type="button"
               className="viz-mono cursor-pointer text-[11px] uppercase tracking-[0.08em] text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
-              onClick={() => createBoard()}
+              onClick={() =>
+                createBoard(undefined, { projectId: folioContext ?? undefined })
+              }
             >
               + New board
             </button>
@@ -365,6 +403,11 @@ export default function MoodboardTab() {
                       >
                         {b.name}
                       </button>
+                      {b.projectId && folioName(b.projectId) && (
+                        <span className="viz-mono max-w-[7rem] shrink-0 truncate rounded-sm border border-[var(--viz-line)] px-1 text-[9px] uppercase tracking-wide text-[var(--viz-muted)]">
+                          {folioName(b.projectId)}
+                        </span>
+                      )}
                       <span className="viz-mono shrink-0 text-[10px] text-[var(--viz-muted)]">
                         {b.itemCount ?? 0} pinned
                       </span>
@@ -391,6 +434,27 @@ export default function MoodboardTab() {
               </li>
             ))}
           </ul>
+
+          {/* File the open board into a folio (or pull it back out) */}
+          {board && !sketchMode && folios.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="viz-label shrink-0">Folio</span>
+              <select
+                className="viz-select w-full rounded-md border border-[var(--viz-line)] bg-white px-2 py-1 text-xs"
+                value={board.projectId ?? ""}
+                onChange={(e) =>
+                  updateBoard({ projectId: e.target.value || null })
+                }
+              >
+                <option value="">Unfiled</option>
+                {folios.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* On the table */}
           <div className="viz-label mt-5">On the table</div>
@@ -608,7 +672,11 @@ export default function MoodboardTab() {
                   <button
                     type="button"
                     className="viz-btn mt-4 cursor-pointer rounded-full bg-[var(--viz-ink)] px-6 py-2.5 text-[var(--viz-paper)] hover:opacity-90"
-                    onClick={() => createBoard()}
+                    onClick={() =>
+                      createBoard(undefined, {
+                        projectId: folioContext ?? undefined,
+                      })
+                    }
                   >
                     Start a board
                   </button>

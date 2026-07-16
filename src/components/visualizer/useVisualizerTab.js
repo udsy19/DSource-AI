@@ -53,6 +53,13 @@ export const fileToDataUrl = (file, maxDim = 2048) =>
 export function useVisualizerTab({ mode }) {
   const [originalUpload, setOriginalUpload] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  // Storage path of the session's original room upload (returned by the
+  // generate API / a restored render). Echoed with each generate so chained
+  // edits reference one stored base instead of re-uploading it.
+  const [baseImagePath, setBaseImagePath] = useState(null);
+  // Set by restoreSession — the tab consumes {params, prompt, layers,
+  // projectId, keepControls} to rebuild its own state for that render.
+  const [restoredSession, setRestoredSession] = useState(null);
   const abortRef = useRef(null);
 
   const [isGenerating, setIsGenerating] = useState({
@@ -84,6 +91,8 @@ export function useVisualizerTab({ mode }) {
     fileToDataUrl(file).then((dataUrl) => {
       setOriginalUpload(dataUrl);
       setImagePreview(dataUrl);
+      setBaseImagePath(null);
+      setRestoredSession(null);
       setActiveHistoryId(null);
       setAdherence(null);
     });
@@ -92,6 +101,8 @@ export function useVisualizerTab({ mode }) {
   const removeImage = () => {
     setOriginalUpload(null);
     setImagePreview(null);
+    setBaseImagePath(null);
+    setRestoredSession(null);
     setActiveHistoryId(null);
     setError(null);
     setNotices([]);
@@ -127,11 +138,37 @@ export function useVisualizerTab({ mode }) {
     return () => abortRef.current?.abort();
   }, [fetchServerHistory]);
 
-  const handleHistorySelect = (item) => {
+  /**
+   * Restores the FULL working session for a render — from a history item or
+   * the GET /api/renders/[id] payload. Canvas shows the render; "original"
+   * becomes its stored room upload (falling back to the render itself for
+   * rows that predate base-image persistence); the tab rebuilds controls,
+   * edits, and materials from `restoredSession`.
+   *
+   * `keepControls` skips the brief rebuild — used by the refresh guard,
+   * where the user's latest (sessionStorage) controls should win over the
+   * render's stored params.
+   */
+  const restoreSession = useCallback((item, { keepControls = false } = {}) => {
     setImagePreview(item.imageUrl);
+    setOriginalUpload(item.baseImageUrl ?? item.imageUrl);
+    setBaseImagePath(item.baseImagePath ?? null);
+    setAdherence(item.adherence ?? null);
     setActiveHistoryId(item.id);
-    setAdherence(null);
-  };
+    setRestoredSession({
+      id: item.id,
+      prompt: item.prompt ?? null,
+      params: item.params ?? null,
+      layers: item.layers ?? null,
+      projectId: item.projectId ?? null,
+      keepControls,
+    });
+  }, []);
+
+  // Selecting a version is a session restore: the whole working state
+  // (controls, edits, materials) switches to THAT item — never accumulates
+  // across items.
+  const handleHistorySelect = (item) => restoreSession(item);
 
   /**
    * PATCHes folio metadata (favorite / file into folio / archive) for a
@@ -201,7 +238,13 @@ export function useVisualizerTab({ mode }) {
       const response = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, mode }),
+        // baseImagePath tells the server the original upload is already in
+        // storage — chained edits reference it instead of re-uploading.
+        body: JSON.stringify({
+          ...body,
+          mode,
+          ...(baseImagePath ? { baseImagePath } : {}),
+        }),
         signal: controller.signal,
       });
       const data = await response.json();
@@ -228,6 +271,7 @@ export function useVisualizerTab({ mode }) {
       }`;
       setImagePreview(dataUrl);
       setAdherence(data.adherence ?? null);
+      if (data.baseImagePath) setBaseImagePath(data.baseImagePath);
 
       const historyItem = {
         id: data.renderId ?? `session-${Date.now()}`,
@@ -236,6 +280,12 @@ export function useVisualizerTab({ mode }) {
         model: data.model,
         persisted: Boolean(data.renderId),
         createdAt: new Date().toISOString(),
+        // Carried so re-selecting this version restores its full session
+        // without a server round-trip.
+        params: body.params ?? null,
+        layers: body.layers ?? null,
+        baseImageUrl: originalUpload,
+        baseImagePath: data.baseImagePath ?? baseImagePath ?? null,
         // Fresh persisted renders start unfiled/unstarred so folio actions
         // are available immediately without refetching history.
         ...(data.renderId
@@ -286,6 +336,10 @@ export function useVisualizerTab({ mode }) {
         (adherence.checked?.length ?? 0) > 0 &&
         (adherence.failures?.length ?? 0) === 0,
     ),
+    // session restore
+    restoreSession,
+    restoredSession,
+    baseImagePath,
     // history
     historyItems: [...sessionHistory, ...serverHistory],
     activeHistoryId,

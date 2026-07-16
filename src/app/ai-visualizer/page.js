@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import Reveal from "@/components/Reveal";
 import CadTab from "@/components/visualizer/CadTab";
 import MoodboardTab from "@/components/visualizer/MoodboardTab";
 import RenderTab from "@/components/visualizer/RenderTab";
+import { UUID_PATTERN } from "@/utils/visualizer/folios";
 
 const TABS = [
   { key: "render", label: "AI Render", component: RenderTab },
@@ -13,8 +15,44 @@ const TABS = [
   { key: "cad", label: "Image to CAD", component: CadTab },
 ];
 
-const AiVisualizer = () => {
-  const [activeTab, setActiveTab] = useState("render");
+/**
+ * Deep links: ?tab=render|moodboard|cad opens a tab; ?render=<uuid> fetches
+ * that render and restores its full session (canvas, brief, edits,
+ * materials), switching to the row's own mode.
+ */
+const VisualizerBoard = () => {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const renderParam = searchParams.get("render");
+  const restoreId =
+    renderParam && UUID_PATTERN.test(renderParam) ? renderParam : null;
+
+  const [activeTab, setActiveTab] = useState(
+    TABS.some((t) => t.key === tabParam) ? tabParam : "render",
+  );
+  const [restore, setRestore] = useState(null);
+
+  useEffect(() => {
+    if (!restoreId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/renders/${restoreId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data.render) return;
+        setRestore(data.render);
+        if (TABS.some((t) => t.key === data.render.mode)) {
+          setActiveTab(data.render.mode);
+        }
+      } catch {
+        // A broken deep link opens the studio empty rather than failing.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreId]);
 
   return (
     <div className="viz-scope w-full">
@@ -77,7 +115,14 @@ const AiVisualizer = () => {
               key={key}
               className={key === activeTab ? "viz-tab-enter" : "hidden"}
             >
-              <TabComponent />
+              {/* Only the render tab can restore a session — the moodboard
+                  workroom persists itself (boards) and CAD hands off. */}
+              {key === "render"
+                ? <TabComponent
+                    restore={restore?.mode === "render" ? restore : null}
+                    restoreId={restoreId}
+                  />
+                : <TabComponent />}
             </div>
           ))}
         </div>
@@ -85,5 +130,12 @@ const AiVisualizer = () => {
     </div>
   );
 };
+
+// useSearchParams requires a Suspense boundary in a client page.
+const AiVisualizer = () => (
+  <Suspense fallback={null}>
+    <VisualizerBoard />
+  </Suspense>
+);
 
 export default AiVisualizer;

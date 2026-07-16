@@ -66,6 +66,33 @@ export const normalizeProductImages = async (products) => {
   const errors = [];
 
   for (const entry of products) {
+    // Catalog products resolve their canonical image server-side by bank id
+    // — the client-supplied URL is never fetched (bank suppliers span
+    // hundreds of CDNs no whitelist can cover; the bank is the authority).
+    const bankId = Number(typeof entry === "object" ? entry?.id : Number.NaN);
+    if (Number.isSafeInteger(bankId)) {
+      const { isMaterialBankConfigured, getBankProduct } = await import(
+        "@/utils/visualizer/material-bank"
+      );
+      if (isMaterialBankConfigured()) {
+        try {
+          const product = await getBankProduct(bankId);
+          if (product?.imageUrl) {
+            const res = await fetch(product.imageUrl);
+            if (res.ok) {
+              const dataUri = await toDataUri(res);
+              if (dataUri.length <= MAX_IMAGE_CHARS) {
+                images.push(dataUri);
+                continue;
+              }
+            }
+          }
+        } catch {
+          // Fall through to the URL path below.
+        }
+      }
+    }
+
     const url = typeof entry === "string" ? entry : entry?.imageUrl;
     if (!url || typeof url !== "string") {
       errors.push("A selected product had no image.");
@@ -189,18 +216,116 @@ export const shrinkForVision = async ({ data, mimeType }, maxDim = 640) => {
 };
 
 /**
+ * Reads an image's pixel dimensions from a data URI (or raw base64).
+ * Returns { width, height } or null when they can't be determined.
+ */
+export const imageDimensions = async (dataUri) => {
+  const { default: sharp } = await import("sharp");
+  const matches = dataUri.match(/^data:[^;]+;base64,(.+)$/);
+  const buffer = Buffer.from(matches ? matches[1] : dataUri, "base64");
+  try {
+    const { width, height } = await sharp(buffer).metadata();
+    return width && height ? { width, height } : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Scales source dimensions into a model's valid custom-size range while
+ * preserving the exact aspect ratio (long edge → `longEdge`, both dims
+ * clamped to [minDim, maxDim], rounded to `multiple`). Defaults match
+ * seedream-4's `size:"custom"` schema (width/height 1024–4096 — the pano
+ * pipeline already generates at 4096×2048 this way). Returns null when the
+ * ratio is too extreme to fit without distorting >1.5% — callers should
+ * fall back to the nearest aspect enum.
+ */
+export const fitExactSize = (
+  { width, height },
+  { longEdge = 2048, minDim = 1024, maxDim = 4096, multiple = 8 } = {},
+) => {
+  if (!width || !height) return null;
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  let scale = longEdge / long;
+  if (short * scale < minDim) scale = minDim / short;
+  if (long * scale > maxDim) scale = maxDim / long;
+
+  const snap = (v) =>
+    Math.min(
+      maxDim,
+      Math.max(minDim, Math.round((v * scale) / multiple) * multiple),
+    );
+  const out = { width: snap(width), height: snap(height) };
+  const drift = Math.abs(out.width / out.height / (width / height) - 1);
+  return drift <= 0.015 ? out : null;
+};
+
+/**
+ * Center-crops a generated image back to the room photo's true aspect ratio
+ * when the model returned a differently framed output (seedream aspect
+ * enums, flux "match_input_image" drift). Within `tolerance` the image is
+ * returned untouched; fail-open on any sharp error.
+ *
+ * @returns {Promise<{ image: string, mimeType: string }>} base64 (no data: prefix)
+ */
+export const cropToRatio = async (
+  imageBase64,
+  mimeType,
+  targetRatio,
+  tolerance = 0.015,
+) => {
+  try {
+    if (!Number.isFinite(targetRatio) || targetRatio <= 0) {
+      return { image: imageBase64, mimeType };
+    }
+    const { default: sharp } = await import("sharp");
+    const image = sharp(Buffer.from(imageBase64, "base64"));
+    const { width, height } = await image.metadata();
+    if (!width || !height) return { image: imageBase64, mimeType };
+
+    const ratio = width / height;
+    if (Math.abs(ratio / targetRatio - 1) <= tolerance) {
+      return { image: imageBase64, mimeType };
+    }
+
+    const cropWidth =
+      ratio > targetRatio ? Math.round(height * targetRatio) : width;
+    const cropHeight =
+      ratio > targetRatio ? height : Math.round(width / targetRatio);
+    const extracted = image.extract({
+      left: Math.floor((width - cropWidth) / 2),
+      top: Math.floor((height - cropHeight) / 2),
+      width: cropWidth,
+      height: cropHeight,
+    });
+
+    // Re-encode in the incoming format family (JPEG stays JPEG for payload
+    // size — see model-router's io policy; everything else normalizes to PNG).
+    const isJpeg = /jpe?g/i.test(mimeType);
+    const out = await (isJpeg
+      ? extracted.jpeg({ quality: 90 })
+      : extracted.png()
+    ).toBuffer();
+    return {
+      image: out.toString("base64"),
+      mimeType: isJpeg ? "image/jpeg" : "image/png",
+    };
+  } catch {
+    return { image: imageBase64, mimeType };
+  }
+};
+
+/**
  * Picks the closest supported aspect-ratio enum ("3:2", "4:3", ...) for an
  * image. Needed for multi-input models where "match_input_image" is
  * ambiguous (it caused cropped swap outputs).
  */
 export const aspectRatioFromImage = async (dataUri, supported) => {
-  const { default: sharp } = await import("sharp");
-  const matches = dataUri.match(/^data:[^;]+;base64,(.+)$/);
-  const buffer = Buffer.from(matches ? matches[1] : dataUri, "base64");
-  const { width, height } = await sharp(buffer).metadata();
-  if (!width || !height) return null;
+  const dims = await imageDimensions(dataUri);
+  if (!dims) return null;
 
-  const ratio = width / height;
+  const ratio = dims.width / dims.height;
   let best = null;
   let bestDiff = Infinity;
   for (const option of supported) {

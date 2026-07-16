@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { renderCountLabel } from "@/components/folios/FolioCard";
 import Reveal from "@/components/Reveal";
 import NoticesBox from "@/components/visualizer/NoticesBox";
+import { useSpec } from "@/contexts/SpecContext";
 
 const INPUT_CLASS =
   "mt-1.5 w-full rounded-md border border-[var(--viz-line)] bg-white px-3 py-2.5 text-sm focus:border-[var(--viz-ink)] focus:outline-none";
@@ -236,7 +237,7 @@ export default function FolioDetailPage() {
               ? <p className="viz-mono mt-8 text-xs text-[var(--viz-muted)]">
                   Nothing filed yet — open a render&rsquo;s ⋯ menu in the{" "}
                   <Link
-                    href="/ai-visualizer"
+                    href="/ai-visualizer?tab=render"
                     className="underline hover:text-[var(--viz-ink)]"
                   >
                     visualizer
@@ -264,6 +265,10 @@ export default function FolioDetailPage() {
                     onSetCover={setCover}
                   />
                 </div>}
+
+            <BoardsSection folioId={id} />
+
+            <MaterialsSection folioId={id} />
           </>
         )}
       </div>
@@ -473,6 +478,161 @@ function RoomManager({ rooms, onAdd }) {
   );
 }
 
+/**
+ * Mood boards filed into this folio — opened straight into the pinning
+ * table workroom.
+ */
+function BoardsSection({ folioId }) {
+  const [boards, setBoards] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/boards?project=${folioId}`)
+      .then((res) => (res.ok ? res.json() : { boards: [] }))
+      .then((data) => {
+        if (!cancelled) setBoards(data.boards ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setBoards([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [folioId]);
+
+  return (
+    <section className="mt-10">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <h2 className="viz-serif text-2xl">Mood boards</h2>
+        <p className="viz-mono text-[11px] text-[var(--viz-muted)]">
+          {String(boards?.length ?? 0).padStart(2, "0")}{" "}
+          {(boards?.length ?? 0) === 1 ? "board" : "boards"}
+        </p>
+        <Link
+          href={`/ai-visualizer?tab=moodboard&folio=${folioId}`}
+          className={`${QUIET_ACTION} no-underline`}
+        >
+          New board →
+        </Link>
+      </div>
+
+      {boards === null
+        ? <p className="viz-mono mt-3 text-xs text-[var(--viz-muted)]">
+            Opening the flat files…
+          </p>
+        : boards.length === 0
+          ? <p className="viz-mono mt-3 text-xs text-[var(--viz-muted)]">
+              No boards filed here yet — compose one on the pinning table and
+              file it into this folio.
+            </p>
+          : <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {boards.map((b) => (
+                <Link
+                  key={b.id}
+                  href={`/ai-visualizer?tab=moodboard&board=${b.id}`}
+                  className="group overflow-hidden rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] no-underline"
+                >
+                  <div className="relative aspect-[4/3] overflow-hidden bg-[var(--viz-ground)]">
+                    {b.coverUrl
+                      ? /* biome-ignore lint/performance/noImgElement: signed URLs cannot use next/image */
+                        <img
+                          src={b.coverUrl}
+                          alt={b.name}
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      : <div
+                          className="absolute inset-0"
+                          style={{
+                            backgroundImage:
+                              "radial-gradient(circle, color-mix(in srgb, var(--viz-ink) 14%, transparent) 1px, transparent 1.3px)",
+                            backgroundSize: "7px 7px",
+                          }}
+                          aria-hidden="true"
+                        />}
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate text-sm font-medium">{b.name}</p>
+                    <p className="viz-mono mt-0.5 text-[10px] uppercase text-[var(--viz-muted)]">
+                      {b.itemCount} pinned ·{" "}
+                      {new Date(b.updatedAt).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>}
+    </section>
+  );
+}
+
+/**
+ * Materials specified for this folio — the folio's spec bucket, filled by
+ * add-to-spec from a restored session of one of its renders. Lives in the
+ * browser's spec store (localStorage), like the spec sheet itself.
+ */
+function MaterialsSection({ folioId }) {
+  const { buckets } = useSpec();
+  const products = buckets[folioId]?.products ?? [];
+
+  return (
+    <section className="mt-10">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <h2 className="viz-serif text-2xl">Materials</h2>
+        <p className="viz-mono text-[11px] text-[var(--viz-muted)]">
+          {String(products.length).padStart(2, "0")}{" "}
+          {products.length === 1 ? "item" : "items"}
+        </p>
+        {products.length > 0 && (
+          <Link
+            href={`/spec-builder?project=${folioId}`}
+            className={`${QUIET_ACTION} no-underline`}
+          >
+            Open spec sheet →
+          </Link>
+        )}
+      </div>
+
+      {products.length === 0
+        ? <p className="viz-mono mt-3 text-xs text-[var(--viz-muted)]">
+            Nothing specified for this folio yet — open a filed render and add
+            the materials you match to the spec.
+          </p>
+        : <div className="mt-4 flex flex-col gap-px overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-line)]">
+            {products.map((product) => (
+              <div
+                key={product.id}
+                className="flex items-center gap-3 bg-[var(--viz-paper)] p-3"
+              >
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-[var(--viz-line)]">
+                  {/* Spec products come from arbitrary supplier CDNs. */}
+                  {/* biome-ignore lint/performance/noImgElement: arbitrary supplier hosts cannot use next/image */}
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{product.name}</p>
+                  <p className="viz-mono truncate text-[11px] uppercase text-[var(--viz-muted)]">
+                    {product.brand}
+                  </p>
+                </div>
+                <p className="viz-mono shrink-0 text-xs">
+                  ₹
+                  {(product.price || 0).toLocaleString("en-IN", {
+                    maximumFractionDigits: 0,
+                  })}
+                </p>
+              </div>
+            ))}
+          </div>}
+    </section>
+  );
+}
+
 /** A room's shelf of renders (room = null renders the Unfiled section). */
 function RoomSection({
   room,
@@ -668,7 +828,7 @@ function RenderCard({ render, project, onUpdate, onSetCover }) {
             </button>
           </div>
           <Link
-            href="/ai-visualizer"
+            href={`/ai-visualizer?render=${render.id}`}
             className={`${QUIET_ACTION} text-[10px] no-underline`}
           >
             Open →

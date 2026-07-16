@@ -5,7 +5,9 @@ import { useState } from "react";
 import AuthShell from "@/components/auth/AuthShell";
 import { createClient } from "@/utils/supabase/client";
 
-const EMAIL_REDIRECT_FALLBACK = "/";
+// Confirmation emails land on the OTP confirm route, which reads `next` and
+// sends the freshly confirmed user into the studio.
+const EMAIL_REDIRECT_FALLBACK = "/auth/confirm?next=/studio";
 
 export default function SignUpPage() {
   const supabase = createClient();

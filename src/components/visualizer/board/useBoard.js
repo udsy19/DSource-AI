@@ -180,7 +180,7 @@ export function useBoard() {
   );
 
   const createBoard = useCallback(
-    async (name) => {
+    async (name, { projectId } = {}) => {
       if (sketchMode) {
         const next = localBoard(name);
         setBoards((prev) => [next, ...prev]);
@@ -192,7 +192,10 @@ export function useBoard() {
         const res = await fetch("/api/boards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(name ? { name } : {}),
+          body: JSON.stringify({
+            ...(name ? { name } : {}),
+            ...(projectId ? { projectId } : {}),
+          }),
         });
         if (res.status === 503) {
           enterSketchMode(

@@ -43,7 +43,7 @@ export default function FoliosPage() {
             <div className="flex items-baseline justify-between gap-4 pb-2">
               <p className="viz-label">DSource Studio</p>
               <Link
-                href="/ai-visualizer"
+                href="/ai-visualizer?tab=render"
                 className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
               >
                 Open the visualizer →

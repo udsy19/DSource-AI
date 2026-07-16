@@ -10,6 +10,9 @@
  *   aspectRatio   explicit output aspect (enum per model)
  *   outputFormat  "png"/"jpg" where supported
  *   size          seedream: "1K" | "2K" | "4K"
+ *   exactSize     seedream: { width, height } in px (1024–4096) — exact
+ *                 output size via size:"custom"; takes precedence over
+ *                 size + aspectRatio
  *   seed          models with supportsSeed
  */
 
@@ -95,11 +98,21 @@ export const IMAGE_MODELS = {
     ],
     buildInput: (prompt, imageDataUrl, opts = {}) => {
       const images = opts.images ?? (imageDataUrl ? [imageDataUrl] : []);
+      // Exact pixel output (schema: size "custom" + width/height 1024–4096,
+      // same call shape the pano pipeline uses at 4096×2048) beats the
+      // preset+enum path, which snaps the source ratio to the nearest enum
+      // and bakes the reframing into the pixels.
+      const exact =
+        opts.exactSize?.width && opts.exactSize?.height ? opts.exactSize : null;
       return {
         prompt,
         ...(images.length ? { image_input: images } : {}),
-        size: opts.size ?? "2K",
-        aspect_ratio: opts.aspectRatio ?? "match_input_image",
+        ...(exact
+          ? { size: "custom", width: exact.width, height: exact.height }
+          : {
+              size: opts.size ?? "2K",
+              aspect_ratio: opts.aspectRatio ?? "match_input_image",
+            }),
       };
     },
   },

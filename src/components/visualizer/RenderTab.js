@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useSpec } from "@/contexts/SpecContext";
 import {
   CREATIVITY_LEVELS,
@@ -28,7 +29,18 @@ const SEARCH_STAGES = [
   { key: "rerank", label: "Compare candidates" },
 ];
 
-export default function RenderTab() {
+// Refresh guard: the working brief survives a reload via sessionStorage.
+// Image data URIs are far too big for it — only the stored base path and the
+// active version id are kept, and the canvas comes back from server history.
+const SESSION_STORAGE_KEY = "viz-session-render";
+
+/**
+ * @param {object|null} restore  Full render row from GET /api/renders/[id]
+ *   (deep link ?render=<id>) — restored into the session once loaded.
+ * @param {string|null} restoreId  The raw ?render param; its presence
+ *   disables the sessionStorage rehydrate so the deep link wins.
+ */
+export default function RenderTab({ restore = null, restoreId = null }) {
   const tab = useVisualizerTab({ mode: "render" });
   const [creativityIndex, setCreativityIndex] = useState(1);
   const [controls, setControls] = useState({
@@ -55,7 +67,16 @@ export default function RenderTab() {
 
   // --- Materials pinned to this design (via Add-to-Spec / Swap) ---
   const { addProductToSpec } = useSpec();
+  // Folio this restored session is filed under (null for unfiled sessions).
+  // Spec additions carry it so they land in the folio's own spec bucket.
+  const folioId = tab.restoredSession?.projectId ?? null;
+  const [folioName, setFolioName] = useState(null);
+  const folioNameCacheRef = useRef(new Map());
   const [designMaterials, setDesignMaterials] = useState([]);
+  // Materials rebuilt from a restored render's layer graph. Layers store only
+  // {id, name, label, price} — no image/link — so these render as quiet
+  // "restored" chips rather than full MaterialsPanel rows.
+  const [restoredMaterials, setRestoredMaterials] = useState([]);
 
   // --- 3D parallax view + layer graph for this design session ---
   const [depthView, setDepthView] = useState(null); // {image, depth}
@@ -78,8 +99,156 @@ export default function RenderTab() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on base-photo change only
   useEffect(() => {
     setDesignMaterials([]);
+    setRestoredMaterials([]);
     setEditsLog([]);
   }, [tab.originalUpload]);
+
+  // Session restore: whenever a render is restored (history click, deep
+  // link, refresh guard), rebuild THIS tab's working state from that row.
+  // Declared after the reset effects above so its seeding wins the commit —
+  // and switching between history items swaps state instead of accumulating.
+  useEffect(() => {
+    const restored = tab.restoredSession;
+    if (!restored) return;
+
+    const layers = restored.layers ?? null;
+    setEditsLog(Array.isArray(layers?.edits) ? layers.edits : []);
+    setComponents(Array.isArray(layers?.components) ? layers.components : []);
+    setRestoredMaterials(
+      Array.isArray(layers?.materials) ? layers.materials : [],
+    );
+    setDesignMaterials([]);
+
+    if (restored.keepControls) return;
+    const params = restored.params ?? null;
+    setControls((prev) => ({
+      ...prev,
+      ...(params
+        ? {
+            spaceKind: params.spaceKind ?? "interior",
+            roomType: params.roomType ?? null,
+            style: params.style ?? null,
+            lighting: params.lighting ?? null,
+            colorPalette: params.colorPalette ?? null,
+            flooring: params.flooring ?? null,
+            wallFinish: params.wallFinish ?? null,
+            furnitureDensity: params.furnitureDensity ?? null,
+          }
+        : {}),
+      prompt: restored.prompt ?? "",
+      referenceImage: null,
+    }));
+    const creativity = CREATIVITY_LEVELS.indexOf(params?.creativity);
+    if (creativity >= 0) setCreativityIndex(creativity);
+  }, [tab.restoredSession]);
+
+  // Resolve the folio's name (once per folio, cached for the tab) so spec
+  // buckets adopt it. A miss is fine — the bucket keeps a default name.
+  useEffect(() => {
+    if (!folioId) {
+      setFolioName(null);
+      return;
+    }
+    const cached = folioNameCacheRef.current.get(folioId);
+    if (cached !== undefined) {
+      setFolioName(cached);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/projects");
+        if (!res.ok) return;
+        const data = await res.json();
+        const name =
+          (data.projects ?? []).find((p) => p.id === folioId)?.name ?? null;
+        folioNameCacheRef.current.set(folioId, name);
+        if (!cancelled) setFolioName(name);
+      } catch {
+        // Name lookup is a nicety — spec filing works without it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [folioId]);
+
+  // Deep link (?render=<id>): restore the fetched row once it arrives.
+  const deepLinkAppliedRef = useRef(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restoreSession is stable (useCallback)
+  useEffect(() => {
+    if (!restore || deepLinkAppliedRef.current === restore.id) return;
+    deepLinkAppliedRef.current = restore.id;
+    tab.restoreSession(restore);
+  }, [restore]);
+
+  // Refresh guard, part 1 — rehydrate the brief from sessionStorage on
+  // mount (skipped when a deep link owns this visit).
+  const rehydratedRef = useRef(false);
+  const pendingHistoryIdRef = useRef(null);
+  useEffect(() => {
+    if (restoreId || rehydratedRef.current) return;
+    rehydratedRef.current = true;
+    try {
+      const saved = JSON.parse(
+        sessionStorage.getItem(SESSION_STORAGE_KEY) ?? "null",
+      );
+      if (!saved) return;
+      if (saved.controls && typeof saved.controls === "object") {
+        setControls((prev) => ({
+          ...prev,
+          ...saved.controls,
+          // Reference data URIs are never stored — only their absence flag.
+          referenceImage: null,
+        }));
+      }
+      if (
+        Number.isInteger(saved.creativityIndex) &&
+        saved.creativityIndex >= 0 &&
+        saved.creativityIndex < CREATIVITY_LEVELS.length
+      ) {
+        setCreativityIndex(saved.creativityIndex);
+      }
+      if (typeof saved.activeHistoryId === "string") {
+        pendingHistoryIdRef.current = saved.activeHistoryId;
+      }
+    } catch {
+      // A malformed draft never blocks the tab.
+    }
+  }, [restoreId]);
+
+  // Refresh guard, part 2 — once server history arrives, put the last
+  // active version back on the canvas, keeping the rehydrated controls.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: guarded by pendingHistoryIdRef
+  useEffect(() => {
+    const pendingId = pendingHistoryIdRef.current;
+    if (!pendingId) return;
+    const item = tab.historyItems.find((i) => i.id === pendingId);
+    if (!item) return;
+    pendingHistoryIdRef.current = null;
+    tab.restoreSession(item, { keepControls: true });
+  }, [tab.historyItems]);
+
+  // Refresh guard, part 3 — debounce-save the brief per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        sessionStorage.setItem(
+          SESSION_STORAGE_KEY,
+          JSON.stringify({
+            controls: { ...controls, referenceImage: null },
+            referenceAttached: Boolean(controls.referenceImage),
+            creativityIndex,
+            activeHistoryId: tab.activeHistoryId,
+            baseImagePath: tab.baseImagePath,
+          }),
+        );
+      } catch {
+        // Quota/private-mode failures are fine — the guard is best-effort.
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [controls, creativityIndex, tab.activeHistoryId, tab.baseImagePath]);
 
   /**
    * Serializable layer graph for this design session (base -> edits ->
@@ -98,7 +267,9 @@ export default function RenderTab() {
         category: c.category,
         box_2d: c.box_2d,
       })),
-      materials: designMaterials.map((m) => ({
+      // Restored materials chain through so an edit on a reopened session
+      // keeps the design's full bill of materials.
+      materials: [...restoredMaterials, ...designMaterials].map((m) => ({
         id: String(m.id),
         name: m.name,
         label: m.label,
@@ -309,10 +480,16 @@ export default function RenderTab() {
     link: match.link || "/marketplace",
   });
 
+  // Restored folio sessions file spec additions into the folio's bucket;
+  // unfiled sessions pass no options and land in the active bucket as before.
+  const specFolioOptions = () =>
+    folioId ? { projectId: folioId, projectName: folioName ?? undefined } : {};
+
   const handleAddToSpec = (match) => {
     addProductToSpec(
       specProductFromMatch(match),
       matchResult?.label || match.category || "Uncategorized",
+      specFolioOptions(),
     );
     pinMaterial(match, matchResult?.label ?? null);
   };
@@ -395,6 +572,7 @@ export default function RenderTab() {
       addProductToSpec(
         specProductFromMatch(material.match),
         material.label || material.match?.category || "Uncategorized",
+        specFolioOptions(),
       );
     }
   };
@@ -467,6 +645,52 @@ export default function RenderTab() {
           }
           onAddAllToSpec={handleAddAllToSpec}
         />
+
+        {/* Materials restored from a saved session. Layers persist only
+            id/name/label/price — no image or link — so these stay quiet
+            chips instead of full panel rows. */}
+        {restoredMaterials.length > 0 && (
+          <div className="mt-3 rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="viz-label">
+                Materials in this design · {restoredMaterials.length}
+              </p>
+              <p className="viz-mono text-[10px] tracking-[0.08em] text-[var(--viz-muted)] uppercase">
+                Restored
+              </p>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {restoredMaterials.map((m) => (
+                <span
+                  key={`${m.id}-${m.label}`}
+                  className="viz-mono rounded-full border border-[var(--viz-line)] bg-white px-3 py-1 text-[11px]"
+                >
+                  {[
+                    m.name || m.label || m.id,
+                    typeof m.price === "number"
+                      ? `₹${m.price.toLocaleString("en-IN")}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Restored sessions filed into a folio keep a quiet way back. */}
+        {folioId && (
+          <p className="viz-mono mt-3 text-[11px] text-[var(--viz-muted)]">
+            Restored session —{" "}
+            <Link
+              href={`/folios/${folioId}`}
+              className="underline hover:text-[var(--viz-ink)]"
+            >
+              open its folio{folioName ? ` “${folioName}”` : ""} →
+            </Link>
+          </p>
+        )}
 
         {/* Reverse material search entry point */}
         {tab.imagePreview && (

@@ -7,7 +7,11 @@ import {
   UUID_PATTERN,
   withCode,
 } from "@/utils/visualizer/folios";
-import { deleteRender, isMissingTableError } from "@/utils/visualizer/persist";
+import {
+  deleteRender,
+  getRender,
+  isMissingTableError,
+} from "@/utils/visualizer/persist";
 
 const isMissingFolioSchema = (error) =>
   isMissingTableError(error) ||
@@ -19,6 +23,41 @@ const resolveId = async (params) => {
   const { id } = resolvedParams;
   return id && UUID_PATTERN.test(id) ? id : null;
 };
+
+/**
+ * GET /api/renders/[id] — one render with everything needed to resume the
+ * session: mode, model, prompt, params, layers, adherence, folio filing
+ * (absent pre-migration), and signed URLs for the render and its original
+ * upload. RLS scopes the lookup to the owner, so a foreign id is a 404.
+ */
+export async function GET(_request, { params }) {
+  try {
+    await requireAuth();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const id = await resolveId(params);
+  if (!id) {
+    return NextResponse.json({ error: "Invalid render id" }, { status: 400 });
+  }
+
+  try {
+    const cookieStore = await cookies();
+    const supabase = await createClient(cookieStore);
+    const render = await getRender(supabase, id);
+    if (!render) {
+      return NextResponse.json({ error: "Render not found" }, { status: 404 });
+    }
+    return NextResponse.json({ render });
+  } catch (error) {
+    console.error("Render fetch failed:", error.message);
+    return NextResponse.json(
+      { error: "Failed to load the render" },
+      { status: 500 },
+    );
+  }
+}
 
 /**
  * PATCH /api/renders/[id] — folio filing and flags:

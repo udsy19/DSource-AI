@@ -14,6 +14,9 @@ import { getModel } from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
 import {
   aspectRatioFromImage,
+  cropToRatio,
+  fitExactSize,
+  imageDimensions,
   isValidBox,
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
@@ -31,7 +34,7 @@ import {
   validateMoodboardParams,
   validateRenderParams,
 } from "@/utils/visualizer/params";
-import { saveRender } from "@/utils/visualizer/persist";
+import { renderBaseImagePath, saveRender } from "@/utils/visualizer/persist";
 import {
   composeCadPrompt,
   composeMoodboardPrompt,
@@ -252,6 +255,27 @@ const runTopicGuard = async (prompt) => {
 // Each prepares: input images, composed instruction, verify + strengthen fns.
 // Returns { error, status } on invalid input.
 
+/**
+ * Aspect handling for multi-input seedream tasks (swap/reference), where
+ * "match_input_image" is ambiguous. Preferred: the room's EXACT dimensions
+ * scaled into seedream's custom-size range — the old nearest-enum snap
+ * (0.93 room → 1:1) baked a reframe into the output pixels. Enum stays as
+ * fallback when dimensions can't be read or the ratio can't fit undistorted.
+ * baseRatio (room W/H) drives the post-generation safety crop.
+ */
+const seedreamRoomIo = async (roomImage) => {
+  const dims = await imageDimensions(roomImage);
+  const baseRatio = dims ? dims.width / dims.height : null;
+  const exactSize = dims ? fitExactSize(dims) : null;
+  if (exactSize) return { io: { exactSize }, baseRatio };
+
+  const aspectRatio = await aspectRatioFromImage(
+    roomImage,
+    getModel("seedream-4")?.aspectRatios ?? [],
+  );
+  return { io: aspectRatio ? { aspectRatio } : {}, baseRatio };
+};
+
 const prepareRender = async (body, prompt) => {
   if (!body.image || typeof body.image !== "string") {
     return {
@@ -313,12 +337,9 @@ const prepareRender = async (body, prompt) => {
       locationHint,
       prompt,
     };
-    // Multi-input models can't "match_input_image" unambiguously — compute
-    // the room's aspect explicitly (this caused the cropped-swap bug).
-    const aspectRatio = await aspectRatioFromImage(
-      normalized.image,
-      getModel("seedream-4")?.aspectRatios ?? [],
-    );
+    // Multi-input models can't "match_input_image" unambiguously — send the
+    // room's exact size (this caused the cropped-swap bug).
+    const roomIo = await seedreamRoomIo(normalized.image);
     return {
       task: "swap",
       params: { ...params, swapProductId: productId },
@@ -327,7 +348,8 @@ const prepareRender = async (body, prompt) => {
       images: [productImage, normalized.image],
       requiresImage: true,
       requiresMultiImage: true,
-      io: aspectRatio ? { aspectRatio } : {},
+      io: roomIo.io,
+      baseRatio: roomIo.baseRatio,
       instruction: composeSwapPrompt(composeInput).instruction,
       // Style params don't apply to a swap; skip param verification.
       verify: async () => ({ checked: [], failures: [], skipped: false }),
@@ -357,10 +379,7 @@ const prepareRender = async (body, prompt) => {
     if (!reference.image) return { error: reference.error, status: 400 };
 
     const composeInput = { prompt, params };
-    const aspectRatio = await aspectRatioFromImage(
-      normalized.image,
-      getModel("seedream-4")?.aspectRatios ?? [],
-    );
+    const roomIo = await seedreamRoomIo(normalized.image);
     return {
       task: "reference",
       params,
@@ -369,7 +388,8 @@ const prepareRender = async (body, prompt) => {
       images: [reference.image, normalized.image],
       requiresImage: true,
       requiresMultiImage: true,
-      io: aspectRatio ? { aspectRatio } : {},
+      io: roomIo.io,
+      baseRatio: roomIo.baseRatio,
       instruction: composeReferencePrompt(composeInput).instruction,
       verify: (image) => verifyAdherence(ai, image, params),
       strengthen: (failures) =>
@@ -713,19 +733,68 @@ export async function POST(request) {
       }
     }
 
+    // --- Ratio safety net: tasks anchored to a room photo must return the
+    // room's exact framing. If the model drifted (aspect enum snap, flux
+    // "match_input_image" being slightly off), center-crop back to the
+    // room's true ratio so nothing mis-framed reaches history or the
+    // before/after compare. No-op within 1.5%.
+    if (prepared.baseRatio) {
+      result = await cropToRatio(
+        result.image,
+        result.mimeType,
+        prepared.baseRatio,
+      );
+      mark("ratioCrop");
+    }
+
     // --- Persist to history (best-effort, after the response is sent) ---
     // The upload + insert used to cost ~1.6s of user-visible latency for a
     // fire-and-forget write. The id is minted here so the client gets it
     // immediately; after() runs the save once the response has flushed.
     // (cookies() is captured now — request APIs aren't available inside after.)
     let renderId = null;
+    let baseImagePath = null;
     if (DEV_BYPASS) {
       notices.push("History is not saved in dev bypass mode.");
     } else {
       renderId = crypto.randomUUID();
+
+      // Original-upload persistence (render/cad; moodboard has no base).
+      // A restored session echoes body.baseImagePath — the storage path of
+      // an already-uploaded base — so chained edits never re-upload it.
+      // Otherwise a data-URI body.image IS the original room photo: store
+      // its bytes once alongside the render.
+      let baseImageBase64 = null;
+      let baseImageMime = null;
+      if (mode !== "moodboard") {
+        if (
+          typeof body.baseImagePath === "string" &&
+          body.baseImagePath.length <= 300 &&
+          body.baseImagePath.startsWith(`${user.id}/`)
+        ) {
+          baseImagePath = body.baseImagePath;
+        } else if (typeof body.image === "string") {
+          const dataUri = body.image.match(
+            /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/is,
+          );
+          if (dataUri) {
+            baseImageMime = dataUri[1].toLowerCase();
+            baseImageBase64 = dataUri[2];
+            // Predicted here (before the deferred save) so the client can
+            // echo it on the next edit in this session.
+            baseImagePath = renderBaseImagePath(
+              user.id,
+              renderId,
+              baseImageMime,
+            );
+          }
+        }
+      }
+
       const savedImage = result.image;
       const savedMime = result.mimeType;
       const savedAdherence = adherence;
+      const savedBasePath = baseImageBase64 ? null : baseImagePath;
       const cookieStore = await cookies();
       after(async () => {
         try {
@@ -741,6 +810,9 @@ export async function POST(request) {
             adherence: savedAdherence,
             mode,
             layers: sanitizeLayers(body.layers),
+            baseImagePath: savedBasePath,
+            baseImageBase64,
+            baseImageMime,
           });
         } catch (persistError) {
           console.error("Render persistence failed:", persistError.message);
@@ -763,6 +835,9 @@ export async function POST(request) {
         composedPrompt: prepared.instruction,
         adherence,
         renderId,
+        // Echoed back on the session's next generate so the original room
+        // upload is stored once, not once per chained edit.
+        baseImagePath,
         notices,
       },
       { status: 200 },

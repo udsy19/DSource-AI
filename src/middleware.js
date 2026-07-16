@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 // /ai-material-finder (the Features page) is deliberately public — it only
 // explains what the product offers; the AI tools it links to gate themselves.
 const protectedRoutes = [
+  "/studio",
   "/spec-builder",
   "/ai-visualizer",
   "/account",
@@ -75,6 +76,15 @@ export async function middleware(request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Signed-in users skip the marketing page — the studio is their front door.
+  // Logged-out visitors keep the landing page untouched.
+  if (user && pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/studio";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   // Role comes ONLY from app_metadata (service-role controlled); user_metadata
   // is user-controlled and must never be trusted for authorization.

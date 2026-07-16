@@ -292,6 +292,24 @@ body {
   }
 }
 
+/* Narrated-story scene cross-fade (keyed remount replays it). */
+@keyframes mf-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.mf-fade {
+  animation: mf-fade 0.5s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-fade {
+    animation: none;
+  }
+}
+
 /* Tab panels ease in when shown — display:none → visible replays this. */
 @keyframes viz-tab-enter {
   from {
