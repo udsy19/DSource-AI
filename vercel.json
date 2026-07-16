@@ -19,7 +19,5 @@
       "entrypoint": "main:app"
     }
   },
-  "rewrites": [
-    { "source": "/(.*)", "destination": { "service": "frontend" } }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "frontend" } }]
 }
