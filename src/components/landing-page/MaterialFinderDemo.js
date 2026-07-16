@@ -4,10 +4,10 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import featureRoom from "../../../public/feature-room.webp";
-import artThumb from "../../../public/material-finder-images/Frame 118.png";
-import rugThumb from "../../../public/material-finder-images/Frame 90.png";
-import lampThumb from "../../../public/material-finder-images/Curtain.png";
 import tableThumb from "../../../public/material-finder-images/Coffee Table.png";
+import lampThumb from "../../../public/material-finder-images/Curtain.png";
+import rugThumb from "../../../public/material-finder-images/Frame 90.png";
+import artThumb from "../../../public/material-finder-images/Frame 118.png";
 import sofaThumb from "../../../public/material-finder-images/Sofa 1.png";
 
 // Each detected piece: a hotspot center, a bounding box (both in % of the
@@ -102,9 +102,7 @@ export default function MaterialFinderDemo() {
     ITEMS.forEach((_, i) => {
       timers.push(setTimeout(() => setDetected(i + 1), 500 + i * 260));
     });
-    timers.push(
-      setTimeout(() => setScanning(false), 500 + ITEMS.length * 260),
-    );
+    timers.push(setTimeout(() => setScanning(false), 500 + ITEMS.length * 260));
     return () => timers.forEach(clearTimeout);
   }, []);
 
@@ -130,11 +128,7 @@ export default function MaterialFinderDemo() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
       {/* The room stage */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: mouseleave only resumes autoplay; all controls inside are real buttons */}
-      <div
-        ref={stageRef}
-        className="lg:col-span-7"
-        onMouseLeave={release}
-      >
+      <div ref={stageRef} className="lg:col-span-7" onMouseLeave={release}>
         <div className="relative overflow-hidden rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-well)] p-2">
           <div className="relative overflow-hidden rounded-xl">
             <Image
@@ -251,6 +245,7 @@ export default function MaterialFinderDemo() {
       </div>
 
       {/* The match panel — rows synced to the active hotspot */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: mouse-leave only resets a decorative hover sync; the rows inside are real buttons */}
       <div className="lg:col-span-5" onMouseLeave={release}>
         <div className="viz-panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-[var(--viz-line)] px-5 py-3">
@@ -263,14 +258,19 @@ export default function MaterialFinderDemo() {
             {ITEMS.map((item, i) => {
               const on = active === i && !scanning;
               return (
-                <li key={item.id} className="border-t border-[var(--viz-line)] first:border-t-0">
+                <li
+                  key={item.id}
+                  className="border-t border-[var(--viz-line)] first:border-t-0"
+                >
                   <button
                     type="button"
                     onMouseEnter={() => pick(i)}
                     onFocus={() => pick(i)}
                     onClick={() => pick(i)}
                     className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors duration-300 ${
-                      on ? "bg-[var(--viz-blue)]/6" : "hover:bg-[var(--viz-ground)]"
+                      on
+                        ? "bg-[var(--viz-blue)]/6"
+                        : "hover:bg-[var(--viz-ground)]"
                     }`}
                   >
                     <span

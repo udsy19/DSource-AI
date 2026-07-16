@@ -143,8 +143,8 @@ const AiMaterialFinder = () => {
                 Point at the room. We&rsquo;ll shop it.
               </h2>
               <p className="max-w-sm text-sm text-[var(--viz-muted)] sm:text-right">
-                The AI reads the whole scene, then matches every piece to a
-                real product — hover the room or the list to explore.
+                The AI reads the whole scene, then matches every piece to a real
+                product — hover the room or the list to explore.
               </p>
             </div>
           </Reveal>
