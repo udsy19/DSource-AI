@@ -1,5 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
-import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { after, NextResponse } from "next/server";
+import {
+  insertCapture,
+  logActivity,
+  requestMeta,
+  touchLastSeen,
+  uploadCaptureImage,
+} from "@/utils/ai-capture";
 import { requireAuth } from "@/utils/api-auth";
 import {
   AiResponseError,
@@ -8,6 +16,9 @@ import {
   getResponseText,
   parseModelJsonObject,
 } from "@/utils/gemini";
+import { createClient } from "@/utils/supabase/server";
+
+const IMAGE_MODEL = "gemini-2.5-flash-image";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -39,11 +50,85 @@ const parseImageData = (imageData) => {
 };
 
 export async function POST(request) {
+  const startedAt = Date.now();
+  const { ip, userAgent } = requestMeta(request);
+  let user = null;
+  let supabase = null;
+  let inputBuffer = null;
+  let inputMime = null;
+  let params = null;
+  let enhancedPromptFinal = null;
+
+  // Schedules best-effort capture (event + designs) AFTER the response is sent.
+  const scheduleCapture = ({ status, errorCode = null, outputs = [] }) =>
+    after(async () => {
+      if (!user || !supabase) return;
+      let inputImagePath = null;
+      if (inputBuffer) {
+        inputImagePath = await uploadCaptureImage(
+          supabase,
+          "room-uploads",
+          user.id,
+          inputBuffer,
+          inputMime,
+        );
+        if (inputImagePath) {
+          await insertCapture(supabase, "room_uploads", {
+            user_id: user.id,
+            storage_path: inputImagePath,
+            mime_type: inputMime,
+            size_bytes: inputBuffer.length,
+            source: "visualizer",
+          });
+        }
+      }
+      const eventId = await insertCapture(supabase, "ai_generation_events", {
+        user_id: user.id,
+        model: IMAGE_MODEL,
+        prompt: params?.prompt ?? null,
+        enhanced_prompt: enhancedPromptFinal,
+        space_type: params?.spaceType ?? null,
+        style: params?.style ?? null,
+        lighting: params?.lighting ?? null,
+        color_palette: params?.colorPalette ?? null,
+        input_image_path: inputImagePath,
+        status,
+        error_code: errorCode,
+        latency_ms: Date.now() - startedAt,
+        ip,
+        user_agent: userAgent,
+      });
+      for (const out of outputs) {
+        const buffer = Buffer.from(out.image, "base64");
+        const path = await uploadCaptureImage(
+          supabase,
+          "generated-designs",
+          user.id,
+          buffer,
+          out.mimeType,
+        );
+        if (path) {
+          await insertCapture(supabase, "generated_designs", {
+            user_id: user.id,
+            generation_event_id: eventId,
+            storage_path: path,
+            prompt: params?.prompt ?? null,
+            source_image_path: inputImagePath,
+          });
+        }
+      }
+      await logActivity(supabase, user.id, "ai_generate", { ip, userAgent });
+      await touchLastSeen(supabase, user.id);
+    });
+
   try {
-    await requireAuth();
+    user = await requireAuth();
+    const cookieStore = await cookies();
+    supabase = await createClient(cookieStore);
 
     const body = await request.json();
     const { prompt, spaceType, style, lighting, colorPalette, image } = body;
+    params = { prompt, spaceType, style, lighting, colorPalette };
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
       return NextResponse.json(
@@ -90,6 +175,7 @@ export async function POST(request) {
     );
 
     if (!validationResult.isValid || validationResult.confidence < 0.5) {
+      scheduleCapture({ status: "rejected" });
       return NextResponse.json(
         {
           success: false,
@@ -129,12 +215,15 @@ export async function POST(request) {
     if (image) {
       const imageData = parseImageData(image);
       if (imageData) {
-        if (Buffer.from(imageData.data, "base64").length > MAX_IMAGE_BYTES) {
+        const decoded = Buffer.from(imageData.data, "base64");
+        if (decoded.length > MAX_IMAGE_BYTES) {
           return NextResponse.json(
             { error: "Image is too large. Maximum size is 10 MB." },
             { status: 413 },
           );
         }
+        inputBuffer = decoded;
+        inputMime = imageData.mimeType;
         contents.push({
           inlineData: {
             data: imageData.data,
@@ -148,6 +237,7 @@ export async function POST(request) {
 
     // Add the text prompt
     contents.push({ text: enhancedPrompt });
+    enhancedPromptFinal = enhancedPrompt;
 
     // Step 4: Generate image using Gemini 2.5 Flash Image model
     const imageResponse = await generateContentWithResilience(ai, {
@@ -199,6 +289,7 @@ export async function POST(request) {
 
     if (images.length === 0) {
       console.error("No images generated in generate-image response");
+      scheduleCapture({ status: "error", errorCode: "no_image" });
       return NextResponse.json(
         {
           success: false,
@@ -208,6 +299,8 @@ export async function POST(request) {
         { status: 500 },
       );
     }
+
+    scheduleCapture({ status: "success", outputs: images });
 
     return NextResponse.json(
       {
@@ -219,6 +312,10 @@ export async function POST(request) {
       { status: 200 },
     );
   } catch (error) {
+    scheduleCapture({
+      status: error instanceof AiResponseError ? "blocked" : "error",
+      errorCode: error?.code ?? error?.name ?? null,
+    });
     if (error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,5 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
-import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { after, NextResponse } from "next/server";
+import {
+  insertCapture,
+  logActivity,
+  requestMeta,
+  touchLastSeen,
+  uploadCaptureImage,
+} from "@/utils/ai-capture";
 import { requireAuth } from "@/utils/api-auth";
 import {
   AiResponseError,
@@ -8,6 +16,9 @@ import {
   getResponseText,
   parseModelJsonObject,
 } from "@/utils/gemini";
+import { createClient } from "@/utils/supabase/server";
+
+const MODEL = "gemini-2.5-flash";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
@@ -24,8 +35,52 @@ const clamp = (value, min, max) => {
 };
 
 export async function POST(request) {
+  const startedAt = Date.now();
+  const { ip, userAgent } = requestMeta(request);
+  let user = null;
+  let supabase = null;
+  let inputBuffer = null;
+  let inputMime = null;
+
+  // Schedules best-effort capture to run AFTER the response is sent (no latency).
+  const scheduleCapture = (fields) =>
+    after(async () => {
+      if (!user || !supabase) return;
+      const inputImagePath = inputBuffer
+        ? await uploadCaptureImage(
+            supabase,
+            "room-uploads",
+            user.id,
+            inputBuffer,
+            inputMime,
+          )
+        : null;
+      if (inputImagePath) {
+        await insertCapture(supabase, "room_uploads", {
+          user_id: user.id,
+          storage_path: inputImagePath,
+          mime_type: inputMime,
+          size_bytes: inputBuffer.length,
+          source: "material_finder",
+        });
+      }
+      await insertCapture(supabase, "ai_analysis_events", {
+        user_id: user.id,
+        model: MODEL,
+        input_image_path: inputImagePath,
+        latency_ms: Date.now() - startedAt,
+        ip,
+        user_agent: userAgent,
+        ...fields,
+      });
+      await logActivity(supabase, user.id, "ai_analyze", { ip, userAgent });
+      await touchLastSeen(supabase, user.id);
+    });
+
   try {
-    await requireAuth();
+    user = await requireAuth();
+    const cookieStore = await cookies();
+    supabase = await createClient(cookieStore);
 
     const formData = await request.formData();
     const imageFile = formData.get("image");
@@ -54,7 +109,9 @@ export async function POST(request) {
       );
     }
 
-    const base64Image = Buffer.from(arrayBuffer).toString("base64");
+    inputBuffer = Buffer.from(arrayBuffer);
+    inputMime = mimeType;
+    const base64Image = inputBuffer.toString("base64");
 
     // Step 1: Validate if image is interior-related
     const interiorValidationPrompt = `
@@ -93,6 +150,11 @@ export async function POST(request) {
     );
 
     if (!validationResult.isInterior) {
+      scheduleCapture({
+        status: "rejected",
+        is_interior: false,
+        space_type: validationResult.spaceType ?? null,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -175,13 +237,33 @@ export async function POST(request) {
         };
       }) ?? [];
 
+    const overallConfidence = clamp(
+      categoryAnalysisResult?.overallConfidence,
+      0,
+      1,
+    );
+    const summary = categoryAnalysisResult?.summary ?? "";
+
+    scheduleCapture({
+      status: "success",
+      is_interior: true,
+      space_type: validationResult.spaceType ?? null,
+      overall_confidence: overallConfidence,
+      detected_categories: categories,
+      summary,
+    });
+
     return NextResponse.json({
       success: true,
       categories,
-      overallConfidence: clamp(categoryAnalysisResult?.overallConfidence, 0, 1),
-      summary: categoryAnalysisResult?.summary ?? "",
+      overallConfidence,
+      summary,
     });
   } catch (error) {
+    scheduleCapture({
+      status: error instanceof AiResponseError ? "blocked" : "error",
+      error_code: error?.code ?? error?.name ?? null,
+    });
     if (error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

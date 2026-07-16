@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
 // Routes that require authentication
-const protectedRoutes = ["/spec-builder", "/ai-material-finder", "/account"];
+const protectedRoutes = [
+  "/spec-builder",
+  "/ai-material-finder",
+  "/ai-visualizer",
+  "/account",
+];
 
 // Routes that require vendor role
 const vendorRoutes = ["/vendor"];

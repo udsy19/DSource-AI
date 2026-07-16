@@ -1,13 +1,14 @@
 import { parse } from "csv-parse/sync";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { after, NextResponse } from "next/server";
+import { logActivity, requestMeta } from "@/utils/ai-capture";
 import { requireVendor } from "@/utils/api-auth";
 import {
-  sanitizeString,
   parseMultiValue,
+  sanitizeString,
   toNumber,
 } from "@/utils/product-normalize";
+import { createClient } from "@/utils/supabase/server";
 
 const REQUIRED_COLUMNS = [
   "product_id",
@@ -36,13 +37,13 @@ const UPSERT_CHUNK_SIZE = 500;
 
 const transformRow = (row) => {
   const multiValueFields = Object.fromEntries(
-    MULTI_VALUE_COLUMNS.map((column) => [column, parseMultiValue(row[column])])
+    MULTI_VALUE_COLUMNS.map((column) => [column, parseMultiValue(row[column])]),
   );
 
   return {
     product_id: toNumber(row.product_id),
     product_material_depot_variant_handle: sanitizeString(
-      row.product_material_depot_variant_handle
+      row.product_material_depot_variant_handle,
     ),
     product_name: sanitizeString(row.product_name),
     brand_name: sanitizeString(row.brand_name),
@@ -69,22 +70,28 @@ export async function POST(request) {
     if (error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (error.message.includes("Forbidden") || error.message.includes("Vendor")) {
+    if (
+      error.message.includes("Forbidden") ||
+      error.message.includes("Vendor")
+    ) {
       return NextResponse.json(
         { error: "Forbidden: Vendor access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
     return NextResponse.json(
       { error: "Authentication error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const cookieStore = await cookies();
   const supabase = await createClient(cookieStore);
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
   if (userError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -104,7 +111,7 @@ export async function POST(request) {
     if (!isCsv) {
       return NextResponse.json(
         { error: "Invalid file type. Please upload a .csv file." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -112,7 +119,7 @@ export async function POST(request) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: "File too large. Maximum size is 5 MB." },
-        { status: 413 }
+        { status: 413 },
       );
     }
 
@@ -120,7 +127,7 @@ export async function POST(request) {
   } catch (_error) {
     return NextResponse.json(
       { error: "Could not read the uploaded file." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -138,35 +145,35 @@ export async function POST(request) {
   } catch (_error) {
     return NextResponse.json(
       { error: "CSV parse error. Ensure the file uses commas and UTF-8." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (rows.length > MAX_ROWS) {
     return NextResponse.json(
       { error: `Too many rows. Maximum is ${MAX_ROWS} rows per upload.` },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (!rows.length) {
     return NextResponse.json(
       { error: "No data rows detected after the header." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const missingColumns = REQUIRED_COLUMNS.filter(
-    (column) => !(column in rows[0])
+    (column) => !(column in rows[0]),
   );
   if (missingColumns.length) {
     return NextResponse.json(
       {
         error: `Missing columns: ${missingColumns.join(
-          ", "
+          ", ",
         )}. Please re-download the template.`,
       },
-      { status: 422 }
+      { status: 422 },
     );
   }
 
@@ -178,7 +185,7 @@ export async function POST(request) {
   if (!transformedRows.length) {
     return NextResponse.json(
       { error: "Could not find any valid rows to import." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -194,12 +201,21 @@ export async function POST(request) {
     if (error) {
       return NextResponse.json(
         { error: error.message ?? "Failed to import CSV." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     inserted += data?.length ?? 0;
   }
+
+  const meta = requestMeta(request);
+  after(async () => {
+    await logActivity(supabase, user.id, "csv_upload", {
+      metadata: { inserted, total_rows: transformedRows.length },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+  });
 
   return NextResponse.json({
     message: "Import complete",
