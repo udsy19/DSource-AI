@@ -15,10 +15,7 @@
     "A-WALL-PATT",
     "Defpoints"
   ],
-  "layouts": [
-    "Model",
-    "SHEET-1"
-  ],
+  "layouts": ["Model", "SHEET-1"],
   "modelspace": {
     "DIMENSION/A-ANNO-DIMS": 2,
     "HATCH/A-WALL-PATT": 1,

@@ -150,7 +150,10 @@ export async function POST(request) {
       Number.isFinite(Number(raw?.price)) && Number(raw?.price) >= 0
         ? Number(raw.price)
         : 0,
-    quantity: Math.min(Math.max(Math.round(Number(raw?.quantity) || 1), 1), 999),
+    quantity: Math.min(
+      Math.max(Math.round(Number(raw?.quantity) || 1), 1),
+      999,
+    ),
     imageUrl: typeof raw?.image === "string" ? raw.image : null,
   }));
 

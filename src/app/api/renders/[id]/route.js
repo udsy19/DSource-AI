@@ -7,7 +7,7 @@ import { deleteRender } from "@/utils/visualizer/persist";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function DELETE(request, { params }) {
+export async function DELETE(_request, { params }) {
   try {
     await requireAuth();
   } catch {

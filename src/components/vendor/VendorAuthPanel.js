@@ -48,14 +48,14 @@ export default function VendorAuthPanel() {
 
       let response;
       if (mode === "signUp") {
+        // A self-service signup must NOT grant the vendor role. Roles are read
+        // only from app_metadata, which is not settable from the client; an
+        // admin grants vendor access after review.
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
           options: {
             emailRedirectTo: emailRedirect,
-            data: {
-              user_type: "vendor",
-            },
           },
         });
       } else {

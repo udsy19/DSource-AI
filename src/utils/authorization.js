@@ -54,20 +54,18 @@ export function canAccessUserRoutes(userRole) {
 export function getUserRole(user) {
   if (!user) return null;
 
-  const metadata = user.user_metadata || {};
+  // Roles are read ONLY from app_metadata, which is settable exclusively with
+  // the service-role key (set by admin). user_metadata is user-controlled and
+  // must never be trusted for authorization.
   const appMetadata = user.app_metadata || {};
 
-  // Check user_metadata first (set during signup)
-  if (metadata.user_type && Object.values(ROLES).includes(metadata.user_type)) {
-    return metadata.user_type;
-  }
-
-  // Check app_metadata (set by admin)
-  if (appMetadata.user_type && Object.values(ROLES).includes(appMetadata.user_type)) {
+  if (
+    appMetadata.user_type &&
+    Object.values(ROLES).includes(appMetadata.user_type)
+  ) {
     return appMetadata.user_type;
   }
 
   // Default to user role
   return ROLES.USER;
 }
-

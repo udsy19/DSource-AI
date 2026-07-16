@@ -6,6 +6,7 @@ const protectedRoutes = [
   "/spec-builder",
   "/ai-material-finder",
   "/ai-visualizer",
+  "/account",
 ];
 
 // Routes that require vendor role
@@ -14,10 +15,13 @@ const vendorRoutes = ["/vendor"];
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Skip middleware for static files, API routes, and public assets
+  // Skip middleware for static files, API routes, auth callback routes, and
+  // public assets. /auth/* must pass through untouched so code-exchange can
+  // establish the session before any gating runs.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
+    pathname.startsWith("/auth") ||
     pathname.startsWith("/static") ||
     pathname.match(/\.(ico|png|jpg|jpeg|svg|webp|avif)$/)
   ) {
@@ -49,28 +53,29 @@ export async function middleware(request) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value),
-          );
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
         },
       },
     },
   );
 
-  // Get session
+  // Get the verified user (getUser revalidates with the Auth server; getSession
+  // trusts unverified cookies and must not be used for gating).
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const user = session?.user;
-  const userRole =
-    user?.user_metadata?.user_type || user?.app_metadata?.user_type || "user";
+  // Role comes ONLY from app_metadata (service-role controlled); user_metadata
+  // is user-controlled and must never be trusted for authorization.
+  const userRole = user?.app_metadata?.user_type || "user";
 
   // Check if route requires vendor role
   if (vendorRoutes.some((route) => pathname.startsWith(route))) {
@@ -88,7 +93,10 @@ export async function middleware(request) {
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = "/";
+      url.pathname = "/login";
+      url.search = "";
+      // Preserve where the user was headed so we can return them after login.
+      url.searchParams.set("redirect", pathname);
       return NextResponse.redirect(url);
     }
   }

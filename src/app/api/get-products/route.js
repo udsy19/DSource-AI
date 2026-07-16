@@ -1,6 +1,6 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 
 // Category mapping from UI categories to database categories
 // This maps the AI-detected categories to database category names
@@ -55,7 +55,10 @@ export async function GET(request) {
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -67,7 +70,7 @@ export async function GET(request) {
     let query = supabase
       .from("scraped_product_list")
       .select(
-        "id, product_name, brand_name, category_name, color, image_url, product_id"
+        "id, product_name, brand_name, category_name, color, image_url, product_id",
       )
       .eq("created_by", user.id);
 
@@ -75,7 +78,7 @@ export async function GET(request) {
     if (selectedCategories.length > 0) {
       // Get all possible database category names for the selected UI categories
       const dbCategories = selectedCategories.flatMap((cat) =>
-        getMatchingDatabaseCategories(cat)
+        getMatchingDatabaseCategories(cat),
       );
 
       // Remove duplicates
@@ -100,7 +103,7 @@ export async function GET(request) {
       console.error("Supabase error:", error);
       return NextResponse.json(
         { error: "Failed to fetch products from database" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -113,10 +116,10 @@ export async function GET(request) {
       // Find products that match this UI category
       const categoryProducts = (products || []).filter((product) => {
         const productCategory = normalizeCategoryName(
-          product.category_name || ""
+          product.category_name || "",
         );
         return dbCategories.some((dbCat) =>
-          productCategory.includes(normalizeCategoryName(dbCat))
+          productCategory.includes(normalizeCategoryName(dbCat)),
         );
       });
 
@@ -144,7 +147,7 @@ export async function GET(request) {
     console.error("Error fetching products:", error);
     return NextResponse.json(
       { error: "Failed to get products" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

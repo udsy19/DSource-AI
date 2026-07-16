@@ -21,11 +21,13 @@ export default function SmoothScroll() {
     gsap.registerPlugin(ScrollTrigger);
 
     const lenis = new Lenis({
-      // Lower lerp = the scroll settles quickly and precisely, which kills
-      // the "floaty catch-up" that reads as choppy on a scrubbed canvas.
-      lerp: 0.12,
+      // A gentle glide — long enough to feel premium, short enough that the
+      // scrubbed hero never lags behind the cursor. The hero's own frame
+      // cross-fade smooths the last bit, so Lenis can stay light here.
+      lerp: 0.1,
       wheelMultiplier: 1,
-      touchMultiplier: 1.4,
+      touchMultiplier: 1.5,
+      syncTouch: true,
     });
     window.__lenis = lenis;
 

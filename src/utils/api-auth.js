@@ -1,6 +1,11 @@
-import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
+import { getUserRole } from "./authorization";
 import { ROLES } from "./roles";
+
+// Single source of truth for role derivation lives in ./authorization. Re-export
+// under the legacy name so existing server callers keep working.
+export { getUserRole as getUserRoleFromUser } from "./authorization";
 
 /**
  * Get authenticated user from API request
@@ -22,31 +27,30 @@ export async function getAuthenticatedUser() {
 }
 
 /**
- * Get user role from user object
- */
-export function getUserRoleFromUser(user) {
-  if (!user) return null;
-
-  const metadata = user.user_metadata || {};
-  const appMetadata = user.app_metadata || {};
-
-  if (metadata.user_type && Object.values(ROLES).includes(metadata.user_type)) {
-    return metadata.user_type;
-  }
-
-  if (appMetadata.user_type && Object.values(ROLES).includes(appMetadata.user_type)) {
-    return appMetadata.user_type;
-  }
-
-  return ROLES.USER;
-}
-
-/**
  * Check if user has vendor role
  */
 export function isVendorUser(user) {
-  const role = getUserRoleFromUser(user);
-  return role === ROLES.VENDOR;
+  return getUserRole(user) === ROLES.VENDOR;
+}
+
+/**
+ * Admin emails allowed to perform privileged actions (e.g. granting roles).
+ * Configured via the ADMIN_EMAILS env var (comma-separated).
+ */
+export function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Check if a user is an admin (by email allowlist).
+ */
+export function isAdminUser(user) {
+  const email = user?.email?.toLowerCase();
+  if (!email) return false;
+  return getAdminEmails().includes(email);
 }
 
 /**
@@ -67,7 +71,7 @@ export async function requireAuth() {
  */
 export async function requireVendor() {
   const user = await requireAuth();
-  const role = getUserRoleFromUser(user);
+  const role = getUserRole(user);
 
   if (role !== ROLES.VENDOR) {
     throw new Error("Forbidden: Vendor access required");
@@ -76,3 +80,15 @@ export async function requireVendor() {
   return user;
 }
 
+/**
+ * Require admin (email allowlist) for a privileged API route.
+ */
+export async function requireAdmin() {
+  const user = await requireAuth();
+
+  if (!isAdminUser(user)) {
+    throw new Error("Forbidden: Admin access required");
+  }
+
+  return user;
+}

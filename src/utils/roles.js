@@ -33,4 +33,3 @@ export function isVendorRole(role) {
 export function isUserRole(role) {
   return role === ROLES.USER;
 }
-

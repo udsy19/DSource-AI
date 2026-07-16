@@ -35,13 +35,16 @@ const EMBEDDING_DIM = 768;
 
 if (!SUPABASE_URL || !SERVICE_KEY || !REPLICATE_TOKEN) {
   console.error(
-    "Missing env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REPLICATE_API_TOKEN"
+    "Missing env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REPLICATE_API_TOKEN",
   );
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-const replicate = new Replicate({ auth: REPLICATE_TOKEN, useFileOutput: false });
+const replicate = new Replicate({
+  auth: REPLICATE_TOKEN,
+  useFileOutput: false,
+});
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let done = 0;

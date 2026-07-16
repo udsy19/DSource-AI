@@ -273,8 +273,7 @@ const SpecBuilder = () => {
               {String(categories.length).padStart(2, "0")}
             </SpecCell>
             <SpecCell label="Subtotal" grow={2}>
-              ₹
-              {subtotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              ₹{subtotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </SpecCell>
           </div>
         )}

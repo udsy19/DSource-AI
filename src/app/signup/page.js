@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import AuthShell from "@/components/auth/AuthShell";
 import { createClient } from "@/utils/supabase/client";
@@ -9,7 +8,6 @@ import { createClient } from "@/utils/supabase/client";
 const EMAIL_REDIRECT_FALLBACK = "/";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const supabase = createClient();
   const [form, setForm] = useState({
     email: "",

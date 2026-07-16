@@ -81,13 +81,11 @@ export default function VideoScrollHero() {
         const frame = { current: 0, target: 0, drawn: -1 };
         let toLoad = FRAME_COUNT;
 
-        const draw = (index) => {
+        // One image cover-fitted onto the stage, at a given opacity.
+        const drawCover = (img, alpha) => {
+          if (!img || !img.complete || img.naturalWidth === 0) return;
           const w = stageSize.w;
           const h = stageSize.h;
-          const img = images[index];
-          if (!img || !img.complete || img.naturalWidth === 0) return;
-          context.clearRect(0, 0, w, h);
-          // cover-fit: fill the stage, preserve aspect, center overflow
           const imgRatio = img.naturalWidth / img.naturalHeight;
           const canvasRatio = w / h;
           let dw = w;
@@ -101,7 +99,21 @@ export default function VideoScrollHero() {
             dh = w / imgRatio;
             dy = (h - dh) / 2;
           }
+          context.globalAlpha = alpha;
           context.drawImage(img, dx, dy, dw, dh);
+          context.globalAlpha = 1;
+        };
+
+        // Cross-fade the two frames bracketing a fractional index. This makes
+        // 243 discrete frames read as continuous motion — no flipbook step,
+        // no matter how slowly you scroll.
+        const draw = (fidx) => {
+          const lo = Math.floor(fidx);
+          const hi = Math.min(lo + 1, FRAME_COUNT - 1);
+          const t = fidx - lo;
+          context.clearRect(0, 0, stageSize.w, stageSize.h);
+          drawCover(images[lo], 1);
+          if (t > 0.001 && hi !== lo) drawCover(images[hi], t);
         };
 
         const onImageSettled = () => {
@@ -116,14 +128,14 @@ export default function VideoScrollHero() {
           images.push(img);
         }
 
-        // Continuously ease the drawn frame toward the scroll target — this
-        // is what removes the stepping when the scroll decelerates.
+        // Ease the drawn position toward the scroll target every frame and
+        // redraw whenever it has moved a hair — the ease plus the cross-fade
+        // together give buttery playback even as scroll decelerates.
         const tick = () => {
-          frame.current += (frame.target - frame.current) * 0.18;
-          const idx = Math.round(frame.current);
-          if (idx !== frame.drawn) {
-            frame.drawn = idx;
-            draw(idx);
+          frame.current += (frame.target - frame.current) * 0.16;
+          if (Math.abs(frame.current - frame.drawn) > 0.002) {
+            frame.drawn = frame.current;
+            draw(frame.current);
           }
         };
         gsap.ticker.add(tick);
@@ -161,7 +173,7 @@ export default function VideoScrollHero() {
 
         const onResize = () => {
           setCanvasSize();
-          draw(frame.drawn < 0 ? 0 : frame.drawn);
+          draw(frame.current);
           ScrollTrigger.refresh();
         };
         window.addEventListener("resize", onResize);
@@ -202,13 +214,14 @@ export default function VideoScrollHero() {
       ref={rootRef}
       className="viz-scope relative h-svh w-full overflow-hidden bg-[var(--viz-well)]"
     >
-      {/* The film — canvas on desktop, autoplay video on mobile */}
+      {/* The film — canvas on desktop, autoplay video on mobile. Both are
+          decorative background media: hidden from AT and out of tab order. */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 hidden lg:block"
         aria-hidden="true"
+        tabIndex={-1}
       />
-      {/* biome-ignore lint/a11y/useMediaCaption: ambient background film, no dialogue */}
       <video
         className="absolute inset-0 h-full w-full object-cover lg:hidden"
         autoPlay
@@ -218,6 +231,7 @@ export default function VideoScrollHero() {
         preload="auto"
         poster={framePath(0)}
         aria-hidden="true"
+        tabIndex={-1}
       >
         <source src="/hero-film.mp4" type="video/mp4" />
       </video>
