@@ -34,13 +34,17 @@ infra/build, live database) with no launch blockers left in code.
 
 ## Deploy checklist (user actions)
 
-1. **Vercel**: import the GitHub repo (framework: Next.js, root =
-   `dsource-client/dsource-client`). Set env vars:
-   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `GOOGLE_GENAI_API_KEY`, `REPLICATE_API_TOKEN`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAILS`, `NEXT_PUBLIC_SITE_URL`;
-   optional: `MATERIAL_BANK_API_URL`, `CAD_EXPORT_URL`, `CAD_EXPORT_TOKEN`,
+1. **Vercel**: the project exists (`d-source-ai`, Git-connected). Set env vars
+   in project settings: `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GOOGLE_GENAI_API_KEY`,
+   `REPLICATE_API_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAILS`,
+   `NEXT_PUBLIC_SITE_URL`; optional: `MATERIAL_BANK_API_URL`,
    `NEXT_PUBLIC_SIGNUP_ALLOWED_DOMAINS`. Never set `DEV_AUTH_BYPASS`.
+   Do NOT set `CAD_EXPORT_URL` — `vercel.json` deploys the cad-export
+   FastAPI microservice as an internal Vercel Service and the binding
+   injects that var automatically (the service is unreachable from the
+   public internet; `CAD_EXPORT_TOKEN` is unnecessary there). For
+   self-hosted cad-export instead, delete the binding and set both vars.
 2. **Rotate the Replicate API token** (it was exposed in a chat) and top up
    Replicate credit — under $5 throttles to 6 predictions/min, which reads
    as "slow renders".

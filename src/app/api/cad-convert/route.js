@@ -324,7 +324,9 @@ const planSizeFromBounds = (bounds) => {
 // renderer consumes. Unset CAD_EXPORT_URL or any failure returns null so the
 // baseline JS renderer always keeps the conversion response working.
 const renderProfessionalExport = async (processed) => {
-  const baseUrl = process.env.CAD_EXPORT_URL;
+  // Tolerate a trailing slash — Vercel's service binding injects the URL as a
+  // base and a double slash would 404 into the silent JS-renderer fallback.
+  const baseUrl = process.env.CAD_EXPORT_URL?.replace(/\/$/, "");
   if (!baseUrl) return null;
   try {
     const response = await fetch(`${baseUrl}/render`, {
