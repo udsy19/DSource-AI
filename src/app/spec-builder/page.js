@@ -173,19 +173,39 @@ const SpecSheet = () => {
     0,
   );
 
-  /** Client sign-off cell — an explicit dropdown, not a mystery cycle. */
+  /**
+   * Client sign-off — a compact single-line pill matching the Vendor button
+   * beside it: "CLIENT · DRAFT ⌄" with the status carrying the color.
+   */
   const renderStatusControl = (productId) => {
     const status = productStatuses[productId] || "draft";
     const tone =
       status === "approved"
         ? "font-bold text-[var(--viz-blue)]"
         : status === "rejected"
-          ? "text-red-700"
-          : "text-[var(--viz-muted)]";
+          ? "font-bold text-red-700"
+          : "text-[var(--viz-ink)]";
 
     return (
-      <label className="block rounded-md border border-[var(--viz-line)] px-3 py-1.5">
-        <span className="viz-label">Client</span>
+      <label className="viz-mono relative inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-xs uppercase transition-colors duration-200 hover:bg-[var(--viz-ground)]">
+        <span className="text-[var(--viz-muted)]">Client ·</span>
+        <span className={tone}>
+          {status === "approved"
+            ? "Approved ✓"
+            : status === "rejected"
+              ? "Rejected ✕"
+              : "Draft"}
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 12 12"
+          className="h-2.5 w-2.5 text-[var(--viz-muted)]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        >
+          <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" />
+        </svg>
         <select
           value={status}
           onChange={(e) =>
@@ -194,7 +214,7 @@ const SpecSheet = () => {
               [productId]: e.target.value,
             }))
           }
-          className={`viz-mono mt-0.5 block w-full cursor-pointer bg-transparent text-xs uppercase outline-none ${tone}`}
+          className="absolute inset-0 cursor-pointer opacity-0"
           aria-label="Client sign-off status"
         >
           <option value="draft">Draft</option>
