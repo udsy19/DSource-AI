@@ -4,26 +4,17 @@ import { ALLOWED_IMAGE_HOSTS } from "./src/utils/image-hosts.mjs";
 // baseline: 'unsafe-inline' is permitted for scripts/styles because Next.js
 // and Tailwind currently emit inline runtime/styles. TODO: tighten by moving
 // to nonces/hashes and dropping 'unsafe-inline' / 'unsafe-eval'.
-// img-src includes data:/blob: (canvas exports, data-URI previews) plus the
-// shared image-host whitelist so CSP matches what next/image will load.
-// The Supabase project host serves signed render thumbnails (history strip,
-// folio covers) — without it CSP blocks every persisted image.
-const SUPABASE_HOST = (() => {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
-  } catch {
-    return null;
-  }
-})();
-
-const IMG_HOSTS = [
-  ...ALLOWED_IMAGE_HOSTS,
-  ...(SUPABASE_HOST ? [SUPABASE_HOST] : []),
-];
-
+//
+// img-src allows any https image (plus data:/blob: for canvas exports and
+// data-URI previews). The marketplace renders product photos from 161k
+// records across UNBOUNDED supplier CDNs — an allowlist can never cover them,
+// which is why those cards use a plain <img>. Images cannot execute code, so
+// this keeps the XSS-relevant directives (script-src, object-src, base-uri,
+// frame-ancestors) strict while letting third-party product images load. It
+// mirrors the already-broad connect-src 'self' https:.
 const CSP = [
   "default-src 'self'",
-  `img-src 'self' data: blob: ${IMG_HOSTS.map((h) => `https://${h}`).join(" ")}`,
+  "img-src 'self' data: blob: https:",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",

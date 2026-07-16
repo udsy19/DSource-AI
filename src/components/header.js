@@ -10,11 +10,18 @@ import specSheetIcon from "../../public/spec-sheet-icon.png";
 import { useAuth } from "../contexts/AuthContext";
 import { useSpec } from "../contexts/SpecContext";
 
-const NAV_LINKS = [
+// Public wayfinding shows only the brochure; the studio tools (Product,
+// Get Inspired, Folios) appear once the user is signed in.
+const PUBLIC_NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/ai-material-finder", label: "Features" },
   { href: "/marketplace/products", label: "Shop sample" },
-  { href: "/ai-visualizer", label: "Get inspired" },
+];
+
+const AUTHED_NAV_LINKS = [
+  ...PUBLIC_NAV_LINKS,
+  { href: "/ai-visualizer", label: "Product" },
+  { href: "/get-inspired", label: "Get inspired" },
   { href: "/folios", label: "Folios" },
 ];
 
@@ -55,6 +62,8 @@ const Header = ({ currentPath = "" }) => {
   const isActive = (href) =>
     href === "/" ? pathName === "/" : pathName?.startsWith(href);
 
+  const navLinks = isAuthenticated ? AUTHED_NAV_LINKS : PUBLIC_NAV_LINKS;
+
   const monoLink =
     "viz-mono text-xs tracking-[0.08em] uppercase transition-colors";
 
@@ -91,7 +100,7 @@ const Header = ({ currentPath = "" }) => {
           {!onVendorRoute && (
             <nav className="hidden lg:block">
               <ul className="flex items-center gap-8 xl:gap-10">
-                {NAV_LINKS.map(({ href, label }) => (
+                {navLinks.map(({ href, label }) => (
                   <li key={href}>
                     <Link
                       href={href}
@@ -212,7 +221,7 @@ const Header = ({ currentPath = "" }) => {
             <div>
               {!onVendorRoute && (
                 <ul className="flex flex-col gap-1">
-                  {NAV_LINKS.map(({ href, label }, i) => (
+                  {navLinks.map(({ href, label }, i) => (
                     <li
                       key={href}
                       className="border-b border-[var(--viz-line)]"

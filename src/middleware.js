@@ -2,12 +2,14 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
 // Routes that require authentication
+// /ai-material-finder (the Features page) is deliberately public — it only
+// explains what the product offers; the AI tools it links to gate themselves.
 const protectedRoutes = [
   "/spec-builder",
-  "/ai-material-finder",
   "/ai-visualizer",
   "/account",
   "/folios",
+  "/get-inspired",
 ];
 
 // Routes that require vendor role

@@ -99,7 +99,7 @@ export default function CollectionParallax() {
               href="/ai-visualizer"
               className="mt-6 inline-block rounded-full bg-[var(--viz-paper)] px-6 py-2.5 text-sm font-semibold text-[var(--viz-ink)] hover:bg-white"
             >
-              Get inspired
+              Start from a room
             </Link>
           </div>
           <Link
