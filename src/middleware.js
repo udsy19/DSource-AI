@@ -31,6 +31,15 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
+  // Dev-only escape hatch: skip all auth gating for local testing.
+  // Hard-disabled in production builds; enabled only via .env.local flag.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEV_AUTH_BYPASS === "true"
+  ) {
+    return NextResponse.next();
+  }
+
   // Create Supabase client for middleware
   let supabaseResponse = NextResponse.next({
     request: {

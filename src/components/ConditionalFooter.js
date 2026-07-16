@@ -1,8 +1,8 @@
 "use client";
 
+import { usePathnameContext } from "../contexts/PathnameContext";
 import Footer from "./footer";
 import QuickLinks from "./quick-links";
-import { usePathnameContext } from "../contexts/PathnameContext";
 
 export default function ConditionalFooter() {
   const { pathname } = usePathnameContext();
@@ -18,4 +18,3 @@ export default function ConditionalFooter() {
     </>
   );
 }
-

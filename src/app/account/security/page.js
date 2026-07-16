@@ -132,89 +132,91 @@ export default function AccountSecurityPage() {
           Two-factor authentication (TOTP)
         </h2>
 
-        {loading ? (
-          <p className="mt-4 text-sm text-gray-500">Loading…</p>
-        ) : enrolling ? (
-          <div className="mt-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Scan this QR code with an authenticator app (Google Authenticator,
-              1Password, Authy), then enter the 6-digit code to confirm.
-            </p>
-            {/* qr_code is a self-contained SVG data URI from Supabase; next/image adds no value for inline data URIs. */}
-            {/* biome-ignore lint/performance/noImgElement: inline SVG data URI, not a remote asset */}
-            <img
-              src={enrolling.qrCode}
-              alt="Two-factor authentication QR code"
-              className="h-44 w-44 rounded-lg border border-gray-200 bg-white p-2"
-            />
-            <p className="break-all text-xs text-gray-500">
-              Or enter this secret manually:{" "}
-              <span className="font-mono">{enrolling.secret}</span>
-            </p>
-            <form onSubmit={verifyEnroll} className="flex items-center gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                className={`${inputClasses} max-w-[10rem] tracking-[0.4em] text-center`}
-                placeholder="000000"
-                maxLength={6}
-                required
-              />
-              <button
-                type="submit"
-                disabled={busy}
-                className="rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:bg-gray-400"
-              >
-                {busy ? "Verifying…" : "Verify"}
-              </button>
-              <button
-                type="button"
-                onClick={cancelEnroll}
-                className="rounded-md border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </form>
-          </div>
-        ) : verifiedFactors.length > 0 ? (
-          <div className="mt-6 space-y-3">
-            <p className="text-sm text-green-700">
-              Two-factor authentication is enabled.
-            </p>
-            {verifiedFactors.map((factor) => (
-              <div
-                key={factor.id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
-              >
-                <span className="text-sm text-gray-700">
-                  {factor.friendly_name || "Authenticator app"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeFactor(factor.id)}
-                  disabled={busy}
-                  className="text-sm font-semibold text-red-600 hover:underline disabled:opacity-50"
+        {loading
+          ? <p className="mt-4 text-sm text-gray-500">Loading…</p>
+          : enrolling
+            ? <div className="mt-6 space-y-4">
+                <p className="text-sm text-gray-600">
+                  Scan this QR code with an authenticator app (Google
+                  Authenticator, 1Password, Authy), then enter the 6-digit code
+                  to confirm.
+                </p>
+                {/* qr_code is a self-contained SVG data URI from Supabase; next/image adds no value for inline data URIs. */}
+                {/* biome-ignore lint/performance/noImgElement: inline SVG data URI, not a remote asset */}
+                <img
+                  src={enrolling.qrCode}
+                  alt="Two-factor authentication QR code"
+                  className="h-44 w-44 rounded-lg border border-gray-200 bg-white p-2"
+                />
+                <p className="break-all text-xs text-gray-500">
+                  Or enter this secret manually:{" "}
+                  <span className="font-mono">{enrolling.secret}</span>
+                </p>
+                <form
+                  onSubmit={verifyEnroll}
+                  className="flex items-center gap-2"
                 >
-                  Remove
-                </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    className={`${inputClasses} max-w-[10rem] tracking-[0.4em] text-center`}
+                    placeholder="000000"
+                    maxLength={6}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:bg-gray-400"
+                  >
+                    {busy ? "Verifying…" : "Verify"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEnroll}
+                    className="rounded-md border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </form>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={startEnroll}
-              disabled={busy}
-              className="rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:bg-gray-400"
-            >
-              {busy ? "Starting…" : "Enable two-factor authentication"}
-            </button>
-          </div>
-        )}
+            : verifiedFactors.length > 0
+              ? <div className="mt-6 space-y-3">
+                  <p className="text-sm text-green-700">
+                    Two-factor authentication is enabled.
+                  </p>
+                  {verifiedFactors.map((factor) => (
+                    <div
+                      key={factor.id}
+                      className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
+                    >
+                      <span className="text-sm text-gray-700">
+                        {factor.friendly_name || "Authenticator app"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFactor(factor.id)}
+                        disabled={busy}
+                        className="text-sm font-semibold text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              : <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={startEnroll}
+                    disabled={busy}
+                    className="rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:bg-gray-400"
+                  >
+                    {busy ? "Starting…" : "Enable two-factor authentication"}
+                  </button>
+                </div>}
 
         {feedback && (
           <p

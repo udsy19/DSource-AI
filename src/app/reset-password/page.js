@@ -82,72 +82,76 @@ export default function ResetPasswordPage() {
             </p>
           </div>
 
-          {hasSession === false ? (
-            <div
-              className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
-              role="alert"
-            >
-              This reset link is invalid or has expired. Please{" "}
-              <Link href="/forgot-password" className="font-semibold underline">
-                request a new one
-              </Link>
-              .
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="password" className="mb-2 block text-sm">
-                  New password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      password: event.target.value,
-                    }))
-                  }
-                  className={inputClasses}
-                  placeholder="At least 8 characters, with a letter and a number"
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="confirmPassword" className="mb-2 block text-sm">
-                  Confirm new password
-                </label>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={form.confirmPassword}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      confirmPassword: event.target.value,
-                    }))
-                  }
-                  className={inputClasses}
-                  placeholder="Confirm your password"
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting || hasSession === null}
-                className="w-full rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-400"
+          {hasSession === false
+            ? <div
+                className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                role="alert"
               >
-                {submitting ? "Updating..." : "Update password"}
-              </button>
-            </form>
-          )}
+                This reset link is invalid or has expired. Please{" "}
+                <Link
+                  href="/forgot-password"
+                  className="font-semibold underline"
+                >
+                  request a new one
+                </Link>
+                .
+              </div>
+            : <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="password" className="mb-2 block text-sm">
+                    New password
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={form.password}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        password: event.target.value,
+                      }))
+                    }
+                    className={inputClasses}
+                    placeholder="At least 8 characters, with a letter and a number"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="mb-2 block text-sm"
+                  >
+                    Confirm new password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    value={form.confirmPassword}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        confirmPassword: event.target.value,
+                      }))
+                    }
+                    className={inputClasses}
+                    placeholder="Confirm your password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting || hasSession === null}
+                  className="w-full rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-400"
+                >
+                  {submitting ? "Updating..." : "Update password"}
+                </button>
+              </form>}
 
           {feedback && (
             <p

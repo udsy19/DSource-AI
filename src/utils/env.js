@@ -7,11 +7,7 @@
  * inside client code.
  */
 
-// The value must be passed in from a STATIC `process.env.NEXT_PUBLIC_*`
-// reference. Next.js inlines NEXT_PUBLIC_* vars into the browser bundle only for
-// literal member access — a dynamic `process.env[name]` is NOT inlined and reads
-// as undefined in the browser, which would throw here on every page.
-const requireEnv = (name, value) => {
+const assertEnv = (name, value) => {
   if (!value) {
     throw new Error(
       `Missing required environment variable: ${name}. ` +
@@ -21,13 +17,17 @@ const requireEnv = (name, value) => {
   return value;
 };
 
+// NEXT_PUBLIC_* vars must be referenced STATICALLY (process.env.FOO) so the
+// bundler can inline them into the client bundle. A dynamic process.env[name]
+// is not inlined and reads undefined in the browser — which previously threw
+// on every page. Keep these as direct static reads.
 /** @returns {string} Public Supabase project URL. */
 export const getSupabaseUrl = () =>
-  requireEnv("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  assertEnv("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 /** @returns {string} Public Supabase anon key. */
 export const getSupabaseAnonKey = () =>
-  requireEnv(
+  assertEnv(
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
@@ -42,5 +42,5 @@ export const getGoogleGenAIKey = () => {
       "GOOGLE_GENAI_API_KEY is server-only and must not be read in the browser.",
     );
   }
-  return requireEnv("GOOGLE_GENAI_API_KEY", process.env.GOOGLE_GENAI_API_KEY);
+  return assertEnv("GOOGLE_GENAI_API_KEY", process.env.GOOGLE_GENAI_API_KEY);
 };

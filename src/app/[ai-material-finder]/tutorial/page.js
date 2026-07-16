@@ -1,77 +1,108 @@
 import Link from "next/link";
+import Reveal from "@/components/Reveal";
 
-export const metadata = {
-  title: "How It Works | DSource.AI",
-  description:
-    "Learn how the DSource.AI material finder turns a room photo into matched materials, visualizations, and specs.",
-};
-
-const steps = [
+const STEPS = [
   {
-    title: "Upload a room photo",
-    description:
-      "Start with a photo of the space you're designing. Our AI reads the room to understand surfaces, lighting, and existing materials.",
+    n: "01",
+    title: "Bring a room",
+    body: "Upload a photo of the space — yours or a client's. The original is never touched; every version you make is kept alongside it.",
   },
   {
-    title: "Get AI-matched materials",
-    description:
-      "DSource.AI detects the materials in your image and surfaces matching products from the marketplace, so you can compare real options in seconds.",
+    n: "02",
+    title: "Set the brief",
+    body: "Pick the space, style, lighting, palette — even flooring and wall finish — or say it in your own words. Every choice becomes an explicit instruction to the model.",
   },
   {
-    title: "Visualize swaps",
-    description:
-      "Preview how different materials look in your space before you commit, helping you move from inspiration to a confident decision.",
+    n: "03",
+    title: "Watch it verify",
+    body: "After rendering, vision AI checks the result against your brief and retries once if something was ignored. When every checked parameter passes, the title block reads PROOF: VERIFIED — evidence, not decoration.",
   },
   {
-    title: "Build your spec",
-    description:
-      "Save the products you like and assemble them into a shareable specification, keeping every detail organized in one place.",
+    n: "04",
+    title: "Find what you see",
+    body: "Tap “Find materials” and click any dot — or drag a box around anything — to search the material bank for the closest real products, with live prices and a one-line reason for each match.",
+  },
+  {
+    n: "05",
+    title: "Swap it in",
+    body: "Like a match? Place the actual product photo into your render. The room, camera, and light stay put; the piece changes.",
+  },
+  {
+    n: "06",
+    title: "Board it, draw it, spec it",
+    body: "Compose mood boards from your products, convert photos to CAD-style drawings, and download the whole selection as a spec sheet PDF set in this same design language.",
   },
 ];
 
-export default function Tutorial() {
+const Tutorial = () => {
   return (
-    <div className="w-full min-h-screen mt-24 sm:mt-32 md:mt-40 px-4 sm:px-8 md:px-16 lg:px-24 pb-16">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8 sm:mb-12">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
-            How It Works
-          </h1>
-          <p className="text-gray-600 text-base sm:text-lg mt-3">
-            From a single room photo to a finished material spec in a few steps.
-          </p>
-        </div>
-
-        <ol className="space-y-6 sm:space-y-8">
-          {steps.map((step, index) => (
-            <li
-              key={step.title}
-              className="flex gap-4 sm:gap-6 bg-white rounded-2xl p-5 sm:p-6 shadow-sm"
-            >
-              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black text-white flex items-center justify-center font-bold text-lg sm:text-xl">
-                {index + 1}
-              </div>
-              <div>
-                <h2 className="font-bold text-lg sm:text-xl mb-1.5">
-                  {step.title}
-                </h2>
-                <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-                  {step.description}
+    <div className="viz-scope w-full">
+      <div className="px-4 pt-24 pb-24 sm:px-6 sm:pt-32 md:px-8 lg:px-12">
+        {/* Masthead folio: meta line over an ink rule, deck at the baseline */}
+        <header>
+          <Reveal>
+            <div className="flex items-baseline justify-between gap-4 pb-2">
+              <p className="viz-label">DSource Studio</p>
+              <Link
+                href="/ai-material-finder"
+                className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
+              >
+                ← Material finder
+              </Link>
+            </div>
+            <div className="relative pt-5">
+              <span
+                className="viz-rule absolute top-0 left-0 h-0.5 w-full bg-[var(--viz-ink)]"
+                aria-hidden="true"
+              />
+              <span className="viz-dots-rule" aria-hidden="true" />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+                <h1 className="viz-serif text-4xl leading-none sm:text-5xl md:text-[3.6rem]">
+                  How the studio works
+                </h1>
+                <p className="viz-serif max-w-md pb-1 text-base italic text-[var(--viz-muted)] sm:text-lg lg:text-right">
+                  Six steps from the room you have to the one you imagined.
                 </p>
+              </div>
+            </div>
+          </Reveal>
+        </header>
+
+        {/* Steps: ruled document sections */}
+        <ol className="mt-10 max-w-3xl sm:mt-14">
+          {STEPS.map((step) => (
+            <li
+              key={step.n}
+              className="border-b border-[var(--viz-line)] py-6 first:pt-0"
+            >
+              <div className="flex items-baseline gap-4">
+                <span className="viz-mono text-xs font-bold text-[var(--viz-blue)]">
+                  {step.n}
+                </span>
+                <div>
+                  <h2 className="viz-serif text-xl sm:text-2xl">
+                    {step.title}
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--viz-muted)] sm:text-base">
+                    {step.body}
+                  </p>
+                </div>
               </div>
             </li>
           ))}
         </ol>
 
-        <div className="text-center mt-10 sm:mt-14">
+        <div className="mt-10">
           <Link
-            href="/help-center"
-            className="text-gray-900 underline underline-offset-2"
+            href="/ai-visualizer"
+            className="inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3 text-sm text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
           >
-            Need more help? Visit the Help Center
+            Bring a room
           </Link>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Tutorial;

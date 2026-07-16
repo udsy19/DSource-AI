@@ -1,181 +1,645 @@
 import { GoogleGenAI } from "@google/genai";
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
-import {
-  insertCapture,
-  logActivity,
-  requestMeta,
-  touchLastSeen,
-  uploadCaptureImage,
-} from "@/utils/ai-capture";
+import Replicate from "replicate";
 import { requireAuth } from "@/utils/api-auth";
 import {
-  AiResponseError,
-  assertNotBlocked,
-  generateContentWithResilience,
+  callWithRetry,
+  extractJsonResponse,
   getResponseText,
-  parseModelJsonObject,
+  parseImageData,
 } from "@/utils/gemini";
+import { checkRateLimit } from "@/utils/rate-limit";
+import { getModel } from "@/utils/replicate-models";
 import { createClient } from "@/utils/supabase/server";
-
-const IMAGE_MODEL = "gemini-2.5-flash-image";
+import {
+  aspectRatioFromImage,
+  isValidBox,
+  MAX_IMAGE_CHARS,
+  normalizeBaseImage,
+  normalizeProductImages,
+} from "@/utils/visualizer/images";
+import { sanitizeLayers } from "@/utils/visualizer/layers";
+import {
+  getBankProduct,
+  isMaterialBankConfigured,
+} from "@/utils/visualizer/material-bank";
+import { routeTask } from "@/utils/visualizer/model-router";
+import {
+  hasDirectiveParams,
+  validateCadParams,
+  validateMoodboardParams,
+  validateRenderParams,
+} from "@/utils/visualizer/params";
+import { saveRender } from "@/utils/visualizer/persist";
+import {
+  composeCadPrompt,
+  composeMoodboardPrompt,
+  composeReferencePrompt,
+  composeRenderPrompt,
+  composeSwapPrompt,
+  locationHintFromBox,
+  strengthenCadPrompt,
+  strengthenPrompt,
+} from "@/utils/visualizer/prompt-composer";
+import { verifyAdherence, verifyCad } from "@/utils/visualizer/verify";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENAI_API_KEY,
 });
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB, matches client limit
+// useFileOutput: false → run() returns plain URL strings instead of FileOutput
+// streams, which we can fetch and re-encode uniformly.
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+  useFileOutput: false,
+});
+
 const MAX_PROMPT_LENGTH = 2000;
+const RATE_LIMIT = { windowMs: 60_000, max: 10 };
+const REPLICATE_TIMEOUT_MS = 120_000;
+const MODES = ["render", "moodboard", "cad"];
 
-// Helper function to convert base64 data URL to base64 string and extract mime type
-const parseImageData = (imageData) => {
-  if (!imageData) return null;
+// Dev-only escape hatch for local testing without a login.
+// Hard-disabled in production builds; enabled only via .env.local flag.
+const DEV_BYPASS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.DEV_AUTH_BYPASS === "true";
 
-  // If it's already a base64 string without data URL prefix
-  if (!imageData.includes(",")) {
-    return { data: imageData, mimeType: "image/png" };
+// Topic guard + adherence verification depend on Gemini, not on auth — run
+// them whenever a real-looking key is configured, bypass or not.
+const GEMINI_READY = Boolean(
+  process.env.GOOGLE_GENAI_API_KEY?.startsWith("AIza"),
+);
+
+// Normalize the many shapes replicate.run() can return into a single URL string.
+const toImageUrl = (output) => {
+  const first = Array.isArray(output) ? output[0] : output;
+  if (!first) return null;
+  if (typeof first === "string") return first;
+  if (typeof first.url === "string") return first.url;
+  if (typeof first.url === "function") return String(first.url());
+  return null;
+};
+
+// Translate a generation/runtime failure into a user-safe response.
+const mapGenerationError = (error) => {
+  const status = error?.status ?? error?.code ?? error?.response?.status;
+  const message = String(error?.message ?? "").toLowerCase();
+
+  if (
+    message.includes("safety") ||
+    message.includes("blocked") ||
+    message.includes("prohibited") ||
+    message.includes("flagged")
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "This request was blocked by the content safety filter. Try rephrasing your prompt.",
+      },
+      { status: 400 },
+    );
   }
 
-  // Extract mime type and base64 data from data URL
-  const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
-  if (matches) {
+  if (
+    status === 429 ||
+    message.includes("quota") ||
+    message.includes("rate limit")
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "The image service is busy right now. Please try again in a moment.",
+      },
+      { status: 503 },
+    );
+  }
+
+  if (message.includes("timed out") || message.includes("timeout")) {
+    return NextResponse.json(
+      { success: false, error: "The request took too long. Please try again." },
+      { status: 504 },
+    );
+  }
+
+  return NextResponse.json(
+    { success: false, error: "Failed to generate image. Please try again." },
+    { status: 500 },
+  );
+};
+
+// --- Generation backends ---------------------------------------------------
+
+const generateWithGemini = async (instruction, images, seed) => {
+  const contents = [
+    ...images.map((img) => {
+      const parsed = parseImageData(img);
+      return {
+        inlineData: { data: parsed.data, mimeType: parsed.mimeType },
+      };
+    }),
+    { text: instruction },
+  ];
+
+  const imageResponse = await callWithRetry(
+    () =>
+      ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents,
+        ...(seed !== undefined ? { config: { seed } } : {}),
+      }),
+    { label: "Image generation", timeoutMs: 60_000 },
+  );
+
+  const candidateParts =
+    imageResponse?.candidates?.[0]?.content?.parts ??
+    imageResponse?.parts ??
+    [];
+  for (const part of candidateParts) {
+    if (part.inlineData) {
+      return {
+        image: part.inlineData.data,
+        mimeType: part.inlineData.mimeType || "image/png",
+      };
+    }
+  }
+  return null;
+};
+
+const generateWithReplicate = async (
+  modelConfig,
+  instruction,
+  images,
+  opts,
+) => {
+  const input = modelConfig.buildInput(instruction, images[0] ?? null, {
+    ...opts,
+    images,
+  });
+  const output = await callWithRetry(
+    () => replicate.run(modelConfig.slug, { input }),
+    {
+      label: `${modelConfig.label} generation`,
+      timeoutMs: REPLICATE_TIMEOUT_MS,
+    },
+  );
+
+  const url = toImageUrl(output);
+  if (!url) return null;
+
+  const downloaded = await fetch(url);
+  if (!downloaded.ok) {
+    throw new Error(
+      `Failed to download generated image (${downloaded.status})`,
+    );
+  }
+  const arrayBuffer = await downloaded.arrayBuffer();
+  return {
+    image: Buffer.from(arrayBuffer).toString("base64"),
+    mimeType: downloaded.headers.get("content-type") || "image/png",
+  };
+};
+
+const generateOnce = (modelConfig, instruction, images, opts = {}) =>
+  modelConfig.provider === "gemini"
+    ? generateWithGemini(instruction, images, opts.seed)
+    : generateWithReplicate(modelConfig, instruction, images, opts);
+
+// --- Topic guard -----------------------------------------------------------
+
+/**
+ * Checks a free-text prompt is interior/architecture related. Only runs when
+ * the user actually typed one — params-only requests are intrinsically
+ * on-topic. Fail-open: a guard outage must not block generation.
+ */
+const runTopicGuard = async (prompt) => {
+  const guardPrompt = `
+    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, mood boards for interior projects, or similar architectural contexts.
+
+    Prompt: "${prompt}"
+
+    Respond with pure JSON:
+    { "isValid": boolean, "confidence": number, "reasoning": string }
+  `;
+
+  try {
+    const response = await callWithRetry(
+      () =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          // Yes/no classification — no chain-of-thought needed; a zero
+          // thinking budget cuts the call from ~2.4s to well under 1s.
+          config: { thinkingConfig: { thinkingBudget: 0 } },
+          contents: [{ text: guardPrompt }],
+        }),
+      { label: "Prompt validation", timeoutMs: 15_000, retries: 0 },
+    );
+    const result = extractJsonResponse(await getResponseText(response));
     return {
-      data: matches[2],
-      mimeType: matches[1] || "image/png",
+      allowed: Boolean(result.isValid) && result.confidence >= 0.5,
+      notice: null,
+    };
+  } catch (error) {
+    console.error("Topic guard skipped:", error.message);
+    return { allowed: true, notice: "Prompt topic check was unavailable." };
+  }
+};
+
+// --- Per-mode request preparation -------------------------------------------
+// Each prepares: input images, composed instruction, verify + strengthen fns.
+// Returns { error, status } on invalid input.
+
+const prepareRender = async (body, prompt) => {
+  if (!body.image || typeof body.image !== "string") {
+    return {
+      error: "Upload a room photo first — every model edits your image.",
+      status: 400,
+    };
+  }
+  const normalized = await normalizeBaseImage(body.image);
+  if (!normalized.image) return { error: normalized.error, status: 400 };
+
+  const validation = validateRenderParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
+
+  // Swap-into-render: fuse a real catalog product into the room. The client
+  // sends only the product id — the canonical image URL is resolved
+  // server-side from the material bank (no client-supplied URLs).
+  if (body.swap && typeof body.swap === "object") {
+    if (!isMaterialBankConfigured()) {
+      return {
+        error: "Product swap requires the material bank connection.",
+        status: 503,
+      };
+    }
+    const productId = Number(body.swap.productId);
+    if (!Number.isFinite(productId)) {
+      return { error: "Invalid product for swap.", status: 400 };
+    }
+    const product = await getBankProduct(productId);
+    if (!product) {
+      return {
+        error: "That product is no longer available in the material bank.",
+        status: 404,
+      };
+    }
+    const productImageRes = await fetch(product.imageUrl);
+    if (!productImageRes.ok) {
+      return {
+        error: "The product's photo could not be loaded — try another match.",
+        status: 502,
+      };
+    }
+    const productBuffer = Buffer.from(await productImageRes.arrayBuffer());
+    const productImage = `data:${
+      productImageRes.headers.get("content-type") || "image/jpeg"
+    };base64,${productBuffer.toString("base64")}`;
+
+    const componentLabel =
+      typeof body.swap.label === "string" ? body.swap.label.slice(0, 60) : null;
+    const locationHint = isValidBox(body.swap.box)
+      ? locationHintFromBox(body.swap.box)
+      : null;
+
+    const composeInput = {
+      productName: product.title,
+      componentLabel,
+      locationHint,
+      prompt,
+    };
+    // Multi-input models can't "match_input_image" unambiguously — compute
+    // the room's aspect explicitly (this caused the cropped-swap bug).
+    const aspectRatio = await aspectRatioFromImage(
+      normalized.image,
+      getModel("seedream-4")?.aspectRatios ?? [],
+    );
+    return {
+      task: "swap",
+      params: { ...params, swapProductId: productId },
+      // Order contract (A/B tested): product FIRST, room LAST — the model
+      // treats the last image as the canvas to edit.
+      images: [productImage, normalized.image],
+      requiresImage: true,
+      requiresMultiImage: true,
+      io: aspectRatio ? { aspectRatio } : {},
+      instruction: composeSwapPrompt(composeInput).instruction,
+      // Style params don't apply to a swap; skip param verification.
+      verify: async () => ({ checked: [], failures: [], skipped: false }),
+      strengthen: () => composeSwapPrompt(composeInput).instruction,
     };
   }
 
-  // If it's just base64 data
-  return { data: imageData, mimeType: "image/png" };
+  if (!prompt && !hasDirectiveParams(params)) {
+    return {
+      error:
+        "Describe a change or set at least one parameter (style, lighting, space, or palette).",
+      status: 400,
+    };
+  }
+
+  // Reference-guided render: the user attached an inspiration image to their
+  // words ("add the flooring from this image"). Data URIs only — same intake
+  // contract as the room photo.
+  if (body.referenceImage && typeof body.referenceImage === "string") {
+    if (body.referenceImage.length > MAX_IMAGE_CHARS) {
+      return {
+        error: "The reference image is too large (max 10MB).",
+        status: 413,
+      };
+    }
+    const reference = await normalizeBaseImage(body.referenceImage);
+    if (!reference.image) return { error: reference.error, status: 400 };
+
+    const composeInput = { prompt, params };
+    const aspectRatio = await aspectRatioFromImage(
+      normalized.image,
+      getModel("seedream-4")?.aspectRatios ?? [],
+    );
+    return {
+      task: "reference",
+      params,
+      // Order contract (same as swap): reference FIRST, room LAST — the
+      // multi-image editor treats the last image as the canvas.
+      images: [reference.image, normalized.image],
+      requiresImage: true,
+      requiresMultiImage: true,
+      io: aspectRatio ? { aspectRatio } : {},
+      instruction: composeReferencePrompt(composeInput).instruction,
+      verify: (image) => verifyAdherence(ai, image, params),
+      strengthen: (failures) =>
+        strengthenPrompt(
+          composeInput,
+          failures.map((f) => f.param),
+          composeReferencePrompt,
+        ),
+    };
+  }
+
+  const composeInput = { prompt, params };
+  return {
+    task: "render",
+    params,
+    images: [normalized.image],
+    requiresImage: true,
+    instruction: composeRenderPrompt(composeInput).instruction,
+    verify: (image) => verifyAdherence(ai, image, params),
+    strengthen: (failures) =>
+      strengthenPrompt(
+        composeInput,
+        failures.map((f) => f.param),
+      ),
+  };
 };
 
-export async function POST(request) {
-  const startedAt = Date.now();
-  const { ip, userAgent } = requestMeta(request);
-  let user = null;
-  let supabase = null;
-  let inputBuffer = null;
-  let inputMime = null;
-  let params = null;
-  let enhancedPromptFinal = null;
+const prepareMoodboard = async (body, prompt, notices) => {
+  const validation = validateMoodboardParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
 
-  // Schedules best-effort capture (event + designs) AFTER the response is sent.
-  const scheduleCapture = ({ status, errorCode = null, outputs = [] }) =>
-    after(async () => {
-      if (!user || !supabase) return;
-      let inputImagePath = null;
-      if (inputBuffer) {
-        inputImagePath = await uploadCaptureImage(
-          supabase,
-          "room-uploads",
-          user.id,
-          inputBuffer,
-          inputMime,
-        );
-        if (inputImagePath) {
-          await insertCapture(supabase, "room_uploads", {
-            user_id: user.id,
-            storage_path: inputImagePath,
-            mime_type: inputMime,
-            size_bytes: inputBuffer.length,
-            source: "visualizer",
-          });
-        }
-      }
-      const eventId = await insertCapture(supabase, "ai_generation_events", {
-        user_id: user.id,
-        model: IMAGE_MODEL,
-        prompt: params?.prompt ?? null,
-        enhanced_prompt: enhancedPromptFinal,
-        space_type: params?.spaceType ?? null,
-        style: params?.style ?? null,
-        lighting: params?.lighting ?? null,
-        color_palette: params?.colorPalette ?? null,
-        input_image_path: inputImagePath,
-        status,
-        error_code: errorCode,
-        latency_ms: Date.now() - startedAt,
-        ip,
-        user_agent: userAgent,
-      });
-      for (const out of outputs) {
-        const buffer = Buffer.from(out.image, "base64");
-        const path = await uploadCaptureImage(
-          supabase,
-          "generated-designs",
-          user.id,
-          buffer,
-          out.mimeType,
-        );
-        if (path) {
-          await insertCapture(supabase, "generated_designs", {
-            user_id: user.id,
-            generation_event_id: eventId,
-            storage_path: path,
-            prompt: params?.prompt ?? null,
-            source_image_path: inputImagePath,
-          });
-        }
-      }
-      await logActivity(supabase, user.id, "ai_generate", { ip, userAgent });
-      await touchLastSeen(supabase, user.id);
-    });
+  let inspiration = null;
+  if (body.image && typeof body.image === "string") {
+    const normalized = await normalizeBaseImage(body.image);
+    if (!normalized.image) return { error: normalized.error, status: 400 };
+    inspiration = normalized.image;
+  }
+
+  const { images: productImages, errors: productErrors } =
+    await normalizeProductImages(body.products);
+  notices.push(...productErrors);
+
+  if (
+    !prompt &&
+    !hasDirectiveParams(params) &&
+    !inspiration &&
+    productImages.length === 0
+  ) {
+    return {
+      error:
+        "Add products, upload an inspiration photo, or set at least one parameter to generate a mood board.",
+      status: 400,
+    };
+  }
+
+  // Order contract with the composer: inspiration first, then products.
+  const images = [...(inspiration ? [inspiration] : []), ...productImages];
+  const composeInput = {
+    prompt,
+    params,
+    productCount: productImages.length,
+    hasInspiration: Boolean(inspiration),
+  };
+
+  return {
+    task: "moodboard",
+    params,
+    images,
+    requiresImage: false,
+    requiresMultiImage: true,
+    io: { aspectRatio: params.aspectRatio },
+    instruction: composeMoodboardPrompt(composeInput).instruction,
+    verify: (image) => verifyAdherence(ai, image, params),
+    strengthen: (failures) =>
+      strengthenPrompt(
+        composeInput,
+        failures.map((f) => f.param),
+        composeMoodboardPrompt,
+      ),
+  };
+};
+
+const prepareCad = async (body, prompt) => {
+  if (!body.image || typeof body.image !== "string") {
+    return {
+      error: "Upload a photo or floor plan to convert to CAD.",
+      status: 400,
+    };
+  }
+  const normalized = await normalizeBaseImage(body.image);
+  if (!normalized.image) return { error: normalized.error, status: 400 };
+
+  const validation = validateCadParams(body.params);
+  if (!validation.ok) {
+    return { error: validation.errors.join(" "), status: 400 };
+  }
+  const params = validation.params;
+  const composeInput = { prompt, params };
+
+  return {
+    task: "cad",
+    params,
+    images: [normalized.image],
+    requiresImage: true,
+    instruction: composeCadPrompt(composeInput).instruction,
+    verify: (image) => verifyCad(ai, image, params.view),
+    strengthen: () => strengthenCadPrompt(composeInput),
+  };
+};
+
+const PREPARERS = {
+  render: prepareRender,
+  moodboard: prepareMoodboard,
+  cad: prepareCad,
+};
+
+// --- Route -----------------------------------------------------------------
+
+export async function POST(request) {
+  // Stage timing: one structured log line per request so slow renders can be
+  // attributed to a specific hop (auth / prepare / guard / generate / verify /
+  // retry / persist) instead of guessed at.
+  const t0 = Date.now();
+  let tPrev = t0;
+  const timings = {};
+  const mark = (stage) => {
+    const now = Date.now();
+    timings[stage] = now - tPrev;
+    tPrev = now;
+  };
+
+  // Step 0: Require an authenticated user (also keys rate limiting).
+  let user;
+  if (DEV_BYPASS) {
+    console.warn(
+      "[generate-image] DEV_AUTH_BYPASS active — auth & topic guard skipped",
+    );
+    user = { id: "dev-bypass" };
+  } else {
+    try {
+      user = await requireAuth();
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  const limit = checkRateLimit(`generate-image:${user.id}`, RATE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment and try again." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const mode = typeof body.mode === "string" ? body.mode : "render";
+  if (!MODES.includes(mode)) {
+    return NextResponse.json({ error: "Unknown mode." }, { status: 400 });
+  }
+
+  const prompt =
+    typeof body.prompt === "string" && body.prompt.trim().length > 0
+      ? body.prompt.trim()
+      : null;
+  if (prompt && prompt.length > MAX_PROMPT_LENGTH) {
+    return NextResponse.json(
+      { error: `Prompt is too long (max ${MAX_PROMPT_LENGTH} characters).` },
+      { status: 400 },
+    );
+  }
+  if (typeof body.image === "string" && body.image.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json(
+      { error: "Image is too large. Please use an image under 10MB." },
+      { status: 413 },
+    );
+  }
+
+  const notices = [];
+  mark("auth+parse");
 
   try {
-    user = await requireAuth();
-    const cookieStore = await cookies();
-    supabase = await createClient(cookieStore);
-
-    const body = await request.json();
-    const { prompt, spaceType, style, lighting, colorPalette, image } = body;
-    params = { prompt, spaceType, style, lighting, colorPalette };
-
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
+    const prepared = await PREPARERS[mode](body, prompt, notices);
+    mark("prepare");
+    if (prepared.error) {
       return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 },
+        { error: prepared.error },
+        { status: prepared.status ?? 400 },
       );
     }
 
-    if (prompt.length > MAX_PROMPT_LENGTH) {
+    // --- Model resolution: the router decides per task; body.model is an
+    // undocumented override kept for internal testing only. ---
+    const route = routeTask(prepared.task);
+    let modelKey = route.modelKey;
+    let modelConfig = route.model;
+    if (typeof body.model === "string" && body.model && getModel(body.model)) {
+      modelKey = body.model;
+      modelConfig = getModel(body.model);
+    }
+    if (prepared.requiresMultiImage && !modelConfig.multiImage) {
       return NextResponse.json(
-        { error: `Prompt must be ${MAX_PROMPT_LENGTH} characters or fewer.` },
+        { error: "This task needs a model that can combine multiple images." },
         { status: 400 },
       );
     }
-
-    // Step 1: Validate if prompt is related to interior design/architecture
-    const validationPrompt = `
-    Analyze this text prompt and determine if it is related to interior redesign, architecture, home improvement, construction, floor layouts, room remodeling, furniture arrangement, lighting redesign, or similar architectural contexts.
-    
-    Prompt: "${prompt}"
-    
-    Respond with a JSON object containing:
-    {
-      "isValid": boolean,
-      "confidence": number (0-1),
-      "category": string (if valid, what category it falls into),
-      "reasoning": string
+    if (modelConfig.provider === "replicate") {
+      if (!modelConfig.slug) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `The ${modelConfig.label} model isn't configured yet.`,
+          },
+          { status: 503 },
+        );
+      }
+      if (!process.env.REPLICATE_API_TOKEN) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Image generation is not configured. Please contact support.",
+          },
+          { status: 500 },
+        );
+      }
     }
-    `;
 
-    const validationResponse = await generateContentWithResilience(ai, {
-      model: "gemini-2.5-flash",
-      contents: [{ text: validationPrompt }],
-    });
+    // "Different renders every time" off → fixed seed (models that support it).
+    const seed =
+      body.variedSeed === false && modelConfig.supportsSeed ? 42 : undefined;
+    // IO policy: router defaults, then task-specific values from the preparer.
+    const generateOpts = { seed, ...route.io, ...(prepared.io ?? {}) };
 
-    assertNotBlocked(
-      validationResponse,
-      "Your request couldn't be processed. Please rephrase and try again.",
-    );
+    // --- Generate, with the topic guard racing alongside ---
+    // The guard (typed prompts only; params are whitelisted enums) used to
+    // gate generation serially, adding its full latency to every prompted
+    // render. Running it concurrently hides that cost; on the rare rejection
+    // the generated image is simply discarded.
+    const guardPromise =
+      prompt && GEMINI_READY
+        ? runTopicGuard(prompt)
+        : Promise.resolve({ allowed: true, notice: null });
+    const [result0, guard] = await Promise.all([
+      generateOnce(
+        modelConfig,
+        prepared.instruction,
+        prepared.images,
+        generateOpts,
+      ),
+      guardPromise,
+    ]);
+    let result = result0;
+    mark("generate+guard");
 
-    const validationResult = parseModelJsonObject(
-      await getResponseText(validationResponse),
-      "We couldn't interpret your request. Please rephrase and try again.",
-    );
-
-    if (!validationResult.isValid || validationResult.confidence < 0.5) {
-      scheduleCapture({ status: "rejected" });
+    if (guard.notice) notices.push(guard.notice);
+    if (!guard.allowed) {
       return NextResponse.json(
         {
           success: false,
@@ -186,152 +650,125 @@ export async function POST(request) {
       );
     }
 
-    // Step 2: Build enhanced prompt with context
-    let enhancedPrompt = prompt;
-
-    if (spaceType) {
-      enhancedPrompt = `${spaceType} space: ${enhancedPrompt}`;
-    }
-
-    if (style) {
-      enhancedPrompt = `${enhancedPrompt}, ${style} style`;
-    }
-
-    if (lighting) {
-      enhancedPrompt = `${enhancedPrompt}, with ${lighting} lighting`;
-    }
-
-    if (colorPalette) {
-      enhancedPrompt = `${enhancedPrompt}, using ${colorPalette} color palette`;
-    }
-
-    // Add quality modifiers for better results
-    enhancedPrompt = `High-quality architectural visualization: ${enhancedPrompt}. Professional interior design rendering, photorealistic, detailed, 4K quality.`;
-
-    // Step 3: Prepare contents for image generation
-    const contents = [];
-
-    // If image is provided, add it first for image editing
-    if (image) {
-      const imageData = parseImageData(image);
-      if (imageData) {
-        const decoded = Buffer.from(imageData.data, "base64");
-        if (decoded.length > MAX_IMAGE_BYTES) {
-          return NextResponse.json(
-            { error: "Image is too large. Maximum size is 10 MB." },
-            { status: 413 },
-          );
-        }
-        inputBuffer = decoded;
-        inputMime = imageData.mimeType;
-        contents.push({
-          inlineData: {
-            data: imageData.data,
-            mimeType: imageData.mimeType,
-          },
-        });
-        // Adjust prompt for image editing
-        enhancedPrompt = `Edit this image: ${enhancedPrompt}`;
-      }
-    }
-
-    // Add the text prompt
-    contents.push({ text: enhancedPrompt });
-    enhancedPromptFinal = enhancedPrompt;
-
-    // Step 4: Generate image using Gemini 2.5 Flash Image model
-    const imageResponse = await generateContentWithResilience(ai, {
-      model: "gemini-2.5-flash-image",
-      contents: contents,
-    });
-
-    assertNotBlocked(
-      imageResponse,
-      "This content couldn't be processed. Please adjust your request and try again.",
-    );
-
-    // Step 5: Extract generated image from response
-    const images = [];
-    let responseText = null;
-
-    // Handle different response structures
-    if (imageResponse.candidates && imageResponse.candidates.length > 0) {
-      const candidate = imageResponse.candidates[0];
-      if (candidate.content && candidate.content.parts) {
-        for (const part of candidate.content.parts) {
-          if (part.text) {
-            responseText = part.text;
-          } else if (part.inlineData) {
-            const imageData = part.inlineData.data;
-            const mimeType = part.inlineData.mimeType || "image/png";
-            images.push({
-              image: imageData,
-              mimeType: mimeType,
-            });
-          }
-        }
-      }
-    } else if (imageResponse.parts) {
-      // Alternative response structure
-      for (const part of imageResponse.parts) {
-        if (part.text) {
-          responseText = part.text;
-        } else if (part.inlineData) {
-          const imageData = part.inlineData.data;
-          const mimeType = part.inlineData.mimeType || "image/png";
-          images.push({
-            image: imageData,
-            mimeType: mimeType,
-          });
-        }
-      }
-    }
-
-    if (images.length === 0) {
-      console.error("No images generated in generate-image response");
-      scheduleCapture({ status: "error", errorCode: "no_image" });
+    if (!result) {
       return NextResponse.json(
         {
           success: false,
           error:
             "No image was generated. Please try again with a different prompt.",
         },
-        { status: 500 },
+        { status: 502 },
       );
     }
 
-    scheduleCapture({ status: "success", outputs: images });
+    // --- Verify adherence, retry once with strengthened directives ---
+    let adherence = {
+      checked: [],
+      failures: [],
+      skipped: false,
+      retried: false,
+    };
+    if (GEMINI_READY) {
+      const check = await prepared.verify({
+        data: result.image,
+        mimeType: result.mimeType,
+      });
+      mark("verify");
+      adherence = { ...check, retried: false };
+
+      if (check.failures.length > 0) {
+        try {
+          const retryResult = await generateOnce(
+            modelConfig,
+            prepared.strengthen(check.failures),
+            prepared.images,
+            generateOpts,
+          );
+          if (retryResult) {
+            const recheck = await prepared.verify({
+              data: retryResult.image,
+              mimeType: retryResult.mimeType,
+            });
+            // Keep the retry only if it did not get worse.
+            if (
+              recheck.skipped ||
+              recheck.failures.length <= check.failures.length
+            ) {
+              result = retryResult;
+              adherence = { ...recheck, retried: true };
+            }
+          }
+        } catch (retryError) {
+          // Retry is best-effort; deliver the first result.
+          console.error("Adherence retry failed:", retryError.message);
+        }
+        mark("adherenceRetry");
+        if (adherence.failures.length > 0 && !adherence.skipped) {
+          notices.push(
+            `The model may not have fully applied: ${adherence.failures
+              .map((f) => `${f.param} (${f.expected})`)
+              .join(", ")}.`,
+          );
+        }
+      }
+    }
+
+    // --- Persist to history (best-effort, after the response is sent) ---
+    // The upload + insert used to cost ~1.6s of user-visible latency for a
+    // fire-and-forget write. The id is minted here so the client gets it
+    // immediately; after() runs the save once the response has flushed.
+    // (cookies() is captured now — request APIs aren't available inside after.)
+    let renderId = null;
+    if (DEV_BYPASS) {
+      notices.push("History is not saved in dev bypass mode.");
+    } else {
+      renderId = crypto.randomUUID();
+      const savedImage = result.image;
+      const savedMime = result.mimeType;
+      const savedAdherence = adherence;
+      const cookieStore = await cookies();
+      after(async () => {
+        try {
+          const supabase = await createClient(cookieStore);
+          await saveRender(supabase, user.id, {
+            renderId,
+            imageBase64: savedImage,
+            mimeType: savedMime,
+            model: modelKey,
+            prompt,
+            composedPrompt: prepared.instruction,
+            params: prepared.params,
+            adherence: savedAdherence,
+            mode,
+            layers: sanitizeLayers(body.layers),
+          });
+        } catch (persistError) {
+          console.error("Render persistence failed:", persistError.message);
+        }
+      });
+    }
+    mark("persist");
+    console.log(
+      `[generate-image] mode=${mode} model=${modelKey} total=${
+        Date.now() - t0
+      }ms stages=${JSON.stringify(timings)}`,
+    );
 
     return NextResponse.json(
       {
         success: true,
-        images: images,
-        text: responseText,
-        enhancedPrompt,
+        images: [result],
+        model: modelConfig.label,
+        mode,
+        composedPrompt: prepared.instruction,
+        adherence,
+        renderId,
+        notices,
       },
       { status: 200 },
     );
   } catch (error) {
-    scheduleCapture({
-      status: error instanceof AiResponseError ? "blocked" : "error",
-      errorCode: error?.code ?? error?.name ?? null,
-    });
-    if (error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    if (error instanceof AiResponseError) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.status },
-      );
-    }
     console.error("Error in generate-image endpoint:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to process image generation request",
-      },
-      { status: 500 },
-    );
+    return mapGenerationError(error);
   }
 }

@@ -1,44 +1,12 @@
 @import "tailwindcss";
 
 body {
-  font-family: "Inter", sans-serif;
-}
-
-#banner-image {
-  background-image: url("../../public/material-finder-images/Serene Modernist Haven.png");
-  background-size: cover;
-  background-position: center;
-}
-
-
-#popular-1 {
-  background-image: url("../../public/popular-1.jpg");
-  background-size: cover;
-  background-position: center;
-}
-
-#popular-2 {
-  background-image: url("../../public/popular-2.jpg");
-  background-size: cover;
-  background-position: center;
-}
-
-#popular-3 {
-  background-image: url("../../public/material-finder-images/Frame 86.png");
-  background-size: cover;
-  background-position: center;
-}
-
-#popular-4 {
-  background-image: url("../../public/popular-4.jpg");
-  background-size: cover;
-  background-position: center;
-}
-
-#popular-5 {
-  background-image: url("../../public/material-finder-images/Frame 90.png");
-  background-size: cover;
-  background-position: center;
+  /* Bricolage Grotesque via next/font — the old "Inter" declaration was
+     never loaded and silently fell back to the system font. */
+  font-family: var(--font-sans), sans-serif;
+  /* Paper, never white — full-bleed sections meet the viewport edge and
+     anything that doesn't bleed sits on warm ground instead of a gap. */
+  background-color: var(--viz-paper);
 }
 
 .mask1 {
@@ -48,65 +16,355 @@ body {
   mask-size: contain;
 }
 
-#modern-minimalist-view-materials {
-  background-image: url("../../public/material-finder-images/Frame 41022.png");
-  background-size: cover;
-  background-position: center;
+/* ---- "Atelier" design tokens ----
+   Gallery warmth with print-craft details: greige paper with grain,
+   editorial serif for the promise moments, one dark lightbox well so
+   renders read true, indigo (the dye) for everything interactive.
+   Tokens live on :root so the header/footer can share them; .viz-scope
+   opts a region into atelier text color. */
+:root {
+  --viz-ground: #eeebe2;
+  --viz-paper: #fbf9f4;
+  --viz-ink: #26221a;
+  --viz-muted: #77705f;
+  --viz-line: #d9d2c2;
+  --viz-well: #2a261e;
+  --viz-blue: #35418c;
+  --viz-blue-deep: #2a3470;
 }
 
-
-#made-with-dsource-1 {
-  background-image: url("../../public/material-finder-images/DS 001.png");
-  background-size: cover;
-  background-position: center;
+.viz-scope {
+  color: var(--viz-ink);
 }
 
-#made-with-dsource-2 {
-  background-image: url("../../public/material-finder-images/DS 006.png");
-  background-size: cover;
-  background-position: center;
+.viz-scope :focus-visible {
+  outline: 2px solid var(--viz-blue);
+  outline-offset: 2px;
 }
 
-#made-with-dsource-3 {
-  background-image: url("../../public/material-finder-images/Frame 99.png");
-  background-size: cover;
-  background-position: center;
+.viz-serif {
+  font-family: var(--font-caslon), Georgia, serif;
 }
 
-#made-with-dsource-4 {
-  background-image: url("../../public/material-finder-images/Frame 96.png");
-  background-size: cover;
-  background-position: center;
+.viz-mono {
+  font-family: var(--font-geist-mono), monospace;
 }
 
-#made-with-dsource-5 {
-  background-image: url("../../public/made-5.jpg");
-  background-size: cover;
-  background-position: center;
+/* Paper grain on the board ground — felt more than seen. */
+.viz-grain {
+  background-color: var(--viz-ground);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.055'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-#made-with-dsource-6 {
-  background-image: url("../../public/made-6.avif");
-  background-size: cover;
-  background-position: center;
+/* Halftone drift off the masthead rule — densest where it meets the rule's
+   right end, dissolving down and left like ink leaving a plate edge. */
+.viz-dots-rule {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 38%;
+  height: 32px;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--viz-ink) 32%, transparent) 1px,
+    transparent 1.3px
+  );
+  background-size: 7px 7px;
+  mask-image: linear-gradient(to bottom left, rgb(0 0 0 / 0.9), transparent 70%);
 }
 
-#made-with-dsource-7 {
-  background-image: url("../../public/made-7.avif");
-  background-size: cover;
-  background-position: center;
+/* Light-on-dark variant for ink surfaces (footer band). */
+.viz-dots-light {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--viz-paper) 30%, transparent) 1px,
+    transparent 1.3px
+  );
+  background-size: 7px 7px;
+  mask-image: linear-gradient(
+    to bottom right,
+    rgb(0 0 0 / 0.9),
+    transparent 72%
+  );
 }
 
-#footer {
-  background-image: url("../../public/material-finder-images/section.png");
-  background-size: cover;
-  background-position: center;
+/* Registration marks at the corners of the canvas plate. */
+.viz-crop {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 0 solid color-mix(in srgb, var(--viz-ink) 45%, var(--viz-ground));
+  pointer-events: none;
 }
 
-#ai-material-finder-image {
-  background-image: url("../../public/ai-material-finder.avif");
-  background-size: cover;
-  background-position: center;
+.viz-crop-tl {
+  top: -9px;
+  left: -9px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.viz-crop-tr {
+  top: -9px;
+  right: -9px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.viz-crop-bl {
+  bottom: -9px;
+  left: -9px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.viz-crop-br {
+  bottom: -9px;
+  right: -9px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+/* A fresh image "develops" onto the plate in discrete print-like steps,
+   with a halftone screen that clears as it resolves. */
+@keyframes viz-develop-img {
+  from {
+    opacity: 0.15;
+    filter: contrast(1.5) saturate(0.4);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes viz-develop-screen {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.viz-develop {
+  animation: viz-develop-img 650ms steps(6, end);
+}
+
+.viz-develop-screen {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    var(--viz-well) 1.1px,
+    transparent 1.4px
+  );
+  background-size: 5px 5px;
+  opacity: 0;
+  animation: viz-develop-screen 650ms steps(6, end);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-develop,
+  .viz-develop-screen {
+    animation: none;
+  }
+}
+
+/* Engravings draw themselves in on load. The dash constant exceeds the
+   longest path (~1440 user units), so offset 1600 → 0 sweeps every stroke
+   in; short detail strokes resolve first, long walls last. Paths with
+   their own dash pattern (dotted floor lines) are left alone. */
+@keyframes viz-draw {
+  from {
+    stroke-dashoffset: 1600px;
+  }
+}
+
+.viz-draw-paths path:not([stroke-dasharray]),
+.viz-draw-paths rect {
+  stroke-dasharray: 1600px;
+  animation: viz-draw 1.7s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+/* Scroll-reveal: sections rise in once; the ink rule plots across. */
+.viz-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 0.7, 0.3, 1),
+    transform 0.7s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+.viz-reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+.viz-reveal .viz-rule {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.9s cubic-bezier(0.22, 0.7, 0.3, 1) 0.15s;
+}
+
+.viz-reveal-in .viz-rule {
+  transform: scaleX(1);
+}
+
+/* Route transitions: each page settles in like a fresh sheet.
+   Opacity only — a transform here would make this wrapper the containing
+   block for fixed/pinned descendants and break ScrollTrigger pins. */
+@keyframes viz-page-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+.viz-page-enter {
+  animation: viz-page-enter 450ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+/* Halftone fields drift almost imperceptibly on ink surfaces. */
+@keyframes viz-dots-drift {
+  to {
+    background-position: 140px 70px;
+  }
+}
+
+.viz-dots-drift {
+  animation: viz-dots-drift 60s linear infinite;
+}
+
+/* A title-block value ticks indigo when it changes. */
+@keyframes viz-value-tick {
+  from {
+    color: var(--viz-blue);
+  }
+}
+
+.viz-value-tick {
+  animation: viz-value-tick 0.7s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-draw-paths path,
+  .viz-draw-paths rect,
+  .viz-page-enter,
+  .viz-dots-drift,
+  .viz-value-tick {
+    animation: none;
+  }
+
+  .viz-reveal,
+  .viz-reveal .viz-rule {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Material-finder detection scan: a soft light bar sweeps the room once. */
+@keyframes mf-scan {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(430%);
+  }
+}
+
+.mf-scan {
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 252, 240, 0.28),
+    transparent
+  );
+  animation: mf-scan 1.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-scan {
+    display: none;
+  }
+}
+
+/* Tab panels ease in when shown — display:none → visible replays this. */
+@keyframes viz-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.viz-tab-enter {
+  animation: viz-tab-enter 380ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-tab-enter {
+    animation: none;
+  }
+}
+
+/* Primary actions speak the spec-sheet voice: mono caps, tracked. */
+.viz-btn {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* Spec-sheet field label: mono, small caps, muted. */
+.viz-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--viz-muted);
+}
+
+.viz-panel {
+  background: var(--viz-paper);
+  border: 1px solid var(--viz-line);
+  border-radius: 1rem;
+}
+
+.viz-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2321201c' stroke-width='1.5'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.9rem;
+  padding-right: 2rem;
+}
+
+/* Plotter scan line shown while a render is in flight. */
+@keyframes viz-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.viz-scan {
+  animation: viz-scan 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-scan {
+    animation: none;
+  }
 }
 
 /* Hide scrollbar for webkit browsers */

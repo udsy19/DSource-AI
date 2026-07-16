@@ -1,0 +1,63 @@
+{
+  "dimension_count": 2,
+  "dimensions_with_geometry_block": 2,
+  "insunits": 4,
+  "layers": [
+    "0",
+    "A-ANNO-DIMS",
+    "A-ANNO-TTLB",
+    "A-AREA",
+    "A-DOOR",
+    "A-FLOR-FIXT",
+    "A-GLAZ",
+    "A-ROOM-IDEN",
+    "A-WALL",
+    "A-WALL-PATT",
+    "Defpoints"
+  ],
+  "layouts": ["Model", "SHEET-1"],
+  "modelspace": {
+    "DIMENSION/A-ANNO-DIMS": 2,
+    "HATCH/A-WALL-PATT": 1,
+    "INSERT/A-DOOR": 1,
+    "LINE/A-GLAZ": 3,
+    "LWPOLYLINE/A-AREA": 1,
+    "LWPOLYLINE/A-WALL": 2,
+    "TEXT/A-ROOM-IDEN": 1
+  },
+  "paperspace": {
+    "LWPOLYLINE/A-ANNO-TTLB": 2,
+    "TEXT/A-ANNO-TTLB": 4,
+    "VIEWPORT/VIEWPORTS": 2
+  },
+  "paperspace_viewport": true,
+  "text_styles": [
+    "ARCHTEXT",
+    "LiberationMono",
+    "LiberationMono-Bold",
+    "LiberationMono-BoldItalic",
+    "LiberationMono-Italic",
+    "LiberationSans",
+    "LiberationSans-Bold",
+    "LiberationSans-BoldItalic",
+    "LiberationSans-Italic",
+    "LiberationSerif",
+    "LiberationSerif-Bold",
+    "LiberationSerif-BoldItalic",
+    "LiberationSerif-Italic",
+    "OpenSans",
+    "OpenSans-Bold",
+    "OpenSans-BoldItalic",
+    "OpenSans-ExtraBold",
+    "OpenSans-ExtraBoldItalic",
+    "OpenSans-Italic",
+    "OpenSans-Light",
+    "OpenSans-Light-Italic",
+    "OpenSans-SemiBold",
+    "OpenSans-SemiBoldItalic",
+    "OpenSansCondensed-Bold",
+    "OpenSansCondensed-Italic",
+    "OpenSansCondensed-Light",
+    "Standard"
+  ]
+}

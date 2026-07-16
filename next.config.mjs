@@ -1,28 +1,14 @@
-// Hosts allowed to serve images. Kept in sync with images.remotePatterns
-// below so the CSP img-src matches what next/image will actually load.
-const IMAGE_HOSTS = [
-  "pub-132f3882c2074e84999a9ab982950552.r2.dev",
-  "materialdepotimages.s3.ap-south-1.amazonaws.com",
-  "www.ikea.com",
-  "images.unsplash.com",
-  "ashleyfurniture.scene7.com",
-  "images.thdstatic.com",
-  "www.nfm.com",
-  "cdn-images.article.com",
-  "assets.weimgs.com",
-  "res.cloudinary.com",
-  "assets.wfcdn.com",
-  "cdn.roveconcepts.com",
-  "target.scene7.com",
-];
+import { ALLOWED_IMAGE_HOSTS } from "./src/utils/image-hosts.mjs";
 
 // Starter Content-Security-Policy. This is a pragmatic, report-friendly
 // baseline: 'unsafe-inline' is permitted for scripts/styles because Next.js
 // and Tailwind currently emit inline runtime/styles. TODO: tighten by moving
 // to nonces/hashes and dropping 'unsafe-inline' / 'unsafe-eval'.
+// img-src includes data:/blob: (canvas exports, data-URI previews) plus the
+// shared image-host whitelist so CSP matches what next/image will load.
 const CSP = [
   "default-src 'self'",
-  `img-src 'self' data: blob: ${IMAGE_HOSTS.map((h) => `https://${h}`).join(" ")}`,
+  `img-src 'self' data: blob: ${ALLOWED_IMAGE_HOSTS.map((h) => `https://${h}`).join(" ")}`,
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
@@ -36,6 +22,11 @@ const CSP = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Vendored Caslon TTFs + the brand mark are read via fs at runtime by the
+  // spec-sheet PDF route — trace them into standalone/serverless output.
+  outputFileTracingIncludes: {
+    "/api/spec-pdf": ["./src/assets/fonts/*.ttf", "./src/assets/brand/*.png"],
+  },
   async headers() {
     return [
       {
@@ -57,86 +48,12 @@ const nextConfig = {
     ];
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "pub-132f3882c2074e84999a9ab982950552.r2.dev",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "materialdepotimages.s3.ap-south-1.amazonaws.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.ikea.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "ashleyfurniture.scene7.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "images.thdstatic.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.nfm.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn-images.article.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "assets.weimgs.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "res.cloudinary.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "assets.wfcdn.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn.roveconcepts.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "target.scene7.com",
-        port: "",
-        pathname: "/**",
-      },
-    ],
+    remotePatterns: ALLOWED_IMAGE_HOSTS.map((hostname) => ({
+      protocol: "https",
+      hostname,
+      port: "",
+      pathname: "/**",
+    })),
   },
 };
 

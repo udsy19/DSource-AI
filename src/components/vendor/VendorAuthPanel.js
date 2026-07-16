@@ -1,15 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { mapAuthError, validateEmail } from "@/utils/auth-validation";
 import { createClient } from "@/utils/supabase/client";
 
 const EMAIL_REDIRECT_FALLBACK = "/vendor";
 
 const inputClasses =
-  "w-full rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10";
+  "w-full rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)] px-4 py-3 text-sm text-[var(--viz-ink)] placeholder:text-[var(--viz-muted)]";
+
+const MODES = [
+  { key: "signIn", label: "Sign in" },
+  { key: "signUp", label: "Request access" },
+];
 
 export default function VendorAuthPanel() {
   const router = useRouter();
@@ -31,17 +34,14 @@ export default function VendorAuthPanel() {
     setFeedback(null);
 
     try {
-      const emailCheck = validateEmail(form.email);
-      if (!emailCheck.valid) {
-        setFeedback({ type: "error", message: emailCheck.message });
-        setSubmitting(false);
-        return;
-      }
-      const trimmedEmail = emailCheck.value;
-      const parsedPassword = form.password;
+      const trimmedEmail = form.email.trim().toLowerCase();
+      const parsedPassword = form.password.trim();
 
-      if (!parsedPassword) {
-        setFeedback({ type: "error", message: "Please enter your password." });
+      if (!trimmedEmail || !parsedPassword) {
+        setFeedback({
+          type: "error",
+          message: "Please provide both email and password.",
+        });
         setSubmitting(false);
         return;
       }
@@ -49,13 +49,13 @@ export default function VendorAuthPanel() {
       let response;
       if (mode === "signUp") {
         // A self-service signup must NOT grant the vendor role. Roles are read
-        // only from app_metadata, which is not settable from the client. An
-        // admin grants vendor access via /api/admin/grant-role after review.
+        // only from app_metadata, which is not settable from the client; an
+        // admin grants vendor access after review.
         response = await supabase.auth.signUp({
           email: trimmedEmail,
           password: parsedPassword,
           options: {
-            emailRedirectTo: `${emailRedirect}`,
+            emailRedirectTo: emailRedirect,
           },
         });
       } else {
@@ -66,152 +66,145 @@ export default function VendorAuthPanel() {
       }
 
       if (response.error) {
-        setFeedback({
-          type: "error",
-          message: mapAuthError(response.error).message,
-        });
-        setSubmitting(false);
-        return;
+        throw response.error;
       }
 
       if (mode === "signUp") {
         setFeedback({
           type: "success",
           message:
-            "Thanks for registering. Confirm your email, then an administrator will review your request and provision vendor access before you can upload products.",
+            "Check your inbox to confirm the email address before logging in.",
         });
       } else {
+        // After sign in, refresh the session to get updated user data
+        await supabase.auth.getSession();
         router.refresh();
       }
     } catch (error) {
-      setFeedback({ type: "error", message: mapAuthError(error).message });
+      setFeedback({
+        type: "error",
+        message: error?.message ?? "Something went wrong. Please try again.",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white/80 p-8 shadow-sm backdrop-blur-sm">
-      <div className="mb-8 space-y-2">
-        <p className="text-sm uppercase tracking-[0.3em] text-gray-500">
-          Vendor Access
-        </p>
-        <h1 className="text-3xl font-semibold text-gray-900">
-          {mode === "signIn" ? "Sign in to upload products" : "Request access"}
+    <div className="grid w-full overflow-hidden rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] shadow-xl lg:grid-cols-2">
+      {/* The form side */}
+      <div className="px-6 py-10 sm:px-10 sm:py-12">
+        <p className="viz-label">Vendor access</p>
+        <h1 className="viz-serif mt-3 text-3xl sm:text-4xl">
+          {mode === "signIn"
+            ? "The workshop office"
+            : "Take a place on the shelf"}
         </h1>
-        <p className="text-sm text-gray-600">
-          Use your vendor email credentials to sign in. New partners can
-          register below, but vendor access is provisioned by an
-          administrator—signing up creates an account only and does not grant
-          vendor permissions.
+        <p className="mt-3 text-sm text-[var(--viz-muted)]">
+          Use your vendor email and password. New partners can request access —
+          we&rsquo;ll send a confirmation link to verify the address.
         </p>
-      </div>
 
-      <div className="mb-6 flex gap-2 rounded-xl bg-gray-100 p-1 text-sm font-medium">
-        <button
-          type="button"
-          onClick={() => setMode("signIn")}
-          className={`flex-1 rounded-lg px-4 py-2 transition ${
-            mode === "signIn"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500"
-          }`}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("signUp")}
-          className={`flex-1 rounded-lg px-4 py-2 transition ${
-            mode === "signUp"
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500"
-          }`}
-        >
-          Request access
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="vendor-email" className="mb-2 block text-sm">
-            Work email
-          </label>
-          <input
-            id="vendor-email"
-            name="email"
-            value={form.email}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, email: event.target.value }))
-            }
-            className={inputClasses}
-            placeholder="you@company.com"
-            type="email"
-            autoComplete="email"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="vendor-password" className="mb-2 block text-sm">
-            Password
-          </label>
-          <input
-            id="vendor-password"
-            name="password"
-            value={form.password}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, password: event.target.value }))
-            }
-            className={inputClasses}
-            placeholder="Minimum 6 characters"
-            type="password"
-            autoComplete="current-password"
-            minLength={6}
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-md bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-400"
-        >
-          {submitting
-            ? "Processing..."
-            : mode === "signIn"
-              ? "Sign in"
-              : "Request access"}
-        </button>
-      </form>
-
-      {feedback && (
-        <p
-          className={`mt-4 rounded-lg px-4 py-3 text-sm ${
-            feedback.type === "error"
-              ? "bg-red-50 text-red-700"
-              : "bg-green-50 text-green-700"
-          }`}
-        >
-          {feedback.message}
-        </p>
-      )}
-
-      {mode === "signIn" && (
-        <>
-          <p className="mt-4 text-xs text-gray-500">
-            Need an account? Switch to &ldquo;Request access&rdquo; to register.
-            An administrator will provision vendor access after reviewing your
-            request.
-          </p>
-          <p className="mt-2 text-xs">
-            <Link
-              href="/forgot-password"
-              className="font-medium text-gray-500 hover:text-gray-900 hover:underline"
+        <div className="mt-8 flex gap-6 border-b border-[var(--viz-line)]">
+          {MODES.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setMode(item.key)}
+              aria-pressed={mode === item.key}
+              className={`viz-mono -mb-px cursor-pointer border-b-2 pb-3 text-xs uppercase tracking-[0.08em] transition-colors duration-200 ${
+                mode === item.key
+                  ? "border-[var(--viz-ink)] font-semibold text-[var(--viz-ink)]"
+                  : "border-transparent text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
+              }`}
             >
-              Forgot your password?
-            </Link>
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="vendor-email" className="viz-label mb-2 block">
+              Work email
+            </label>
+            <input
+              id="vendor-email"
+              name="email"
+              value={form.email}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, email: event.target.value }))
+              }
+              className={inputClasses}
+              placeholder="you@company.com"
+              type="email"
+              autoComplete="email"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="vendor-password" className="viz-label mb-2 block">
+              Password
+            </label>
+            <input
+              id="vendor-password"
+              name="password"
+              value={form.password}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, password: event.target.value }))
+              }
+              className={inputClasses}
+              placeholder="Minimum 6 characters"
+              type="password"
+              autoComplete="current-password"
+              minLength={6}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full cursor-pointer rounded-full bg-[var(--viz-ink)] px-4 py-3 text-sm font-semibold text-[var(--viz-paper)] transition-colors hover:bg-[var(--viz-well)] disabled:cursor-not-allowed disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)]"
+          >
+            {submitting
+              ? "One moment…"
+              : mode === "signIn"
+                ? "Sign in"
+                : "Request access"}
+          </button>
+        </form>
+
+        {feedback && (
+          <p
+            className={`mt-4 rounded-md border px-4 py-3 text-sm ${
+              feedback.type === "error"
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-[var(--viz-blue)]/40 bg-[var(--viz-blue)]/5 text-[var(--viz-blue-deep)]"
+            }`}
+          >
+            {feedback.message}
           </p>
-        </>
-      )}
+        )}
+
+        {mode === "signIn" && (
+          <p className="mt-4 text-xs text-[var(--viz-muted)]">
+            Need an account? Switch to &ldquo;Request access&rdquo; and
+            we&rsquo;ll walk you through onboarding.
+          </p>
+        )}
+      </div>
+
+      {/* The office vignette */}
+      <div className="relative hidden overflow-hidden bg-[var(--viz-well)] lg:block">
+        <div
+          className="viz-dots-light viz-dots-drift pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        />
+        <p className="viz-serif absolute bottom-8 left-8 max-w-[16rem] text-2xl italic text-stone-200">
+          Your catalog, kept in order. <br />
+          Every product on record.
+        </p>
+      </div>
     </div>
   );
 }

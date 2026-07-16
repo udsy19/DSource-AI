@@ -1,8 +1,8 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 
-export async function GET(request, { params }) {
+export async function GET(_request, { params }) {
   try {
     const { path: imagePath } = await params;
 
