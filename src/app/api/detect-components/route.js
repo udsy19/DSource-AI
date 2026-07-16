@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/utils/api-auth";
 import {
@@ -8,7 +9,9 @@ import {
   parseImageData,
 } from "@/utils/gemini";
 import { checkRateLimit } from "@/utils/rate-limit";
+import { createClient } from "@/utils/supabase/server";
 import {
+  imageFromRender,
   isValidBox,
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
@@ -79,17 +82,40 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.image || typeof body.image !== "string") {
+  const hasRenderId = typeof body.renderId === "string" && body.renderId;
+  if (!hasRenderId && (!body.image || typeof body.image !== "string")) {
     return NextResponse.json({ error: "No image provided" }, { status: 400 });
   }
-  if (body.image.length > MAX_IMAGE_CHARS) {
+  if (typeof body.image === "string" && body.image.length > MAX_IMAGE_CHARS) {
     return NextResponse.json({ error: "Image is too large." }, { status: 413 });
   }
 
-  const normalized = await normalizeBaseImage(body.image);
-  if (!normalized.image) {
-    return NextResponse.json({ error: normalized.error }, { status: 400 });
+  // Persisted renders load straight from storage by id — the signed URL the
+  // client holds may have expired (they last one hour).
+  let image = null;
+  if (
+    typeof body.renderId === "string" &&
+    /^[0-9a-f-]{36}$/i.test(body.renderId) &&
+    !DEV_BYPASS
+  ) {
+    const cookieStore = await cookies();
+    const supabase = await createClient(cookieStore);
+    image = await imageFromRender(supabase, body.renderId);
   }
+  if (!image) {
+    if (!body.image || typeof body.image !== "string") {
+      return NextResponse.json(
+        { error: "That render is no longer available — please re-open it." },
+        { status: 404 },
+      );
+    }
+    const fallback = await normalizeBaseImage(body.image);
+    if (!fallback.image) {
+      return NextResponse.json({ error: fallback.error }, { status: 400 });
+    }
+    image = fallback.image;
+  }
+  const normalized = { image };
 
   try {
     const imageData = parseImageData(normalized.image);

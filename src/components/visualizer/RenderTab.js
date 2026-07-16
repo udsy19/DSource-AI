@@ -85,10 +85,13 @@ export default function RenderTab({ restore = null, restoreId = null }) {
   const [loadingPano, setLoadingPano] = useState(false);
   const [editsLog, setEditsLog] = useState([]); // {kind, summary, at}
 
-  // Hotspots belong to a specific image — clear them whenever it changes.
+  // Hotspots belong to a specific image. Detection is expensive (a Gemini
+  // vision call), so results are cached per image for the session — coming
+  // back to an already-scanned version restores its dots instantly.
+  const detectionCacheRef = useRef(new Map());
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on image change only
   useEffect(() => {
-    setComponents([]);
+    setComponents(detectionCacheRef.current.get(tab.imagePreview) ?? []);
     setFindError(null);
     setSearchingLabel(null);
     setSearchStage(null);
@@ -335,6 +338,15 @@ export default function RenderTab({ restore = null, restoreId = null }) {
     });
   };
 
+  // Persisted renders are re-signed server-side by id — signed URLs in the
+  // history list expire after an hour, which broke detect/search on old
+  // sessions ("Could not detect components").
+  const activeRenderId =
+    tab.historyItems.find((i) => i.id === tab.activeHistoryId && i.persisted)
+      ?.id ??
+    tab.restoredSession?.id ??
+    null;
+
   const handleDetect = async () => {
     if (!tab.imagePreview || detecting) return;
     setDetecting(true);
@@ -343,7 +355,10 @@ export default function RenderTab({ restore = null, restoreId = null }) {
       const res = await fetch("/api/detect-components", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: tab.imagePreview }),
+        body: JSON.stringify({
+          image: tab.imagePreview,
+          renderId: activeRenderId ?? undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -354,6 +369,7 @@ export default function RenderTab({ restore = null, restoreId = null }) {
         setFindError("No shoppable components detected in this image.");
         return;
       }
+      detectionCacheRef.current.set(tab.imagePreview, data.components);
       setComponents(data.components);
     } catch {
       setFindError("Could not detect components. Please try again.");
@@ -378,6 +394,7 @@ export default function RenderTab({ restore = null, restoreId = null }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image: tab.imagePreview,
+          renderId: activeRenderId ?? undefined,
           box: box_2d,
           label,
           category,

@@ -59,20 +59,39 @@ const fetchImageAsJpeg = async (url) => {
         .toBuffer();
     }
 
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return null;
-    const addresses = isIP(parsed.hostname)
-      ? [{ address: parsed.hostname }]
-      : await lookup(parsed.hostname, { all: true });
-    if (addresses.some(({ address }) => isPrivateAddress(address))) {
-      return null;
+    // Follow up to 3 redirects manually, re-running the private-address SSRF
+    // check on every hop (supplier CDNs redirect constantly — the previous
+    // redirect:"error" left those products imageless in the PDF).
+    let target = url;
+    let res = null;
+    for (let hop = 0; hop < 4; hop++) {
+      const parsed = new URL(target);
+      if (parsed.protocol !== "https:") return null;
+      const addresses = isIP(parsed.hostname)
+        ? [{ address: parsed.hostname }]
+        : await lookup(parsed.hostname, { all: true });
+      if (addresses.some(({ address }) => isPrivateAddress(address))) {
+        return null;
+      }
+      res = await fetch(target, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(8_000),
+        headers: {
+          // Several supplier CDNs 403 bare fetches.
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          Accept: "image/*,*/*;q=0.8",
+        },
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const next = res.headers.get("location");
+        if (!next) return null;
+        target = new URL(next, target).toString();
+        continue;
+      }
+      break;
     }
-
-    const res = await fetch(url, {
-      redirect: "error",
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) return null;
+    if (!res?.ok) return null;
     if (!(res.headers.get("content-type") ?? "").startsWith("image/")) {
       return null;
     }

@@ -42,6 +42,7 @@ import {
   composeRenderPrompt,
   composeSwapPrompt,
   locationHintFromBox,
+  sizeHintFromBox,
   strengthenCadPrompt,
   strengthenPrompt,
 } from "@/utils/visualizer/prompt-composer";
@@ -330,11 +331,15 @@ const prepareRender = async (body, prompt) => {
     const locationHint = isValidBox(body.swap.box)
       ? locationHintFromBox(body.swap.box)
       : null;
+    const sizeHint = isValidBox(body.swap.box)
+      ? sizeHintFromBox(body.swap.box)
+      : null;
 
     const composeInput = {
       productName: product.title,
       componentLabel,
       locationHint,
+      sizeHint,
       prompt,
     };
     // Multi-input models can't "match_input_image" unambiguously — send the

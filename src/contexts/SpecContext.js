@@ -138,6 +138,20 @@ export const SpecProvider = ({ children }) => {
       setSpec((prev) => {
         const key = projectId ?? prev.activeProjectId;
         const existing = prev.buckets[key];
+        const products = existing?.products ?? [];
+        // Adding the same product again bumps its quantity — a spec sheet is
+        // a tally, not a log (10 duplicate vase rows was the failure mode).
+        const dupIndex = products.findIndex(
+          (p) => p.name === specProduct.name && p.brand === specProduct.brand,
+        );
+        const nextProducts =
+          dupIndex >= 0
+            ? products.map((p, i) =>
+                i === dupIndex
+                  ? { ...p, quantity: Math.min(99, (p.quantity || 1) + 1) }
+                  : p,
+              )
+            : [...products, specProduct];
         return {
           buckets: {
             ...prev.buckets,
@@ -146,15 +160,54 @@ export const SpecProvider = ({ children }) => {
                 cleanName(projectName) ??
                 existing?.projectName ??
                 DEFAULT_PROJECT_NAME,
-              products: [...(existing?.products ?? []), specProduct],
+              products: nextProducts,
             },
           },
           activeProjectId: projectId ? key : prev.activeProjectId,
         };
       });
+      setLastAdded({
+        name: specProduct.name,
+        at: Date.now(),
+      });
     },
     [],
   );
+
+  // Quiet confirmation for add-to-spec — consumed by the provider's toast.
+  const [lastAdded, setLastAdded] = useState(null);
+  useEffect(() => {
+    if (!lastAdded) return undefined;
+    const timer = setTimeout(() => setLastAdded(null), 2800);
+    return () => clearTimeout(timer);
+  }, [lastAdded]);
+
+  /**
+   * Files the whole active bucket under a folio: merges its products into
+   * the folio's bucket (the unfiled tray empties) and switches to it.
+   */
+  const assignActiveBucketToProject = useCallback((projectId, projectName) => {
+    if (!projectId) return;
+    setSpec((prev) => {
+      const fromKey = prev.activeProjectId;
+      if (fromKey === projectId) return prev;
+      const from = prev.buckets[fromKey] ?? emptyBucket();
+      const to = prev.buckets[projectId] ?? emptyBucket();
+      const buckets = {
+        ...prev.buckets,
+        [projectId]: {
+          projectName: cleanName(projectName) ?? to.projectName,
+          products: [...to.products, ...from.products],
+        },
+      };
+      if (fromKey === UNFILED_BUCKET_ID) {
+        buckets[UNFILED_BUCKET_ID] = emptyBucket();
+      } else {
+        delete buckets[fromKey];
+      }
+      return { buckets, activeProjectId: projectId };
+    });
+  }, []);
 
   const updateActiveBucket = useCallback((update) => {
     setSpec((prev) => {
@@ -173,6 +226,21 @@ export const SpecProvider = ({ children }) => {
     (productId) =>
       updateActiveBucket((bucket) => ({
         products: bucket.products.filter((p) => p.id !== productId),
+      })),
+    [updateActiveBucket],
+  );
+
+  const updateProductQuantity = useCallback(
+    (productId, quantity) =>
+      updateActiveBucket((bucket) => ({
+        products: bucket.products.map((p) =>
+          p.id === productId
+            ? {
+                ...p,
+                quantity: Math.max(1, Math.min(99, Math.round(quantity) || 1)),
+              }
+            : p,
+        ),
       })),
     [updateActiveBucket],
   );
@@ -208,6 +276,8 @@ export const SpecProvider = ({ children }) => {
         setProjectName,
         addProductToSpec,
         removeProductFromSpec,
+        updateProductQuantity,
+        assignActiveBucketToProject,
         clearSpec,
         buckets: spec.buckets,
         activeProjectId: spec.activeProjectId,
@@ -216,6 +286,22 @@ export const SpecProvider = ({ children }) => {
       }}
     >
       {children}
+      {/* Quiet add-to-spec confirmation — one line of mono, bottom center. */}
+      {lastAdded && (
+        <div className="viz-scope pointer-events-none fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4">
+          <div className="viz-mono pointer-events-auto flex items-center gap-3 rounded-full border border-[var(--viz-line)] bg-[var(--viz-ink)] px-4 py-2 text-[11px] uppercase tracking-[0.08em] text-[var(--viz-paper)] shadow-lg">
+            <span className="max-w-[16rem] truncate">
+              {lastAdded.name} — added to spec
+            </span>
+            <a
+              href="/spec-builder"
+              className="shrink-0 border-b border-[var(--viz-paper)]/40 hover:border-[var(--viz-paper)]"
+            >
+              View →
+            </a>
+          </div>
+        </div>
+      )}
     </SpecContext.Provider>
   );
 };

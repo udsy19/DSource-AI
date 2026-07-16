@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import Reveal from "@/components/Reveal";
 import {
   formatInr,
@@ -73,6 +74,9 @@ const ProductDetails = async ({ params }) => {
   return (
     <div className="viz-scope min-h-screen w-full">
       <div className="mx-auto max-w-6xl px-4 pt-24 pb-16 sm:px-8 sm:pt-32 md:pb-24">
+        <div className="mb-4">
+          <BackLink href="/marketplace/products" label="Back" />
+        </div>
         {/* Folio masthead */}
         <Reveal>
           <div className="flex items-baseline justify-between gap-4 pb-2">

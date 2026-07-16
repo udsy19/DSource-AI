@@ -46,6 +46,30 @@ export const normalizeBaseImage = async (image) => {
 };
 
 /**
+ * Loads a persisted render's image straight from storage as a data URI —
+ * the reliable path for detect/search on history items, whose signed URLs
+ * expire after an hour. RLS scopes the row lookup to the caller.
+ */
+export const imageFromRender = async (supabase, renderId) => {
+  try {
+    const { data: row } = await supabase
+      .from("visualizer_renders")
+      .select("image_path")
+      .eq("id", renderId)
+      .maybeSingle();
+    if (!row?.image_path) return null;
+    const { data: blob, error } = await supabase.storage
+      .from("visualizer-renders")
+      .download(row.image_path);
+    if (error || !blob) return null;
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    return `data:${blob.type || "image/jpeg"};base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Normalizes mood-board product images. Each entry may be a data URI or an
  * https URL on a whitelisted product-image host (the catalog's own hosts).
  * Failures are collected per-image so one broken product doesn't sink the

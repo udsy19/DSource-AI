@@ -398,10 +398,6 @@ export const FEATURES = [
   },
 ];
 
-// Also export the per-feature visuals so the narrated Story can reuse them
-// in journey order without duplicating the compositions.
-export { VISUALS };
-
 export default function FeaturesShowcase({ embedded = false }) {
   const rootRef = useRef(null);
 

@@ -76,6 +76,40 @@ export const getTaxonomy = async () => {
  * One publish-gated catalog page. `category` must be a taxonomy category name
  * (sent as category_std). Returns { total, items, page } or null.
  */
+// Scraped titles sometimes carry raw HTML entities ("Mesh Chair &#8211;
+// HT-713B") — decode the common ones once, at the catalog boundary.
+const ENTITY_MAP = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+export const decodeEntities = (text) =>
+  typeof text === "string"
+    ? text
+        .replace(/&#(\d+);/g, (_, code) =>
+          String.fromCodePoint(Number(code) || 63),
+        )
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) =>
+          String.fromCodePoint(Number.parseInt(code, 16) || 63),
+        )
+        .replace(
+          /&([a-z]+);/gi,
+          (m, name) => ENTITY_MAP[name.toLowerCase()] ?? m,
+        )
+    : text;
+
+const decodeItem = (item) =>
+  item && typeof item === "object"
+    ? {
+        ...item,
+        title: decodeEntities(item.title),
+        brand: decodeEntities(item.brand),
+      }
+    : item;
+
 export const getCatalogPage = async ({ category, page = 1 } = {}) => {
   const params = new URLSearchParams({
     limit: String(PAGE_SIZE),
@@ -84,7 +118,11 @@ export const getCatalogPage = async ({ category, page = 1 } = {}) => {
   if (category) params.set("category_std", category);
   const data = await fetchBank(`/api/catalog?${params}`);
   if (!data || data === "not_found" || !Array.isArray(data.items)) return null;
-  return { total: data.total ?? data.items.length, items: data.items, page };
+  return {
+    total: data.total ?? data.items.length,
+    items: data.items.map(decodeItem),
+    page,
+  };
 };
 
 /**
@@ -96,7 +134,13 @@ export const getProduct = async (id) => {
   const data = await fetchBank(`/api/product/${id}`);
   if (data === "not_found") return "not_found";
   if (!data?.product) return null;
-  return data;
+  return {
+    ...data,
+    product: decodeItem(data.product),
+    similar: Array.isArray(data.similar)
+      ? data.similar.map(decodeItem)
+      : data.similar,
+  };
 };
 
 /**
@@ -110,11 +154,13 @@ export const searchCatalog = async (query, k = 48) => {
   if (!data || data === "not_found" || !Array.isArray(data.results)) {
     return null;
   }
-  return data.results.map((r) => ({
-    ...r,
-    price_inr: r.price?.price_inr ?? null,
-    price_unit: r.price?.price_unit ?? r.price_unit ?? null,
-  }));
+  return data.results.map((r) =>
+    decodeItem({
+      ...r,
+      price_inr: r.price?.price_inr ?? null,
+      price_unit: r.price?.price_unit ?? r.price_unit ?? null,
+    }),
+  );
 };
 
 const PRICE_UNIT_LABELS = {

@@ -14,6 +14,7 @@ import { createClient } from "@/utils/supabase/server";
 import { embedImage } from "@/utils/visualizer/embeddings";
 import {
   cropBoxToDataUri,
+  imageFromRender,
   isValidBox,
   MAX_IMAGE_CHARS,
   normalizeBaseImage,
@@ -227,10 +228,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.image || typeof body.image !== "string") {
+  const hasRenderId = typeof body.renderId === "string" && body.renderId;
+  if (!hasRenderId && (!body.image || typeof body.image !== "string")) {
     return NextResponse.json({ error: "No image provided" }, { status: 400 });
   }
-  if (body.image.length > MAX_IMAGE_CHARS) {
+  if (typeof body.image === "string" && body.image.length > MAX_IMAGE_CHARS) {
     return NextResponse.json({ error: "Image is too large." }, { status: 413 });
   }
   if (!isValidBox(body.box)) {
@@ -248,10 +250,34 @@ export async function POST(request) {
       ? body.category.trim().slice(0, 60)
       : null;
 
-  const normalized = await normalizeBaseImage(body.image);
-  if (!normalized.image) {
-    return NextResponse.json({ error: normalized.error }, { status: 400 });
+  // Persisted renders load straight from storage by id — the client's signed
+  // URL may have expired (one-hour TTL).
+  let sourceImage = null;
+  if (
+    typeof body.renderId === "string" &&
+    /^[0-9a-f-]{36}$/i.test(body.renderId)
+  ) {
+    const cookieStore = await cookies();
+    const supabase = await createClient(cookieStore);
+    sourceImage = await imageFromRender(supabase, body.renderId);
   }
+  if (!sourceImage) {
+    if (!body.image || typeof body.image !== "string") {
+      return NextResponse.json(
+        { error: "That render is no longer available — please re-open it." },
+        { status: 404 },
+      );
+    }
+    const normalizedInput = await normalizeBaseImage(body.image);
+    if (!normalizedInput.image) {
+      return NextResponse.json(
+        { error: normalizedInput.error },
+        { status: 400 },
+      );
+    }
+    sourceImage = normalizedInput.image;
+  }
+  const normalized = { image: sourceImage };
 
   // The pipeline takes 10-20s (describe + hybrid search + vision rerank), so
   // the response is an NDJSON stream: stage events first, final payload last.

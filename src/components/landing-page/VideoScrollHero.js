@@ -1,8 +1,8 @@
 "use client";
 
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef } from "react";
+import { useScrubFilm } from "@/components/useScrubFilm";
 
 // 243 frames from three chained Higgsfield clips: a golden-hour orbit
 // toward the villa, one continuous glide through the teak door into the
@@ -28,178 +28,74 @@ export default function VideoScrollHero() {
   const canvasRef = useRef(null);
   const copyRef = useRef(null);
   const scrimRef = useRef(null);
+  const navRef = useRef(null);
 
+  // --- Title sequence: staggered mask-reveal on load ---
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger);
-    const mm = gsap.matchMedia();
-    const reduce = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    // --- Title sequence: staggered mask-reveal on load, every viewport ---
-    if (!reduce) {
-      const lines = rootRef.current.querySelectorAll(".hero-copy-line");
-      gsap.set(lines, { yPercent: 118 });
-      gsap.set(scrimRef.current, { autoAlpha: 0 });
-      gsap
-        .timeline({ delay: 0.3 })
-        .to(
-          scrimRef.current,
-          { autoAlpha: 1, duration: 1.1, ease: "power2.out" },
-          0,
-        )
-        .to(
-          lines,
-          { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.13 },
-          0.1,
-        );
-    }
-
-    // Shared canvas frame-scrub. `srcOf` picks the frame set, `pinVh` sets
-    // the pin length in viewports. Used by both desktop and mobile so the
-    // scroll-driven film is identical — only resolution and length differ.
-    const runFilm = ({ srcOf, pinVh }) => {
-      const canvas = canvasRef.current;
-      const context = canvas.getContext("2d");
-      const nav = document.querySelector("div.viz-scope.fixed");
-
-      const stageSize = { w: 0, h: 0 };
-      const setCanvasSize = () => {
-        const rect = rootRef.current.getBoundingClientRect();
-        stageSize.w = rect.width;
-        stageSize.h = rect.height;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.round(rect.width * dpr);
-        canvas.height = Math.round(rect.height * dpr);
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-      };
-      setCanvasSize();
-
-      const images = [];
-      const frame = { current: 0, target: 0, drawn: -1 };
-      let toLoad = FRAME_COUNT;
-
-      // One image cover-fitted onto the stage, at a given opacity.
-      const drawCover = (img, alpha) => {
-        if (!img || !img.complete || img.naturalWidth === 0) return;
-        const w = stageSize.w;
-        const h = stageSize.h;
-        const imgRatio = img.naturalWidth / img.naturalHeight;
-        const canvasRatio = w / h;
-        let dw = w;
-        let dh = h;
-        let dx = 0;
-        let dy = 0;
-        if (imgRatio > canvasRatio) {
-          dw = h * imgRatio;
-          dx = (w - dw) / 2;
-        } else {
-          dh = w / imgRatio;
-          dy = (h - dh) / 2;
-        }
-        context.globalAlpha = alpha;
-        context.drawImage(img, dx, dy, dw, dh);
-        context.globalAlpha = 1;
-      };
-
-      // Cross-fade the two frames bracketing a fractional index — 243
-      // frames read as continuous motion, no flipbook step, however slow.
-      const draw = (fidx) => {
-        const lo = Math.floor(fidx);
-        const hi = Math.min(lo + 1, FRAME_COUNT - 1);
-        const t = fidx - lo;
-        context.clearRect(0, 0, stageSize.w, stageSize.h);
-        drawCover(images[lo], 1);
-        if (t > 0.001 && hi !== lo) drawCover(images[hi], t);
-      };
-
-      const onImageSettled = () => {
-        toLoad -= 1;
-        if (toLoad === 0) draw(0);
-      };
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        const img = new window.Image();
-        img.onload = onImageSettled;
-        img.onerror = onImageSettled;
-        img.src = srcOf(i);
-        images.push(img);
-      }
-
-      // Ease the drawn position toward the scroll target and redraw when it
-      // has moved a hair. The gentle ease (0.1) lets the film keep gliding a
-      // beat after the scroll settles, so the picture coasts rather than snaps.
-      const tick = () => {
-        frame.current += (frame.target - frame.current) * 0.1;
-        if (Math.abs(frame.current - frame.drawn) > 0.0015) {
-          frame.drawn = frame.current;
-          draw(frame.current);
-        }
-      };
-      gsap.ticker.add(tick);
-
-      const st = ScrollTrigger.create({
-        trigger: rootRef.current,
-        start: "top top",
-        end: `+=${window.innerHeight * pinVh}`,
-        pin: true,
-        pinSpacing: true,
-        anticipatePin: 1,
-        onUpdate: (self) => {
-          const p = self.progress;
-          frame.target = Math.min(p / 0.92, 1) * (FRAME_COUNT - 1);
-
-          if (nav) {
-            gsap.set(nav, {
-              opacity: p < 0.1 ? 1 - p / 0.1 : 0,
-              pointerEvents: p < 0.05 ? "auto" : "none",
-            });
-          }
-
-          // Title + scrim lift away together across the first act.
-          const out = Math.min(p / 0.16, 1);
-          gsap.set(copyRef.current, {
-            autoAlpha: 1 - out,
-            yPercent: -10 * out,
-          });
-          gsap.set(scrimRef.current, { autoAlpha: 1 - out });
-        },
-        onLeave: () =>
-          nav &&
-          gsap.to(nav, { opacity: 1, pointerEvents: "auto", duration: 0.4 }),
-      });
-
-      const onResize = () => {
-        setCanvasSize();
-        draw(frame.current);
-        ScrollTrigger.refresh();
-      };
-      window.addEventListener("resize", onResize);
-
-      return () => {
-        window.removeEventListener("resize", onResize);
-        gsap.ticker.remove(tick);
-        st.kill();
-        if (nav) gsap.set(nav, { opacity: 1, pointerEvents: "auto" });
-      };
-    };
-
-    // Desktop: full-res set, longer pin. Mobile: lighter set, shorter pin
-    // (phone scrolling covers a given progress in fewer pixels).
-    mm.add(
-      "(min-width: 1024px) and (prefers-reduced-motion: no-preference)",
-      () => runFilm({ srcOf: framePath, pinVh: 6 }),
-    );
-    mm.add(
-      "(max-width: 1023px) and (prefers-reduced-motion: no-preference)",
-      () => runFilm({ srcOf: framePathM, pinVh: 4.5 }),
-    );
-
-    return () => mm.revert();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const lines = rootRef.current.querySelectorAll(".hero-copy-line");
+    gsap.set(lines, { yPercent: 118 });
+    gsap.set(scrimRef.current, { autoAlpha: 0 });
+    const tl = gsap
+      .timeline({ delay: 0.3 })
+      .to(
+        scrimRef.current,
+        { autoAlpha: 1, duration: 1.1, ease: "power2.out" },
+        0,
+      )
+      .to(
+        lines,
+        { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.13 },
+        0.1,
+      );
+    return () => tl.kill();
   }, []);
+
+  // --- Scroll film: camera orbits the villa, glides through the door into
+  // the empty house, and the room designs itself, then unpins into The
+  // Workflow. Nav bows out over the first 10%; title + scrim lift over the
+  // first act. Desktop reads the 4K set on a longer pin; phones the lighter
+  // 1280px set on a shorter pin (fewer pixels cover a given progress). ---
+  useScrubFilm({
+    rootRef,
+    canvasRef,
+    frameCount: FRAME_COUNT,
+    variants: [
+      {
+        query:
+          "(min-width: 1024px) and (prefers-reduced-motion: no-preference)",
+        srcOf: framePath,
+        pinVh: 6,
+      },
+      {
+        query:
+          "(max-width: 1023px) and (prefers-reduced-motion: no-preference)",
+        srcOf: framePathM,
+        pinVh: 4.5,
+      },
+    ],
+    onProgress: (p) => {
+      if (!navRef.current) {
+        navRef.current = document.querySelector("div.viz-scope.fixed");
+      }
+      const nav = navRef.current;
+      if (nav) {
+        gsap.set(nav, {
+          opacity: p < 0.1 ? 1 - p / 0.1 : 0,
+          pointerEvents: p < 0.05 ? "auto" : "none",
+        });
+      }
+      // Title + scrim lift away together across the first act.
+      const out = Math.min(p / 0.16, 1);
+      gsap.set(copyRef.current, { autoAlpha: 1 - out, yPercent: -10 * out });
+      gsap.set(scrimRef.current, { autoAlpha: 1 - out });
+    },
+    onLeave: () => {
+      const nav = navRef.current;
+      if (nav)
+        gsap.to(nav, { opacity: 1, pointerEvents: "auto", duration: 0.4 });
+    },
+  });
 
   return (
     <section

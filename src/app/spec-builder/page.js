@@ -24,6 +24,9 @@ const SpecSheet = () => {
     buckets,
     activeProjectId,
     setActiveProject,
+    removeProductFromSpec,
+    updateProductQuantity,
+    assignActiveBucketToProject,
     hydrated,
   } = useSpec();
   const searchParams = useSearchParams();
@@ -32,6 +35,21 @@ const SpecSheet = () => {
   const [productStatuses, setProductStatuses] = useState({});
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+
+  // Folios the unfiled sheet can be filed into.
+  const [folios, setFolios] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/projects")
+      .then((res) => (res.ok ? res.json() : { projects: [] }))
+      .then((data) => {
+        if (!cancelled) setFolios(data.projects ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Deep link (?project=<folio id>): activate that folio's bucket once the
   // stored spec has hydrated. Unknown ids are ignored by setActiveProject.
@@ -308,6 +326,27 @@ const SpecSheet = () => {
                     className="viz-mono mt-0.5 w-full border-b border-transparent bg-transparent text-xs uppercase outline-none transition-colors focus:border-[var(--viz-ink)]"
                     aria-label="Project name"
                   />
+                  {folios.length > 0 && specProducts.length > 0 && (
+                    <select
+                      className="viz-mono mt-1.5 w-full cursor-pointer rounded-sm border border-[var(--viz-line)] bg-white px-1.5 py-1 text-[10px] uppercase tracking-wide text-[var(--viz-muted)]"
+                      value=""
+                      aria-label="File this sheet into a folio"
+                      onChange={(e) => {
+                        const folio = folios.find(
+                          (f) => f.id === e.target.value,
+                        );
+                        if (folio)
+                          assignActiveBucketToProject(folio.id, folio.name);
+                      }}
+                    >
+                      <option value="">File into folio…</option>
+                      {folios.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </>}
           </div>
           <SpecCell label="Items">
@@ -467,8 +506,49 @@ const SpecSheet = () => {
                           maximumFractionDigits: 0,
                         })}
                       </SpecCell>
-                      <SpecCell label="Qty">{product.quantity}</SpecCell>
+                      <SpecCell label="Qty">
+                        <span className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label={`Decrease quantity of ${product.name}`}
+                            className="cursor-pointer rounded border border-[var(--viz-line)] px-1.5 leading-none hover:bg-[var(--viz-ground)]"
+                            onClick={() =>
+                              updateProductQuantity(
+                                product.id,
+                                (product.quantity || 1) - 1,
+                              )
+                            }
+                          >
+                            −
+                          </button>
+                          <span className="min-w-5 text-center">
+                            {product.quantity || 1}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Increase quantity of ${product.name}`}
+                            className="cursor-pointer rounded border border-[var(--viz-line)] px-1.5 leading-none hover:bg-[var(--viz-ground)]"
+                            onClick={() =>
+                              updateProductQuantity(
+                                product.id,
+                                (product.quantity || 1) + 1,
+                              )
+                            }
+                          >
+                            +
+                          </button>
+                        </span>
+                      </SpecCell>
                       <SpecCell label="Timeline">{product.timeline}</SpecCell>
+                      <SpecCell label="">
+                        <button
+                          type="button"
+                          onClick={() => removeProductFromSpec(product.id)}
+                          className="viz-mono cursor-pointer text-[11px] uppercase tracking-wide text-[var(--viz-muted)] transition-colors hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </SpecCell>
                     </div>
                   </article>
                 ))}

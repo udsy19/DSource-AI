@@ -296,6 +296,7 @@ export const composeSwapPrompt = ({
   productName,
   componentLabel,
   locationHint,
+  sizeHint,
   prompt,
 }) => {
   const parts = [
@@ -304,10 +305,24 @@ export const composeSwapPrompt = ({
     `Edit the room photograph: remove the ${componentLabel || "highlighted item"}${
       locationHint ? ` in the ${locationHint} of the image` : ""
     } and place the product from the first image in its position, at the same angle and realistic scale.`,
+    // The models tend to hero the product at the reference photo's framing —
+    // pin the size to the removed item's actual footprint in the room photo.
+    sizeHint
+      ? `CRITICAL: the removed item occupies roughly ${sizeHint} of the room photograph — the product must occupy that same area, no larger. Do not zoom in on it or enlarge it.`
+      : "The product must occupy the same visual footprint as the item it replaces — do not enlarge it.",
     "Reproduce the product's exact design, colors, materials, and proportions.",
     prompt ? sentence(prompt) : null,
     "Keep every other element of the room photograph exactly the same — camera angle, walls, floor, rug, curtains, plants, decor, and lighting. Do not add or remove any other furniture or objects.",
     "The result must be a photorealistic, professional interior visualization.",
   ].filter(Boolean);
   return { instruction: parts.join(" "), directives: [] };
+};
+
+/** Human-readable footprint of a 0-1000 box, e.g. "12% of the width and 30% of the height". */
+export const sizeHintFromBox = (box) => {
+  if (!Array.isArray(box) || box.length !== 4) return null;
+  const w = Math.round((box[3] - box[1]) / 10);
+  const h = Math.round((box[2] - box[0]) / 10);
+  if (!w || !h) return null;
+  return `${w}% of the image width and ${h}% of its height`;
 };
