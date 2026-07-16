@@ -205,8 +205,9 @@ export default function WorkflowPlates() {
           </p>
         </Link>
 
-        {/* 03 — Source */}
-        <Link href="/spec-builder" className="workflow-plate group block">
+        {/* 03 — Source: a static exhibit — the spec sheet is reached from
+            inside the studio, not from the brochure. */}
+        <div className="workflow-plate group block">
           <p className="viz-label">Step 03 — Source</p>
           <div className="mt-3 flex h-[300px] flex-col justify-center gap-3 sm:h-[380px] lg:h-[420px]">
             {SPEC_ROWS.map((item) => (
@@ -252,7 +253,7 @@ export default function WorkflowPlates() {
           <p className="mt-1 text-sm text-[var(--viz-muted)]">
             Every choice lands on one spec sheet — codes, finishes, suppliers.
           </p>
-        </Link>
+        </div>
       </div>
     </section>
   );
