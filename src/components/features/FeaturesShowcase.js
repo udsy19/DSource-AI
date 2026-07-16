@@ -10,7 +10,7 @@ import Reveal from "@/components/Reveal";
 import featureRoom from "../../../public/feature-room.webp";
 import mbTable from "../../../public/material-finder-images/Coffee Table.png";
 import mbLamp from "../../../public/material-finder-images/Curtain.png";
-import folioA from "../../../public/material-finder-images/DS 001.png";
+import folioA from "../../../public/material-finder-images/DS 001.webp";
 import folioB from "../../../public/material-finder-images/DS 006.png";
 import libA from "../../../public/material-finder-images/Frame 86.png";
 import mbRug from "../../../public/material-finder-images/Frame 90.png";
