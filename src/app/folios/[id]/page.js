@@ -191,10 +191,10 @@ export default function FolioDetailPage() {
             <div className="flex items-baseline justify-between gap-4 pb-2">
               <p className="viz-label">DSource Studio — Folio</p>
               <Link
-                href="/folios"
+                href="/studio"
                 className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
               >
-                ← All folios
+                ← Studio
               </Link>
             </div>
             <div className="relative pt-5">

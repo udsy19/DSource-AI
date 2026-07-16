@@ -119,7 +119,7 @@ export default function RenderActionsMenu({ item, onUpdate }) {
                           <>
                             No folios yet —{" "}
                             <Link
-                              href="/folios"
+                              href="/studio"
                               className="underline hover:text-[var(--viz-ink)]"
                             >
                               start one

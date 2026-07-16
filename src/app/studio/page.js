@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import FolioCard from "@/components/folios/FolioCard";
+import NewFolioForm from "@/components/folios/NewFolioForm";
 import Reveal from "@/components/Reveal";
 import NoticesBox from "@/components/visualizer/NoticesBox";
 
@@ -41,6 +42,7 @@ export default function StudioPage() {
   const [renders, setRenders] = useState(null); // null = loading
   const [projects, setProjects] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [newFolioOpen, setNewFolioOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -167,7 +169,7 @@ export default function StudioPage() {
                     </div>
                   </section>}
 
-              {/* Folios */}
+              {/* Folios — the whole cabinet lives here (no separate page) */}
               <section className="mt-14">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
                   <h2 className="viz-serif text-2xl">Folios</h2>
@@ -175,22 +177,32 @@ export default function StudioPage() {
                     {String(projects.length).padStart(2, "0")}{" "}
                     {projects.length === 1 ? "folio" : "folios"}
                   </p>
-                  <Link href="/folios" className={QUIET_ACTION}>
-                    + New folio
-                  </Link>
-                  {projects.length > 0 && (
-                    <Link href="/folios" className={`${QUIET_ACTION} ml-auto`}>
-                      All folios →
-                    </Link>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setNewFolioOpen((v) => !v)}
+                    className={`${QUIET_ACTION} cursor-pointer`}
+                  >
+                    {newFolioOpen ? "Close" : "+ New folio"}
+                  </button>
                 </div>
-                {projects.length === 0
+                {newFolioOpen && (
+                  <div className="mt-4 max-w-xl">
+                    <NewFolioForm
+                      onCreated={() => {
+                        setNewFolioOpen(false);
+                        load();
+                      }}
+                      onCancel={() => setNewFolioOpen(false)}
+                    />
+                  </div>
+                )}
+                {projects.length === 0 && !newFolioOpen
                   ? <p className="viz-mono mt-4 text-xs text-[var(--viz-muted)]">
                       No folios yet — start one for the home you&rsquo;re
                       designing, then file renders into it from the visualizer.
                     </p>
                   : <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                      {projects.slice(0, 4).map((project) => (
+                      {projects.map((project) => (
                         <FolioCard key={project.id} project={project} />
                       ))}
                     </div>}

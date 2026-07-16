@@ -26,6 +26,7 @@ const SpecSheet = () => {
     setActiveProject,
     removeProductFromSpec,
     updateProductQuantity,
+    moveProductToBucket,
     assignActiveBucketToProject,
     hydrated,
   } = useSpec();
@@ -114,17 +115,18 @@ const SpecSheet = () => {
     }));
   };
 
-  const toggleStatus = (productId) => {
-    setProductStatuses((prev) => {
-      const statuses = ["approved", "rejected", "draft"];
-      const currentIndex = statuses.indexOf(prev[productId] || "draft");
-      const nextIndex = (currentIndex + 1) % statuses.length;
-      return {
-        ...prev,
-        [productId]: statuses[nextIndex],
-      };
-    });
-  };
+  // Right-click context menu on spec items: {x, y, productId} or null.
+  const [contextMenu, setContextMenu] = useState(null);
+  useEffect(() => {
+    if (!contextMenu) return undefined;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
 
   // Group products by category
   const categories = useMemo(() => {
@@ -171,32 +173,35 @@ const SpecSheet = () => {
     0,
   );
 
-  /** Client sign-off cell: cycles draft → approved → rejected on click. */
+  /** Client sign-off cell — an explicit dropdown, not a mystery cycle. */
   const renderStatusControl = (productId) => {
     const status = productStatuses[productId] || "draft";
-    const statusConfig = {
-      approved: {
-        text: "Approved ✓",
-        className: "font-bold text-[var(--viz-blue)]",
-      },
-      rejected: { text: "Rejected ✕", className: "text-red-700" },
-      draft: { text: "Draft", className: "text-[var(--viz-muted)]" },
-    };
-    const config = statusConfig[status];
+    const tone =
+      status === "approved"
+        ? "font-bold text-[var(--viz-blue)]"
+        : status === "rejected"
+          ? "text-red-700"
+          : "text-[var(--viz-muted)]";
 
     return (
-      <button
-        type="button"
-        onClick={() => toggleStatus(productId)}
-        className="cursor-pointer rounded-md border border-[var(--viz-line)] px-3 py-1.5 text-left transition-colors duration-200 hover:bg-[var(--viz-ground)]"
-      >
+      <label className="block rounded-md border border-[var(--viz-line)] px-3 py-1.5">
         <span className="viz-label">Client</span>
-        <span
-          className={`viz-mono mt-0.5 block text-xs uppercase ${config.className}`}
+        <select
+          value={status}
+          onChange={(e) =>
+            setProductStatuses((prev) => ({
+              ...prev,
+              [productId]: e.target.value,
+            }))
+          }
+          className={`viz-mono mt-0.5 block w-full cursor-pointer bg-transparent text-xs uppercase outline-none ${tone}`}
+          aria-label="Client sign-off status"
         >
-          {config.text}
-        </span>
-      </button>
+          <option value="draft">Draft</option>
+          <option value="approved">Approved ✓</option>
+          <option value="rejected">Rejected ✕</option>
+        </select>
+      </label>
     );
   };
 
@@ -437,6 +442,16 @@ const SpecSheet = () => {
                   <article
                     key={product.id}
                     className="bg-[var(--viz-paper)] p-4 sm:p-5"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        productId: product.id,
+                        productName: product.name,
+                        link: product.link,
+                      });
+                    }}
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-start gap-4">
@@ -540,15 +555,23 @@ const SpecSheet = () => {
                         </span>
                       </SpecCell>
                       <SpecCell label="Timeline">{product.timeline}</SpecCell>
-                      <SpecCell label="">
+                      <div className="flex min-w-16 flex-1 items-center justify-center bg-[var(--viz-paper)] px-3 py-2">
                         <button
                           type="button"
                           onClick={() => removeProductFromSpec(product.id)}
-                          className="viz-mono cursor-pointer text-[11px] uppercase tracking-wide text-[var(--viz-muted)] transition-colors hover:text-red-700"
+                          aria-label={`Remove ${product.name} from the spec`}
+                          title="Remove from spec"
+                          className="cursor-pointer rounded-md p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
                         >
-                          Remove
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4 fill-current"
+                          >
+                            <path d="M9 3v1H4v2h16V4h-5V3H9zm-3 5v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8H6zm4 2h2v9h-2v-9zm4 0h2v9h-2v-9z" />
+                          </svg>
                         </button>
-                      </SpecCell>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -557,6 +580,87 @@ const SpecSheet = () => {
           </section>
         ))}
       </div>
+
+      {/* Right-click menu: file the item elsewhere, open it, or remove it. */}
+      {contextMenu && (
+        <div
+          className="fixed z-[80] w-56 overflow-hidden rounded-lg border border-[var(--viz-line)] bg-[var(--viz-paper)] py-1 shadow-xl"
+          style={{
+            left: Math.min(
+              contextMenu.x,
+              (typeof window !== "undefined" ? window.innerWidth : 1200) - 240,
+            ),
+            top: Math.min(
+              contextMenu.y,
+              (typeof window !== "undefined" ? window.innerHeight : 800) - 260,
+            ),
+          }}
+          role="menu"
+        >
+          <p className="viz-label truncate px-3 pt-1.5 pb-1">
+            {contextMenu.productName}
+          </p>
+          <div className="viz-label border-t border-[var(--viz-line)] px-3 pt-2 pb-0.5">
+            Move to
+          </div>
+          {activeProjectId !== UNFILED_BUCKET_ID && (
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-[var(--viz-ground)]"
+              onClick={() => {
+                moveProductToBucket(
+                  contextMenu.productId,
+                  UNFILED_BUCKET_ID,
+                  "Untitled Project",
+                );
+                setContextMenu(null);
+              }}
+            >
+              Unfiled sheet
+            </button>
+          )}
+          {folios
+            .filter((f) => f.id !== activeProjectId)
+            .map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                role="menuitem"
+                className="block w-full cursor-pointer truncate px-3 py-1.5 text-left text-sm hover:bg-[var(--viz-ground)]"
+                onClick={() => {
+                  moveProductToBucket(contextMenu.productId, f.id, f.name);
+                  setContextMenu(null);
+                }}
+              >
+                {f.name}
+              </button>
+            ))}
+          <div className="mt-1 border-t border-[var(--viz-line)]">
+            {contextMenu.link && (
+              <Link
+                href={contextMenu.link}
+                role="menuitem"
+                className="block px-3 py-1.5 text-sm hover:bg-[var(--viz-ground)]"
+                onClick={() => setContextMenu(null)}
+              >
+                View product
+              </Link>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full cursor-pointer px-3 py-1.5 text-left text-sm text-red-700 hover:bg-red-50"
+              onClick={() => {
+                removeProductFromSpec(contextMenu.productId);
+                setContextMenu(null);
+              }}
+            >
+              Remove from spec
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

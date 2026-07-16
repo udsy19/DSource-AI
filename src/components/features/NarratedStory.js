@@ -5,21 +5,20 @@ import { useRef, useState } from "react";
 import { useScrubFilm } from "@/components/useScrubFilm";
 
 // The narrated story is a scroll-scrubbed film — the same canvas frame-scrub
-// the homepage hero uses (useScrubFilm). One continuous camera journey carries
-// the whole DSource workflow: an empty room fills with a design, the camera
-// pushes in as pieces are sourced, the render dissolves to CAD linework and
-// back to an elevation, and it all lands on a spec sheet. Chapter copy and
-// product callouts are pinned over the film and swap in at scroll checkpoints.
+// the homepage hero uses (useScrubFilm). One continuous golden-hour journey
+// carries the whole DSource workflow through a single room: it furnishes
+// itself, the camera pushes in on the sourced pieces, tilts to a mood board of
+// materials, the render dissolves into a blue CAD drawing and back into a teak
+// elevation, and it settles on the spec sheet. Chapter copy and product
+// callouts are pinned over the film and swap in at scroll checkpoints.
 //
-// PLACEHOLDER FRAMES: until the dedicated journey film is generated, this
-// reuses the hero's 243-frame set so the whole experience is buildable and
-// verifiable. When the film lands, drop it into /story-frames + /story-frames-m
-// and change FRAME_COUNT, the two path helpers, and each chapter's `at` timing
-// to match the film's actual beats. Nothing else changes.
-const FRAME_COUNT = 243;
+// 242 frames extracted at 8fps from six chained Higgsfield morphs (bespoke
+// to this page — distinct from the homepage hero film). Desktop reads the
+// 1920px set; phones read a lighter 1280px set.
+const FRAME_COUNT = 242;
 const frameName = (i) => `frame_${String(i + 1).padStart(4, "0")}.webp`;
-const framePath = (i) => `/frames/${frameName(i)}`;
-const framePathM = (i) => `/frames-m/${frameName(i)}`;
+const framePath = (i) => `/story-frames/${frameName(i)}`;
+const framePathM = (i) => `/story-frames-m/${frameName(i)}`;
 
 // Each chapter is a beat of the journey, keyed to the scroll progress (`at`,
 // 0–1) where its copy takes over. `pin`, when present, is a clickable product
@@ -34,54 +33,54 @@ const CHAPTERS = [
     href: "/ai-visualizer",
   },
   {
-    at: 0.16,
+    at: 0.09,
     eyebrow: "AI Room Render",
     title: "Watch it become a home.",
     line: "The room designs itself — furniture, light, materials, all in place.",
     href: "/ai-visualizer",
   },
   {
-    at: 0.34,
+    at: 0.25,
     eyebrow: "AI Material Finder",
     title: "Every piece, sourced.",
     line: "Point at anything in the room and we identify the real product.",
     href: "/ai-material-finder",
     pin: {
-      x: 40,
-      y: 62,
+      x: 52,
+      y: 52,
       label: "Bouclé lounge chair",
       meta: "Matched · ₹1,84,000",
     },
   },
   {
-    at: 0.5,
+    at: 0.42,
     eyebrow: "Mood Board Creator",
     title: "Pull your ideas together.",
     line: "Colours, textures and pieces collect into one clear board.",
     href: "/ai-visualizer",
     pin: {
-      x: 66,
-      y: 40,
+      x: 50,
+      y: 46,
       label: "Travertine · warm stone",
       meta: "Added to board",
     },
   },
   {
-    at: 0.66,
+    at: 0.58,
     eyebrow: "Image to CAD",
     title: "Drawn to scale.",
     line: "The same room resolves into a clean, dimensioned 2D drawing.",
     href: "/ai-visualizer",
   },
   {
-    at: 0.8,
+    at: 0.72,
     eyebrow: "Image to CAD",
     title: "Every elevation, rendered.",
     line: "Linework lifts back into an elevation you can hand to a builder.",
     href: "/ai-visualizer",
   },
   {
-    at: 0.92,
+    at: 0.87,
     eyebrow: "QuoteBoard · Spec Builder",
     title: "One spec sheet, ready to send.",
     line: "Every choice lands on a live-priced sheet — quote in hand.",
@@ -183,7 +182,7 @@ export default function NarratedStory() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--viz-paper)] opacity-60" />
                 <span className="relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-[var(--viz-paper)] bg-[var(--viz-blue)]" />
               </span>
-              <span className="absolute top-1/2 left-6 w-max -translate-y-1/2 rounded-lg border border-white/15 bg-[var(--viz-well)]/85 px-3 py-2 text-left backdrop-blur-sm">
+              <span className="absolute top-5 left-1/2 w-max max-w-[68vw] -translate-x-1/2 rounded-lg border border-white/15 bg-[var(--viz-well)]/85 px-3 py-2 text-left backdrop-blur-sm sm:top-1/2 sm:left-6 sm:max-w-none sm:translate-x-0 sm:-translate-y-1/2">
                 <span className="viz-mono block text-[10px] tracking-[0.06em] text-white/60 uppercase">
                   {ch.pin.meta}
                 </span>

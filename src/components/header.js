@@ -22,7 +22,6 @@ const AUTHED_NAV_LINKS = [
   { href: "/studio", label: "Studio" },
   { href: "/ai-visualizer", label: "Product" },
   { href: "/get-inspired", label: "Get inspired" },
-  { href: "/folios", label: "Folios" },
   { href: "/marketplace/products", label: "Digital Library" },
 ];
 

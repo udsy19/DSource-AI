@@ -394,7 +394,7 @@ export const FEATURES = [
     blurb:
       "Keep renders, boards, and specs together per project. File a favourite, group a room, and pick up exactly where you left off.",
     cta: "Open folios",
-    href: "/folios",
+    href: "/studio",
   },
 ];
 

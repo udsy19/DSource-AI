@@ -230,6 +230,39 @@ export const SpecProvider = ({ children }) => {
     [updateActiveBucket],
   );
 
+  /**
+   * Moves one product from the active bucket into another project's bucket
+   * (creating it if needed). `targetProjectId` of UNFILED_BUCKET_ID unfiles.
+   */
+  const moveProductToBucket = useCallback(
+    (productId, targetProjectId, targetName) => {
+      if (!targetProjectId) return;
+      setSpec((prev) => {
+        const fromKey = prev.activeProjectId;
+        if (fromKey === targetProjectId) return prev;
+        const from = prev.buckets[fromKey] ?? emptyBucket();
+        const product = from.products.find((p) => p.id === productId);
+        if (!product) return prev;
+        const to = prev.buckets[targetProjectId] ?? emptyBucket();
+        return {
+          ...prev,
+          buckets: {
+            ...prev.buckets,
+            [fromKey]: {
+              ...from,
+              products: from.products.filter((p) => p.id !== productId),
+            },
+            [targetProjectId]: {
+              projectName: cleanName(targetName) ?? to.projectName,
+              products: [...to.products, product],
+            },
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const updateProductQuantity = useCallback(
     (productId, quantity) =>
       updateActiveBucket((bucket) => ({
@@ -277,6 +310,7 @@ export const SpecProvider = ({ children }) => {
         addProductToSpec,
         removeProductFromSpec,
         updateProductQuantity,
+        moveProductToBucket,
         assignActiveBucketToProject,
         clearSpec,
         buckets: spec.buckets,
