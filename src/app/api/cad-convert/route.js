@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
+import { recordAiCall, startAiLog } from "@/utils/ai-log";
 import { requireAuth } from "@/utils/api-auth";
 import { geometryToDxf, geometryToSvg } from "@/utils/cad";
 import {
@@ -43,6 +44,7 @@ const EXTRACTION_MODELS = ["gemini-3.5-flash", "gemini-pro-latest"];
 const generateJsonWithFallback = async (contents) => {
   let lastError = null;
   for (const model of EXTRACTION_MODELS) {
+    const startedAt = Date.now();
     try {
       const response = await ai.models.generateContent({
         model,
@@ -53,11 +55,28 @@ const generateJsonWithFallback = async (contents) => {
           temperature: 0.2,
         },
       });
+      recordAiCall({
+        label: "cad-extract",
+        provider: "gemini",
+        model,
+        operation: "generateContent",
+        status: "success",
+        latencyMs: Date.now() - startedAt,
+      });
       return {
         result: extractJsonResponse(await getResponseText(response)),
         model,
       };
     } catch (error) {
+      recordAiCall({
+        label: "cad-extract",
+        provider: "gemini",
+        model,
+        operation: "generateContent",
+        status: "error",
+        latencyMs: Date.now() - startedAt,
+        error: error?.message,
+      });
       console.error(`CAD Gemini call failed with ${model}:`, error.message);
       lastError = error;
     }
@@ -402,6 +421,7 @@ const buildSuccessResponse = ({
 });
 
 export async function POST(request) {
+  const aiLog = startAiLog("cad-convert");
   // Same auth + rate-limit prologue as every other AI route — the pipeline
   // makes multiple Gemini calls per conversion.
   let user;
@@ -410,6 +430,7 @@ export async function POST(request) {
   } else {
     try {
       user = await requireAuth();
+      aiLog.userId = user.id;
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -699,10 +720,33 @@ export async function POST(request) {
     };
 
     // Step 1: Gate — only proceed on images that are actually floor plans
-    const classificationResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [imagePart, { text: CLASSIFICATION_PROMPT }],
-    });
+    const classifyStartedAt = Date.now();
+    let classificationResponse;
+    try {
+      classificationResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [imagePart, { text: CLASSIFICATION_PROMPT }],
+      });
+      recordAiCall({
+        label: "cad-classify",
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        operation: "generateContent",
+        status: "success",
+        latencyMs: Date.now() - classifyStartedAt,
+      });
+    } catch (error) {
+      recordAiCall({
+        label: "cad-classify",
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        operation: "generateContent",
+        status: "error",
+        latencyMs: Date.now() - classifyStartedAt,
+        error: error?.message,
+      });
+      throw error;
+    }
     const classification = extractJsonResponse(
       await getResponseText(classificationResponse),
     );

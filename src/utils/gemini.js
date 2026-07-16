@@ -1,3 +1,5 @@
+import { recordAiCall } from "@/utils/ai-log";
+
 // Convert a data URL (or bare base64 string) into { data, mimeType } for Gemini inlineData parts
 export const parseImageData = (imageData) => {
   if (!imageData) return null;
@@ -67,20 +69,39 @@ export const generateContentWithResilience = async (
   params,
   { timeoutMs = DEFAULT_TIMEOUT_MS, maxRetries = DEFAULT_MAX_RETRIES } = {},
 ) => {
+  const startedAt = Date.now();
+  const logBase = {
+    label: "generateContent",
+    provider: "gemini",
+    model: params?.model ?? null,
+    operation: "generateContent",
+  };
   let lastError;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await ai.models.generateContent({
+      const result = await ai.models.generateContent({
         ...params,
         config: { ...(params.config ?? {}), abortSignal: controller.signal },
       });
+      recordAiCall({
+        ...logBase,
+        status: "success",
+        latencyMs: Date.now() - startedAt,
+      });
+      return result;
     } catch (error) {
       lastError = error;
       const status = getErrorStatus(error);
       const isTransient = status !== null && TRANSIENT_STATUSES.has(status);
       if (!isTransient || attempt === maxRetries) {
+        recordAiCall({
+          ...logBase,
+          status: "error",
+          latencyMs: Date.now() - startedAt,
+          error: error?.message,
+        });
         throw error;
       }
       await sleep(BASE_RETRY_DELAY_MS * 2 ** attempt);
@@ -88,6 +109,12 @@ export const generateContentWithResilience = async (
       clearTimeout(timer);
     }
   }
+  recordAiCall({
+    ...logBase,
+    status: "error",
+    latencyMs: Date.now() - startedAt,
+    error: lastError?.message,
+  });
   throw lastError;
 };
 
@@ -171,21 +198,48 @@ export const callWithRetry = async (
     timeoutMs = DEFAULT_TIMEOUT_MS,
     retries = DEFAULT_RETRIES,
     label = "Gemini request",
+    provider = null,
+    model = null,
+    operation = null,
   } = {},
 ) => {
+  const startedAt = Date.now();
+  const logBase = { label, provider, model, operation };
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      return await withTimeout(Promise.resolve().then(fn), timeoutMs, label);
+      const result = await withTimeout(
+        Promise.resolve().then(fn),
+        timeoutMs,
+        label,
+      );
+      recordAiCall({
+        ...logBase,
+        status: "success",
+        latencyMs: Date.now() - startedAt,
+      });
+      return result;
     } catch (error) {
       lastError = error;
       if (attempt < retries && isRetryableError(error)) {
         await sleep(RETRY_BACKOFF_MS * (attempt + 1));
         continue;
       }
+      recordAiCall({
+        ...logBase,
+        status: "error",
+        latencyMs: Date.now() - startedAt,
+        error: error?.message,
+      });
       throw error;
     }
   }
+  recordAiCall({
+    ...logBase,
+    status: "error",
+    latencyMs: Date.now() - startedAt,
+    error: lastError?.message,
+  });
   throw lastError;
 };
 

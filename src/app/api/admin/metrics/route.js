@@ -25,6 +25,8 @@ export async function GET() {
       analysesTotal,
       designsTotal,
       activity24h,
+      aiCallsTotal,
+      aiCallsErrors,
     ] = await Promise.all([
       count("profiles"),
       count("profiles", (q) => q.eq("role", "vendor")),
@@ -37,6 +39,8 @@ export async function GET() {
       count("ai_analysis_events"),
       count("visualizer_renders"),
       count("activity_events", (q) => q.gte("created_at", iso(DAY))),
+      count("ai_calls"),
+      count("ai_calls", (q) => q.eq("status", "error")),
     ]);
 
     const n = (r) => r.count ?? 0;
@@ -54,6 +58,8 @@ export async function GET() {
         generationErrors: n(genErrors),
         analysesTotal: n(analysesTotal),
         designsTotal: n(designsTotal),
+        callsTotal: n(aiCallsTotal),
+        callErrors: n(aiCallsErrors),
       },
       activityLast24h: n(activity24h),
     });

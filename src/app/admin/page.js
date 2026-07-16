@@ -40,7 +40,12 @@ export default function AdminOverviewPage() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-gray-700">AI usage</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <StatCard
+            label="AI calls (all)"
+            value={ai.callsTotal}
+            hint={`${ai.callErrors} errors`}
+          />
           <StatCard
             label="Generations"
             value={ai.generationsTotal}

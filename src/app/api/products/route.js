@@ -1,12 +1,15 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { startAiLog } from "@/utils/ai-log";
 import { requireVendor } from "@/utils/api-auth";
 import { parseArrayField, sanitizeString } from "@/utils/product-normalize";
 import { createClient } from "@/utils/supabase/server";
 
 export async function POST(request) {
+  const aiLog = startAiLog("products");
   try {
-    await requireVendor();
+    const vendorUser = await requireVendor();
+    aiLog.userId = vendorUser.id;
   } catch (error) {
     if (error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

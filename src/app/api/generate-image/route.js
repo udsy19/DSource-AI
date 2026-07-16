@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
 import Replicate from "replicate";
+import { startAiLog } from "@/utils/ai-log";
 import { requireAuth } from "@/utils/api-auth";
 import {
   callWithRetry,
@@ -492,6 +493,7 @@ const PREPARERS = {
 // --- Route -----------------------------------------------------------------
 
 export async function POST(request) {
+  const aiLog = startAiLog("generate-image");
   // Stage timing: one structured log line per request so slow renders can be
   // attributed to a specific hop (auth / prepare / guard / generate / verify /
   // retry / persist) instead of guessed at.
@@ -514,6 +516,7 @@ export async function POST(request) {
   } else {
     try {
       user = await requireAuth();
+      aiLog.userId = user.id;
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

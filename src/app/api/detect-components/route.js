@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
+import { startAiLog } from "@/utils/ai-log";
 import { requireAuth } from "@/utils/api-auth";
 import {
   callWithRetry,
@@ -48,12 +49,14 @@ Rules:
 `;
 
 export async function POST(request) {
+  const aiLog = startAiLog("detect-components");
   let user;
   if (DEV_BYPASS) {
     user = { id: "dev-bypass" };
   } else {
     try {
       user = await requireAuth();
+      aiLog.userId = user.id;
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { startAiLog } from "@/utils/ai-log";
 import { requireAuth } from "@/utils/api-auth";
 import { checkRateLimit } from "@/utils/rate-limit";
 import { generateDepthMap } from "@/utils/visualizer/depth";
@@ -11,12 +12,14 @@ const DEV_BYPASS =
   process.env.DEV_AUTH_BYPASS === "true";
 
 export async function POST(request) {
+  const aiLog = startAiLog("depth");
   let user;
   if (DEV_BYPASS) {
     user = { id: "dev-bypass" };
   } else {
     try {
       user = await requireAuth();
+      aiLog.userId = user.id;
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

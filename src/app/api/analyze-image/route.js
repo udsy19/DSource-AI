@@ -8,6 +8,7 @@ import {
   touchLastSeen,
   uploadCaptureImage,
 } from "@/utils/ai-capture";
+import { startAiLog } from "@/utils/ai-log";
 import { requireAuth } from "@/utils/api-auth";
 import {
   AiResponseError,
@@ -35,6 +36,7 @@ const clamp = (value, min, max) => {
 };
 
 export async function POST(request) {
+  const aiLog = startAiLog("analyze-image");
   const startedAt = Date.now();
   const { ip, userAgent } = requestMeta(request);
   let user = null;
@@ -79,6 +81,7 @@ export async function POST(request) {
 
   try {
     user = await requireAuth();
+    aiLog.userId = user.id;
     const cookieStore = await cookies();
     supabase = await createClient(cookieStore);
 
