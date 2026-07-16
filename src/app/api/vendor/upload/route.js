@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { logActivity, requestMeta } from "@/utils/ai-capture";
 import { requireVendor } from "@/utils/api-auth";
 import {
   parseMultiValue,
@@ -206,6 +207,15 @@ export async function POST(request) {
 
     inserted += data?.length ?? 0;
   }
+
+  const meta = requestMeta(request);
+  after(async () => {
+    await logActivity(supabase, user.id, "csv_upload", {
+      metadata: { inserted, total_rows: transformedRows.length },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+  });
 
   return NextResponse.json({
     message: "Import complete",

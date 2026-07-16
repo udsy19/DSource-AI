@@ -4,6 +4,7 @@
 export const ROLES = {
   USER: "user",
   VENDOR: "vendor",
+  ADMIN: "admin",
 };
 
 /**
@@ -32,4 +33,11 @@ export function isVendorRole(role) {
  */
 export function isUserRole(role) {
   return role === ROLES.USER;
+}
+
+/**
+ * Check if user has admin role
+ */
+export function isAdminRole(role) {
+  return role === ROLES.ADMIN;
 }

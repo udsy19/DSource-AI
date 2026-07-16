@@ -35,17 +35,31 @@ export function isUser(userRole) {
 }
 
 /**
- * Check if user can access vendor routes
+ * Check if user is admin
  */
-export function canAccessVendorRoutes(userRole) {
-  return isVendor(userRole);
+export function isAdmin(userRole) {
+  return hasRole(userRole, ROLES.ADMIN);
 }
 
 /**
- * Check if user can access user routes
+ * Check if user can access vendor routes. Admins can access everything.
+ */
+export function canAccessVendorRoutes(userRole) {
+  return isVendor(userRole) || isAdmin(userRole);
+}
+
+/**
+ * Check if user can access user routes. Vendors and admins can too.
  */
 export function canAccessUserRoutes(userRole) {
-  return isUser(userRole) || isVendor(userRole); // Vendors can also access user routes
+  return isUser(userRole) || isVendor(userRole) || isAdmin(userRole);
+}
+
+/**
+ * Check if user can access admin routes.
+ */
+export function canAccessAdminRoutes(userRole) {
+  return isAdmin(userRole);
 }
 
 /**
