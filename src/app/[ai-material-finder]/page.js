@@ -1,9 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
+import MaterialFinderDemo from "@/components/landing-page/MaterialFinderDemo";
 import Reveal from "@/components/Reveal";
 
-import aiMaterialOne from "../../../public/ai-material-finder-1.png";
-import aiMaterialTwo from "../../../public/ai-material-finder-2.png";
+import featureRoom from "../../../public/feature-room.webp";
 
 const HOW_IT_WORKS = [
   {
@@ -30,8 +30,7 @@ const AiMaterialFinder = () => {
   return (
     <div className="viz-scope w-full">
       <div className="px-4 pt-24 pb-24 sm:px-6 sm:pt-32 md:px-8 lg:px-12">
-        {/* Masthead folio: meta line over an ink rule, promise deck at the
-            title's baseline, halftone drifting off the rule's right end */}
+        {/* Masthead folio */}
         <header>
           <Reveal>
             <div className="flex items-baseline justify-between gap-4 pb-2">
@@ -61,7 +60,7 @@ const AiMaterialFinder = () => {
           </Reveal>
         </header>
 
-        {/* Hero: brief on the left, one dark plate on the right */}
+        {/* Hero: brief on the left, the room plate on the right */}
         <div className="mt-10 grid grid-cols-1 gap-8 sm:mt-14 lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-4 lg:pt-10">
             <h2 className="viz-serif text-2xl sm:text-3xl">
@@ -73,7 +72,7 @@ const AiMaterialFinder = () => {
             </p>
             <Link
               href="/ai-material-finder/find"
-              className="mt-8 inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3 text-sm text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
+              className="viz-btn mt-8 inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3.5 text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
             >
               Open the material finder
             </Link>
@@ -82,21 +81,22 @@ const AiMaterialFinder = () => {
             </p>
           </div>
           <div className="relative lg:col-span-8">
-            {/* Registration marks — this plate is the artwork of the page */}
             <span className="viz-crop viz-crop-tl" aria-hidden="true" />
             <span className="viz-crop viz-crop-tr" aria-hidden="true" />
             <span className="viz-crop viz-crop-bl" aria-hidden="true" />
             <span className="viz-crop viz-crop-br" aria-hidden="true" />
             <div className="rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-well)] p-3 sm:p-4">
-              <div
-                className="h-[40vh] w-full rounded-lg sm:h-[50vh] lg:h-[60vh]"
-                id="ai-material-finder-image"
+              <Image
+                src={featureRoom}
+                alt="A warm modern living room — the kind of space you'd bring to the material finder"
+                priority
+                className="h-[40vh] w-full rounded-lg object-cover sm:h-[50vh] lg:h-[60vh]"
               />
             </div>
           </div>
         </div>
 
-        {/* How it works: three steps hung on hairlines, type doing the work */}
+        {/* How it works */}
         <section className="mt-20 sm:mt-28">
           <Reveal>
             <div className="flex items-baseline justify-between gap-4 pb-2">
@@ -127,7 +127,7 @@ const AiMaterialFinder = () => {
           </div>
         </section>
 
-        {/* The shopping assistant: two plates, alternating with their briefs */}
+        {/* The shopping assistant */}
         <section className="mt-20 sm:mt-28">
           <Reveal>
             <div className="flex items-baseline justify-between gap-4 pb-2">
@@ -138,55 +138,20 @@ const AiMaterialFinder = () => {
               className="viz-rule block h-0.5 w-full bg-[var(--viz-ink)]"
               aria-hidden="true"
             />
-            <h2 className="viz-serif mt-5 max-w-xl text-2xl sm:text-3xl">
-              Your AI shopping assistant
-            </h2>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="viz-serif max-w-xl text-2xl sm:text-3xl">
+                Point at the room. We&rsquo;ll shop it.
+              </h2>
+              <p className="max-w-sm text-sm text-[var(--viz-muted)] sm:text-right">
+                The AI reads the whole scene, then matches every piece to a
+                real product — hover the room or the list to explore.
+              </p>
+            </div>
           </Reveal>
 
-          <div className="mt-10 grid grid-cols-1 items-center gap-6 sm:mt-14 lg:grid-cols-12 lg:gap-12">
-            <div className="lg:col-span-4">
-              <h3 className="viz-serif text-xl sm:text-2xl">
-                Material from any image
-              </h3>
-              <p className="mt-3 max-w-sm text-sm text-[var(--viz-muted)] sm:text-base">
-                Find and shop matching furniture instantly, bringing your vision
-                to life.
-              </p>
-            </div>
-            <div className="lg:col-span-8">
-              <div className="overflow-hidden rounded-2xl border border-[var(--viz-line)]">
-                <Image
-                  src={aiMaterialOne}
-                  alt="A room photo with every detected piece matched to a product"
-                  width={800}
-                  height={600}
-                  className="h-auto w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 items-center gap-6 sm:mt-16 lg:grid-cols-12 lg:gap-12">
-            <div className="order-2 lg:order-1 lg:col-span-8">
-              <div className="overflow-hidden rounded-2xl border border-[var(--viz-line)]">
-                <Image
-                  src={aiMaterialTwo}
-                  alt="Matched products listed beside the room they came from"
-                  width={800}
-                  height={600}
-                  className="h-auto w-full"
-                />
-              </div>
-            </div>
-            <div className="order-1 lg:order-2 lg:col-span-4">
-              <h3 className="viz-serif text-xl sm:text-2xl">
-                From match to marketplace
-              </h3>
-              <p className="mt-3 max-w-sm text-sm text-[var(--viz-muted)] sm:text-base">
-                Every find links straight to the product — view it, or add it to
-                your spec.
-              </p>
-            </div>
+          {/* The interactive detection playground */}
+          <div className="mt-10 sm:mt-12">
+            <MaterialFinderDemo />
           </div>
 
           <Reveal>
@@ -196,7 +161,7 @@ const AiMaterialFinder = () => {
               </p>
               <Link
                 href="/ai-material-finder/find"
-                className="inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3 text-sm text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
+                className="viz-btn inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3.5 text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
               >
                 Try it yourself
               </Link>

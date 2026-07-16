@@ -16,12 +16,6 @@ body {
   mask-size: contain;
 }
 
-#ai-material-finder-image {
-  background-image: url("../../public/ai-material-finder.avif");
-  background-size: cover;
-  background-position: center;
-}
-
 /* ---- "Atelier" design tokens ----
    Gallery warmth with print-craft details: greige paper with grain,
    editorial serif for the promise moments, one dark lightbox well so
@@ -269,6 +263,32 @@ body {
     opacity: 1;
     transform: none;
     transition: none;
+  }
+}
+
+/* Material-finder detection scan: a soft light bar sweeps the room once. */
+@keyframes mf-scan {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(430%);
+  }
+}
+
+.mf-scan {
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 252, 240, 0.28),
+    transparent
+  );
+  animation: mf-scan 1.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-scan {
+    display: none;
   }
 }
 
