@@ -133,6 +133,44 @@ export function useVisualizerTab({ mode }) {
     setAdherence(null);
   };
 
+  /**
+   * PATCHes folio metadata (favorite / file into folio / archive) for a
+   * persisted render and mirrors the change into local history state.
+   * @returns {Promise<boolean>} success — the menu closes only on true.
+   */
+  const handleHistoryUpdate = async (item, patch) => {
+    try {
+      const res = await fetch(`/api/renders/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Pre-migration DBs answer 503 with a migration notice — surface it.
+        if (data.error) {
+          setNotices((prev) =>
+            prev.includes(data.error) ? prev : [...prev, data.error],
+          );
+        }
+        return false;
+      }
+      const updated = data.render ?? {};
+      const apply = (list) =>
+        updated.archived
+          ? list.filter((r) => r.id !== item.id)
+          : list.map((r) => (r.id === item.id ? { ...r, ...updated } : r));
+      setServerHistory(apply);
+      setSessionHistory(apply);
+      if (updated.archived && activeHistoryId === item.id) {
+        setActiveHistoryId(null);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleHistoryDelete = async (item) => {
     try {
       const res = await fetch(`/api/renders/${item.id}`, { method: "DELETE" });
@@ -198,6 +236,11 @@ export function useVisualizerTab({ mode }) {
         model: data.model,
         persisted: Boolean(data.renderId),
         createdAt: new Date().toISOString(),
+        // Fresh persisted renders start unfiled/unstarred so folio actions
+        // are available immediately without refetching history.
+        ...(data.renderId
+          ? { projectId: null, roomId: null, isFavorite: false }
+          : {}),
       };
       setSessionHistory((prev) => [historyItem, ...prev]);
       setActiveHistoryId(historyItem.id);
@@ -248,5 +291,6 @@ export function useVisualizerTab({ mode }) {
     activeHistoryId,
     handleHistorySelect,
     handleHistoryDelete,
+    handleHistoryUpdate,
   };
 }

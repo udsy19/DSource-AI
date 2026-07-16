@@ -571,6 +571,7 @@ export default function RenderTab() {
           activeId={tab.activeHistoryId}
           onSelect={tab.handleHistorySelect}
           onDelete={tab.handleHistoryDelete}
+          onUpdate={tab.handleHistoryUpdate}
         />
         <ActionBar
           creativityIndex={creativityIndex}

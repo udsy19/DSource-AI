@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/utils/api-auth";
 import { createClient } from "@/utils/supabase/server";
+import { UUID_PATTERN } from "@/utils/visualizer/folios";
 import { listRenders } from "@/utils/visualizer/persist";
 
 const DEV_BYPASS =
@@ -28,10 +29,30 @@ export async function GET(request) {
   const modeParam = searchParams.get("mode");
   const mode = MODES.includes(modeParam) ? modeParam : null;
 
+  // Folio filters — absent params keep today's default: all non-archived
+  // renders for the mode.
+  const projectIdParam = searchParams.get("projectId");
+  const projectId =
+    projectIdParam === "none" || UUID_PATTERN.test(projectIdParam ?? "")
+      ? projectIdParam
+      : null;
+  const favorites = searchParams.get("favorites") === "1";
+  const includeArchived = searchParams.get("includeArchived") === "1";
+  const limitParam = Number.parseInt(searchParams.get("limit") ?? "", 10);
+  const limit = Number.isFinite(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 100)
+    : 24;
+
   try {
     const cookieStore = await cookies();
     const supabase = await createClient(cookieStore);
-    const renders = await listRenders(supabase, { mode });
+    const renders = await listRenders(supabase, {
+      mode,
+      projectId,
+      favorites,
+      includeArchived,
+      limit,
+    });
     return NextResponse.json({ renders });
   } catch (error) {
     // Degrade gracefully (e.g. migration not applied yet) — history is

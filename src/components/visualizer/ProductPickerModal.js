@@ -54,6 +54,10 @@ export default function ProductPickerModal({
           id: product.id,
           name: product.product_name,
           imageUrl: product.image_url,
+          // Spec fields for board captions. Price columns are optional in the
+          // catalog schema, so read them defensively.
+          brand: product.brand_name ?? null,
+          price: product.price_inr ?? product.price ?? null,
         },
       ];
     });

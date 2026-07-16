@@ -1,11 +1,20 @@
 "use client";
 
+import RenderActionsMenu from "@/components/folios/RenderActionsMenu";
+
 /**
  * Horizontal strip of previous versions for this mode. Items are either
  * session renders (data URLs, this visit) or persisted renders (signed URLs
- * from /api/renders).
+ * from /api/renders). Persisted items with folio metadata (post-migration)
+ * get a quiet actions menu: favorite, file into a folio, archive.
  */
-export default function HistoryStrip({ items, activeId, onSelect, onDelete }) {
+export default function HistoryStrip({
+  items,
+  activeId,
+  onSelect,
+  onDelete,
+  onUpdate,
+}) {
   return (
     <div className="viz-panel mt-3 p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -40,6 +49,12 @@ export default function HistoryStrip({ items, activeId, onSelect, onDelete }) {
                       className="h-full w-full object-cover"
                     />
                   </button>
+                  {item.isFavorite && (
+                    <span className="absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--viz-paper)]/90 text-[10px] leading-none text-[var(--viz-blue)]">
+                      <span aria-hidden="true">★</span>
+                      <span className="sr-only">Favorited</span>
+                    </span>
+                  )}
                   {item.persisted && onDelete && (
                     <button
                       type="button"
@@ -50,6 +65,14 @@ export default function HistoryStrip({ items, activeId, onSelect, onDelete }) {
                       ×
                     </button>
                   )}
+                  {/* Folio fields are absent until the projects migration is
+                      applied — hide the menu rather than offer actions that
+                      would fail. */}
+                  {item.persisted &&
+                    onUpdate &&
+                    item.isFavorite !== undefined && (
+                      <RenderActionsMenu item={item} onUpdate={onUpdate} />
+                    )}
                 </div>
               ))}
             </div>

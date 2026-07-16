@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/ai-material-finder", label: "Features" },
   { href: "/marketplace/products", label: "Shop sample" },
   { href: "/ai-visualizer", label: "Get inspired" },
+  { href: "/folios", label: "Folios" },
 ];
 
 /**

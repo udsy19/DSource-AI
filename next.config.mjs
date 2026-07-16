@@ -6,9 +6,24 @@ import { ALLOWED_IMAGE_HOSTS } from "./src/utils/image-hosts.mjs";
 // to nonces/hashes and dropping 'unsafe-inline' / 'unsafe-eval'.
 // img-src includes data:/blob: (canvas exports, data-URI previews) plus the
 // shared image-host whitelist so CSP matches what next/image will load.
+// The Supabase project host serves signed render thumbnails (history strip,
+// folio covers) — without it CSP blocks every persisted image.
+const SUPABASE_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
+  } catch {
+    return null;
+  }
+})();
+
+const IMG_HOSTS = [
+  ...ALLOWED_IMAGE_HOSTS,
+  ...(SUPABASE_HOST ? [SUPABASE_HOST] : []),
+];
+
 const CSP = [
   "default-src 'self'",
-  `img-src 'self' data: blob: ${ALLOWED_IMAGE_HOSTS.map((h) => `https://${h}`).join(" ")}`,
+  `img-src 'self' data: blob: ${IMG_HOSTS.map((h) => `https://${h}`).join(" ")}`,
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",

@@ -7,6 +7,7 @@ const protectedRoutes = [
   "/ai-material-finder",
   "/ai-visualizer",
   "/account",
+  "/folios",
 ];
 
 // Routes that require vendor role
