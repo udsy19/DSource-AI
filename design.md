@@ -376,9 +376,7 @@ act 1→2 seam is a single kling3_0 `mode:'4k'` clip pinned at BOTH ends
 lock — this is what fixed the "abrupt" transition. Every clip upscaled to
 2K via `upscale_video` (bytedance, preset 'aigc') before frame extraction.
 Frames: `ffmpeg -vf "select='not(mod(n,3))',scale=2560:1440:...crop" -c:v
-libwebp -quality 82` → 243 × 2560×1440 webp (~40MB). Mobile: the three
-clips stitched with ffmpeg concat to `public/hero-film.mp4` (720p, ~9MB),
-autoplayed muted/looping/playsInline. Canvas sizes to the section's
+libwebp -quality 82` → 243 × 2560×1440 webp (~40MB). Mobile scroll-scrubs the SAME canvas film via a shared runFilm() helper, reading a lighter 1280×720 set (public/frames-m, ~11MB, q72) with a shorter 4.5-viewport pin; the old autoplay hero-film.mp4 is gone. Canvas sizes to the section's
 `getBoundingClientRect`, NOT window.innerWidth (which includes the
 scrollbar and leaves a grey gutter). Title sequence: white serif over a
 soft radial ink scrim, staggered mask-reveal on load (`.hero-copy-line`
@@ -386,6 +384,21 @@ clipped by `overflow-hidden` parents), lifting away with the scrim across
 the first 18% so interior beats play undistracted. Lenis smooth scroll
 while mounted (homepage only); frames land by 90% of the pin. Reduced
 motion: static first frame + title.
+
+Smoothness & sharpness (v4.2): frames are 3200×1800 webp q90 from all-three-
+acts upscaled to true 4K (Topaz `2160p`), so on a 2× display (3024px canvas)
+they downscale = crisp, never upscaled. The desktop scrub decouples frame index
+from scroll AND cross-fades adjacent frames (floor at full opacity, ceil
+at the fractional part) so 243 frames read as continuous motion: ScrollTrigger `onUpdate` sets a float `target`, a
+`gsap.ticker` lerps the drawn index toward it (0.18) — this removes the
+stepping when scroll decelerates. Pin shortened 7→6 viewports (a touch
+faster). Site-wide smooth scroll is one shared Lenis in `components/
+SmoothScroll.js` (mounted in layout, `lerp:0.12`, on `window.__lenis`); the
+hero no longer spawns its own. Title mask-reveal containers carry
+`pb-[0.16em] -mb-[0.16em]` so descenders (j/g/p) never clip. Env note: a
+parallel workstream's `utils/env.js` used dynamic `process.env[name]`, which
+Next does NOT inline into client bundles → threw on every page; fixed to
+static `process.env.NEXT_PUBLIC_*` reads.
 
 **Sections** — every one opens with the folio header (mono meta pair over
 a 2px ink rule):

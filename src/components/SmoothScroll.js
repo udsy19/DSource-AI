@@ -21,10 +21,13 @@ export default function SmoothScroll() {
     gsap.registerPlugin(ScrollTrigger);
 
     const lenis = new Lenis({
-      // A gentle glide — long enough to feel premium, short enough that the
-      // scrubbed hero never lags behind the cursor. The hero's own frame
-      // cross-fade smooths the last bit, so Lenis can stay light here.
-      lerp: 0.1,
+      // Momentum mode (duration + easing) instead of fixed lerp: releasing
+      // the wheel/trackpad coasts and eases to rest on an exponential
+      // ease-out, so scrolling never "just stops" — it settles. This is the
+      // graceful glide the hero film rides on.
+      duration: 1.25,
+      easing: (t) => Math.min(1, 1.001 - 2 ** (-10 * t)),
+      smoothWheel: true,
       wheelMultiplier: 1,
       touchMultiplier: 1.5,
       syncTouch: true,
