@@ -129,7 +129,7 @@ const SymbolPreview = ({ symbol, size = 24 }) => {
       viewBox="0 0 24 24"
       role="img"
       aria-label={label}
-      className="shrink-0 text-gray-700"
+      className="shrink-0"
     >
       <title>{label}</title>
       <g transform={`translate(${(24 - w) / 2} ${(24 - h) / 2})`}>

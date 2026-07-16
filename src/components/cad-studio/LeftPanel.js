@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 
 import { SYMBOL_CATEGORIES, SYMBOLS } from "@/utils/cad-symbols";
-import SymbolPreview, { Chevron } from "./SymbolPreview";
+import SymbolPreview from "./SymbolPreview";
 
 const FALLBACK_CATEGORY_LABELS = {
   living: "Living Room",
@@ -53,15 +53,7 @@ const SYMBOL_ENTRIES = Object.entries(SYMBOLS || {}).map(([id, def]) => ({
 }));
 
 const Card = ({ children, className = "" }) => (
-  <div
-    className={`rounded-2xl border border-gray-200 bg-white p-4 ${className}`}
-  >
-    {children}
-  </div>
-);
-
-const CadWord = () => (
-  <span className="bg-yellow-300 px-1 rounded text-black">CAD</span>
+  <div className={`viz-panel p-4 ${className}`}>{children}</div>
 );
 
 const LeftPanel = ({
@@ -110,15 +102,8 @@ const LeftPanel = ({
     <div className="w-full lg:w-[260px] shrink-0 flex flex-col gap-3">
       {/* Header */}
       <Card className="py-3">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
-        >
-          <span className="text-sm font-semibold text-black">
-            Image to <CadWord /> Drawings
-          </span>
-          <Chevron className="w-4 h-4 text-gray-500 shrink-0" />
-        </button>
+        <h2 className="viz-serif text-xl leading-tight">Image to CAD</h2>
+        <p className="viz-label mt-1">Plan → drawing</p>
       </Card>
 
       {/* Upload */}
@@ -132,7 +117,7 @@ const LeftPanel = ({
         />
         {imagePreview
           ? <div className="relative">
-              <div className="relative w-full h-32 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+              <div className="relative w-full h-32 rounded-xl border border-[var(--viz-line)] bg-[var(--viz-ground)] overflow-hidden">
                 <Image
                   src={imagePreview}
                   alt="Uploaded floor plan"
@@ -144,7 +129,7 @@ const LeftPanel = ({
                 type="button"
                 onClick={onRemoveImage}
                 aria-label="Remove image"
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 cursor-pointer"
+                className="absolute -top-2 -right-2 bg-red-600 text-[var(--viz-paper)] rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-700 cursor-pointer"
               >
                 ×
               </button>
@@ -154,10 +139,10 @@ const LeftPanel = ({
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
-              className="w-full border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-gray-400 transition-colors cursor-pointer"
+              className="w-full border-2 border-dashed border-[var(--viz-line)] rounded-lg p-5 text-center hover:border-[var(--viz-muted)] transition-colors cursor-pointer"
             >
               <svg
-                className="h-7 w-7 mx-auto text-gray-400"
+                className="h-7 w-7 mx-auto text-[var(--viz-muted)]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -170,46 +155,46 @@ const LeftPanel = ({
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              <span className="block mt-2 text-sm text-gray-500">
+              <span className="block mt-2 text-sm text-[var(--viz-muted)]">
                 Drag &amp; drop or choose file to upload.
               </span>
-              <span className="block mt-1 text-xs text-gray-400">
-                Image format: JPG, PNG, WEBP &amp; SVG. Max 10MB.
+              <span className="viz-mono block mt-1 text-xs text-[var(--viz-muted)]">
+                JPG, PNG, WEBP or SVG · max 10MB
               </span>
             </button>}
         <button
           type="button"
           onClick={onConvert}
           disabled={!imagePreview}
-          className="mt-3 w-full rounded-full bg-black text-white py-2.5 text-sm font-medium cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="viz-btn mt-3 w-full rounded-full bg-[var(--viz-ink)] text-[var(--viz-paper)] py-2.5 cursor-pointer hover:bg-black disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
         >
-          Convert to <CadWord />
+          Convert to CAD
         </button>
         {error && (
-          <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-xs text-red-600">{error}</p>
+          <div className="mt-3 p-2.5 bg-red-50 border border-red-300 rounded-md">
+            <p className="text-xs text-red-700">{error}</p>
           </div>
         )}
       </Card>
 
       {/* Edits needed */}
       <Card>
-        <h3 className="text-sm font-semibold mb-2">Edits needed</h3>
+        <h3 className="viz-serif text-lg mb-2">Edits needed</h3>
         <textarea
           rows={4}
           value={editPrompt}
           onChange={(event) => onEditPromptChange(event.target.value)}
-          placeholder='Prompt — e.g. "add a double bed in bedroom 1"'
-          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm resize-none"
+          placeholder='In your words — e.g. "add a double bed in bedroom 1"'
+          className="w-full border border-[var(--viz-line)] bg-white rounded-md px-3 py-2 text-sm resize-none"
         />
         <div className="mt-1 flex justify-end">
           <button
             type="button"
             onClick={onSuggest}
             disabled={!hasResult}
-            className="rounded-full border border-gray-300 px-3 py-1 text-xs cursor-pointer hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="viz-mono rounded-full border border-[var(--viz-line)] px-3 py-1 text-xs cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
           >
-            ✨ Suggest
+            Suggest
           </button>
         </div>
         {suggestions.length > 0 && (
@@ -219,7 +204,7 @@ const LeftPanel = ({
                 key={suggestion}
                 type="button"
                 onClick={() => onPickSuggestion(suggestion)}
-                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 text-left cursor-pointer hover:bg-gray-200"
+                className="rounded-full border border-[var(--viz-line)] bg-white px-2.5 py-1 text-xs text-left cursor-pointer hover:bg-[var(--viz-ground)]"
               >
                 {suggestion}
               </button>
@@ -230,14 +215,14 @@ const LeftPanel = ({
           type="button"
           onClick={onApplyEdit}
           disabled={!hasResult || editPrompt.trim() === ""}
-          className="mt-3 w-full rounded-full bg-black text-white py-2 text-sm font-medium cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="viz-btn mt-3 w-full rounded-full bg-[var(--viz-ink)] text-[var(--viz-paper)] py-2 cursor-pointer hover:bg-black disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
         >
           Apply edit
         </button>
         {editInfo && (
           <p
             className={`mt-2 text-xs ${
-              editInfo.applied ? "text-green-700" : "text-amber-700"
+              editInfo.applied ? "text-[var(--viz-blue)]" : "text-amber-700"
             }`}
           >
             {editInfo.text}
@@ -247,10 +232,10 @@ const LeftPanel = ({
 
       {/* Add Asset */}
       <Card>
-        <h3 className="text-sm font-semibold mb-2">Add Asset</h3>
-        <label className="flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5">
+        <h3 className="viz-serif text-lg mb-2">Add asset</h3>
+        <label className="flex items-center gap-2 rounded-full border border-[var(--viz-line)] bg-white px-3 py-1.5">
           <svg
-            className="w-4 h-4 text-gray-400 shrink-0"
+            className="w-4 h-4 text-[var(--viz-muted)] shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -267,7 +252,7 @@ const LeftPanel = ({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search"
-            className="w-full text-sm outline-none"
+            className="w-full bg-transparent text-sm outline-none"
           />
         </label>
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
@@ -278,8 +263,8 @@ const LeftPanel = ({
               onClick={() => setCategory(tab.id)}
               className={`whitespace-nowrap rounded-full px-3 py-1 text-xs cursor-pointer ${
                 category === tab.id
-                  ? "bg-black text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                  : "bg-[var(--viz-ground)] text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
               }`}
             >
               {tab.label}
@@ -306,7 +291,7 @@ const LeftPanel = ({
                   ? "Click to place at center, or drag onto the canvas"
                   : "Convert a plan to CAD first"
               }
-              className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 p-2 text-xs text-gray-700 cursor-pointer hover:border-black disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex flex-col items-center gap-1 rounded-xl border border-[var(--viz-line)] p-2 text-xs text-[var(--viz-ink)] cursor-pointer hover:border-[var(--viz-ink)] disabled:bg-[var(--viz-line)]/50 disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
             >
               <SymbolPreview symbol={entry} size={28} />
               <span className="truncate w-full text-center">
@@ -315,7 +300,7 @@ const LeftPanel = ({
             </button>
           ))}
           {visibleSymbols.length === 0 && (
-            <p className="col-span-2 text-xs text-gray-400 text-center py-3">
+            <p className="viz-mono col-span-2 text-xs text-[var(--viz-muted)] text-center py-3">
               No assets match.
             </p>
           )}

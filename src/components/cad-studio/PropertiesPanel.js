@@ -32,7 +32,7 @@ const ALIGN_ACTIONS = [
 // Commit-on-blur number field: a keyed defaultValue keeps typing free of
 // re-render churn while still refreshing when the selection changes.
 const NumberField = ({ label, value, disabled, readOnly, onCommit }) => (
-  <label className="flex items-center gap-2 text-xs text-gray-600">
+  <label className="viz-mono flex items-center gap-2 text-xs text-[var(--viz-muted)]">
     <span className="w-3 shrink-0">{label}</span>
     <input
       key={`${value}`}
@@ -48,7 +48,7 @@ const NumberField = ({ label, value, disabled, readOnly, onCommit }) => (
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();
       }}
-      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-black disabled:bg-gray-50 disabled:text-gray-400 read-only:bg-gray-50 read-only:text-gray-400"
+      className="w-full px-2 py-1 border border-[var(--viz-line)] bg-white rounded-md text-sm text-[var(--viz-ink)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] read-only:bg-[var(--viz-line)] read-only:text-[var(--viz-muted)]"
     />
   </label>
 );
@@ -59,9 +59,9 @@ const SectionHeader = ({ title, open, onToggle }) => (
     onClick={onToggle}
     className="w-full flex items-center justify-between mb-3 cursor-pointer"
   >
-    <span className="text-sm font-semibold">{title}</span>
+    <span className="viz-label">{title}</span>
     <Chevron
-      className={`w-4 h-4 text-gray-500 transition-transform ${
+      className={`w-4 h-4 text-[var(--viz-muted)] transition-transform ${
         open ? "rotate-180" : ""
       }`}
     />
@@ -214,18 +214,18 @@ const PropertiesPanel = ({
   const isRoom = kind === "room";
 
   return (
-    <div className="w-full lg:w-[280px] shrink-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:sticky lg:top-24 self-start">
+    <div className="viz-panel w-full lg:w-[280px] shrink-0 p-4 lg:sticky lg:top-24 self-start">
       {/* View mode pills */}
-      <div className="flex rounded-full bg-gray-100 p-1">
+      <div className="flex rounded-full border border-[var(--viz-line)] bg-[var(--viz-ground)] p-1">
         {VIEW_TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => onViewModeChange(tab.id)}
-            className={`flex-1 rounded-full px-3 py-1.5 text-sm cursor-pointer ${
+            className={`viz-btn flex-1 rounded-full px-3 py-1.5 cursor-pointer ${
               viewMode === tab.id
-                ? "bg-black text-white"
-                : "text-gray-600 hover:text-black"
+                ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                : "text-[var(--viz-muted)] hover:text-[var(--viz-ink)]"
             }`}
           >
             {tab.label}
@@ -234,12 +234,12 @@ const PropertiesPanel = ({
       </div>
 
       {viewMode === "2d"
-        ? <p className="mt-4 text-xs text-gray-400">
+        ? <p className="viz-mono mt-4 text-xs text-[var(--viz-muted)]">
             Switch to Floor plan to edit elements.
           </p>
         : <>
             {!selection && (
-              <p className="mt-4 text-xs text-gray-400">
+              <p className="viz-mono mt-4 text-xs text-[var(--viz-muted)]">
                 Select an element on the canvas.
               </p>
             )}
@@ -248,7 +248,7 @@ const PropertiesPanel = ({
                 selected — confirm it as-is or delete it. */}
             {element && isFlagged(element) && (
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-semibold text-amber-900">
+                <p className="viz-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900">
                   Needs review
                 </p>
                 <p className="mt-1 text-xs text-amber-800">
@@ -260,19 +260,19 @@ const PropertiesPanel = ({
                   <button
                     type="button"
                     onClick={onKeepSelected}
-                    className="flex-1 rounded-full bg-black px-3 py-1 text-xs text-white cursor-pointer hover:bg-gray-800"
+                    className="flex-1 rounded-full bg-[var(--viz-ink)] px-3 py-1 text-xs text-[var(--viz-paper)] cursor-pointer hover:bg-black"
                   >
                     ✓ Keep
                   </button>
                   <button
                     type="button"
                     onClick={onDeleteSelected}
-                    className="flex-1 rounded-full border border-red-300 bg-white px-3 py-1 text-xs text-red-600 cursor-pointer hover:bg-red-50"
+                    className="flex-1 rounded-full border border-red-300 bg-[var(--viz-paper)] px-3 py-1 text-xs text-red-600 cursor-pointer hover:bg-red-50"
                   >
                     ✕ Delete
                   </button>
                 </div>
-                <p className="mt-2 text-[10px] text-amber-700">
+                <p className="viz-mono mt-2 text-[10px] text-amber-700">
                   Enter = keep · Delete = remove · Tab = next flagged
                 </p>
               </div>
@@ -288,9 +288,7 @@ const PropertiesPanel = ({
               {positionOpen && (
                 <>
                   <div className="mb-4">
-                    <div className="text-xs font-medium text-gray-600 mb-2">
-                      Alignment
-                    </div>
+                    <div className="viz-label mb-2">Alignment</div>
                     <div className="flex gap-1">
                       {ALIGN_ACTIONS.map((action) => (
                         <button
@@ -300,7 +298,7 @@ const PropertiesPanel = ({
                           aria-label={action.label}
                           disabled={!alignable}
                           onClick={() => alignSelected(action.id)}
-                          className="p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="p-2 border border-[var(--viz-line)] rounded-md cursor-pointer hover:bg-[var(--viz-ground)] transition-colors disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
                         >
                           <svg
                             className="w-4 h-4"
@@ -322,9 +320,7 @@ const PropertiesPanel = ({
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-xs font-medium text-gray-600 mb-1">
-                      Size (mm)
-                    </div>
+                    <div className="viz-label mb-1">Size (mm)</div>
                     <div className="grid grid-cols-2 gap-2">
                       <NumberField
                         label="X"
@@ -342,9 +338,7 @@ const PropertiesPanel = ({
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-xs font-medium text-gray-600 mb-1">
-                      Length (mm)
-                    </div>
+                    <div className="viz-label mb-1">Length (mm)</div>
                     <NumberField
                       label="L"
                       value={
@@ -361,9 +355,7 @@ const PropertiesPanel = ({
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-xs font-medium text-gray-600 mb-1">
-                      Layout (mm)
-                    </div>
+                    <div className="viz-label mb-1">Layout (mm)</div>
                     <div className="grid grid-cols-2 gap-2">
                       <NumberField
                         label="W"
@@ -381,9 +373,7 @@ const PropertiesPanel = ({
                   </div>
 
                   <div>
-                    <div className="text-xs font-medium text-gray-600 mb-2">
-                      Rotation
-                    </div>
+                    <div className="viz-label mb-2">Rotation</div>
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <NumberField
@@ -401,7 +391,7 @@ const PropertiesPanel = ({
                         aria-label="Rotate -90 degrees"
                         disabled={kind !== "asset"}
                         onClick={() => rotateBy(-90)}
-                        className="p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 border border-[var(--viz-line)] rounded-md cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
                       >
                         <svg
                           className="w-4 h-4"
@@ -424,7 +414,7 @@ const PropertiesPanel = ({
                         aria-label="Rotate +90 degrees"
                         disabled={kind !== "asset"}
                         onClick={() => rotateBy(90)}
-                        className="p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 border border-[var(--viz-line)] rounded-md cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
                       >
                         <svg
                           className="w-4 h-4"
@@ -447,7 +437,7 @@ const PropertiesPanel = ({
                         aria-label="Flip horizontal"
                         disabled={kind !== "asset"}
                         onClick={flipHorizontal}
-                        className="p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 border border-[var(--viz-line)] rounded-md cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
                       >
                         <svg
                           className="w-4 h-4"
@@ -470,7 +460,7 @@ const PropertiesPanel = ({
               )}
             </div>
 
-            <div className="border-t border-gray-200 my-4" />
+            <div className="border-t border-[var(--viz-line)] my-4" />
 
             {/* Style */}
             <div>
@@ -482,8 +472,8 @@ const PropertiesPanel = ({
               {styleOpen &&
                 (isRoom
                   ? <>
-                      <label className="block mb-3 text-xs font-medium text-gray-600">
-                        Object
+                      <label className="block mb-3">
+                        <span className="viz-label">Object</span>
                         <input
                           type="text"
                           value={element.label || ""}
@@ -491,11 +481,11 @@ const PropertiesPanel = ({
                             updateElement({ label: event.target.value })
                           }
                           placeholder="Room name"
-                          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-black font-normal"
+                          className="mt-1 w-full px-2 py-1.5 border border-[var(--viz-line)] bg-white rounded-md text-sm text-[var(--viz-ink)]"
                         />
                       </label>
-                      <label className="block mb-3 text-xs font-medium text-gray-600">
-                        Texture
+                      <label className="block mb-3">
+                        <span className="viz-label">Texture</span>
                         <select
                           value={element.floorPattern || ""}
                           onChange={(event) =>
@@ -503,7 +493,7 @@ const PropertiesPanel = ({
                               floorPattern: event.target.value || null,
                             })
                           }
-                          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-black font-normal"
+                          className="viz-select mt-1 w-full px-2 py-1.5 border border-[var(--viz-line)] bg-white rounded-md text-sm text-[var(--viz-ink)]"
                         >
                           {FLOOR_PATTERN_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -512,16 +502,13 @@ const PropertiesPanel = ({
                           ))}
                         </select>
                       </label>
-                      <label
-                        className="block text-xs font-medium text-gray-400"
-                        title="Coming soon"
-                      >
-                        Material
+                      <label className="block" title="Coming soon">
+                        <span className="viz-label">Material</span>
                         <select
                           key={`material-${element.floorPattern || ""}`}
                           defaultValue={element.floorPattern || ""}
                           disabled
-                          className="mt-1 w-full px-2 py-1.5 border border-gray-200 rounded text-sm bg-gray-50 text-gray-400 font-normal"
+                          className="viz-select mt-1 w-full px-2 py-1.5 border border-[var(--viz-line)] rounded-md text-sm bg-[var(--viz-line)] text-[var(--viz-muted)]"
                         >
                           {FLOOR_PATTERN_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -531,7 +518,7 @@ const PropertiesPanel = ({
                         </select>
                       </label>
                     </>
-                  : <p className="text-xs text-gray-400">
+                  : <p className="viz-mono text-xs text-[var(--viz-muted)]">
                       Select a room to edit its style.
                     </p>)}
             </div>

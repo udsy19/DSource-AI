@@ -442,16 +442,52 @@ const CadStudioPage = () => {
   );
 
   return (
-    <div className="w-full mt-24 pb-10">
+    <div className="viz-scope w-full mt-24 pb-10 px-4 sm:px-6 lg:px-8">
       {busy.state && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-xl">
-          <div className="bg-white/20 backdrop-blur-md rounded-lg p-8 flex flex-col items-center space-y-4 min-w-[400px] border border-white/30 shadow-xl">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black" />
-            <p className="text-lg text-center text-black">{busy.message}</p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a261e]/60 p-4 pb-10 backdrop-blur-sm sm:items-center sm:pb-4">
+          <div className="w-full max-w-xl rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-6 shadow-2xl">
+            <div className="flex items-baseline justify-between gap-4">
+              <p className="viz-label">In the studio</p>
+              <p className="viz-mono text-[11px] tracking-widest text-[var(--viz-muted)] uppercase">
+                Sheet in progress
+              </p>
+            </div>
+            <p className="viz-serif mt-3 text-xl italic sm:text-2xl">
+              {busy.message}
+            </p>
+            <div className="mt-5 h-[3px] overflow-hidden rounded-full bg-[var(--viz-line)]/50">
+              <div className="viz-scan h-full w-1/4 rounded-full bg-[var(--viz-blue)]" />
+            </div>
+            <p className="mt-3 max-w-md text-xs text-[var(--viz-muted)]">
+              Your uploaded plan is untouched — every conversion drafts a fresh
+              sheet.
+            </p>
           </div>
         </div>
       )}
-      <div className="flex flex-col lg:flex-row items-start gap-4">
+      {/* Compact folio masthead: mono meta pair over the ink rule. */}
+      <header className="mb-6">
+        <div className="flex items-baseline justify-between gap-4 pb-2">
+          <p className="viz-label">DSource Studio</p>
+          <p className="viz-label shrink-0">Sheet C-01 · Plan to CAD</p>
+        </div>
+        <div className="relative pt-4">
+          <span
+            className="absolute top-0 left-0 h-0.5 w-full bg-[var(--viz-ink)]"
+            aria-hidden="true"
+          />
+          <span className="viz-dots-rule" aria-hidden="true" />
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+            <h1 className="viz-serif text-3xl leading-none sm:text-4xl">
+              CAD Studio
+            </h1>
+            <p className="viz-serif pb-0.5 text-sm italic text-[var(--viz-muted)] sm:text-base lg:text-right">
+              Trace the plan you have into a drawing you can build on.
+            </p>
+          </div>
+        </div>
+      </header>
+      <div className="viz-grain rounded-2xl border border-[var(--viz-line)] p-3 sm:p-4 flex flex-col lg:flex-row items-start gap-4">
         <LeftPanel
           imagePreview={imagePreview}
           onFileSelected={handleFileSelected}

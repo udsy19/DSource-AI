@@ -310,7 +310,13 @@ const renderProfessionalExport = async (processed) => {
   try {
     const response = await fetch(`${baseUrl}/render`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Shared-secret auth when the service has CAD_EXPORT_TOKEN set.
+        ...(process.env.CAD_EXPORT_TOKEN
+          ? { "X-CAD-Token": process.env.CAD_EXPORT_TOKEN }
+          : {}),
+      },
       body: JSON.stringify({
         geometry: processed,
         meta: {

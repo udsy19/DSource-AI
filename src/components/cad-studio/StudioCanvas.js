@@ -26,7 +26,14 @@ import {
 } from "./geometry-utils";
 import { SymbolShapes } from "./SymbolPreview";
 
-const SELECT_COLOR = "#dc2626";
+// Atelier drawing palette: ink lines on the paper plate, indigo for
+// selection/highlights, muted for secondary marks (flag tints stay red/amber
+// via confidenceTint so low-confidence elements read as warnings).
+const SELECT_COLOR = "#35418C";
+const INK = "#26221A";
+const MUTED = "#77705F";
+const PAPER = "#FBF9F4";
+const HAIRLINE = "#D9D2C2";
 
 const ARROW_DELTAS = {
   ArrowUp: [0, -1],
@@ -37,7 +44,7 @@ const ARROW_DELTAS = {
 
 const SCALE_SOURCE_TEXT = {
   dimensions: {
-    className: "text-green-700",
+    className: "text-[var(--viz-blue)]",
     text: "Scale read from printed dimensions",
   },
   "door-heuristic": {
@@ -48,11 +55,11 @@ const SCALE_SOURCE_TEXT = {
     className: "text-red-600",
     text: "No scale found — enter a known measurement",
   },
-  user: { className: "text-green-700", text: "Scale set manually" },
+  user: { className: "text-[var(--viz-blue)]", text: "Scale set manually" },
 };
 
 const DOT_GRID_STYLE = {
-  backgroundImage: "radial-gradient(#d4d4d8 1.5px, transparent 1.5px)",
+  backgroundImage: `radial-gradient(${HAIRLINE} 1.5px, transparent 1.5px)`,
   backgroundSize: "24px 24px",
 };
 
@@ -564,7 +571,7 @@ const StudioCanvas = ({
       case "planks":
         return patternRef("planks");
       default:
-        return "#f1f5f9";
+        return "#EEEBE2";
     }
   };
 
@@ -587,7 +594,7 @@ const StudioCanvas = ({
   const renderEmptyState = () => (
     <div className="h-full min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[var(--viz-muted)]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -600,7 +607,7 @@ const StudioCanvas = ({
           d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
         />
       </svg>
-      <p className="mt-3 text-sm text-gray-500">
+      <p className="viz-serif mt-3 text-base italic text-[var(--viz-muted)]">
         {imagePreview
           ? "Convert your image to CAD to start editing the floor plan."
           : "Upload a floor plan image and convert it to CAD to begin."}
@@ -619,7 +626,7 @@ const StudioCanvas = ({
           <button
             type="button"
             onClick={onConfirmAllFlagged}
-            className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs text-amber-900 cursor-pointer hover:bg-amber-100"
+            className="rounded-full border border-amber-300 bg-[var(--viz-paper)] px-3 py-1 text-xs text-amber-900 cursor-pointer hover:bg-amber-100"
           >
             Confirm all remaining
           </button>
@@ -654,11 +661,11 @@ const StudioCanvas = ({
               height={30}
               patternUnits="userSpaceOnUse"
             >
-              <rect width={30} height={30} fill="#f8fafc" />
+              <rect width={30} height={30} fill={PAPER} />
               <path
                 d="M30 0L0 0 0 30"
                 fill="none"
-                stroke="#cbd5e1"
+                stroke={HAIRLINE}
                 strokeWidth={1.5}
               />
             </pattern>
@@ -668,11 +675,11 @@ const StudioCanvas = ({
               height={24}
               patternUnits="userSpaceOnUse"
             >
-              <rect width={24} height={24} fill="#f8fafc" />
+              <rect width={24} height={24} fill={PAPER} />
               <path
                 d="M0 12L12 0M12 24L24 12M0 12l12 12M12 0l12 12"
                 fill="none"
-                stroke="#cbd5e1"
+                stroke={HAIRLINE}
                 strokeWidth={1.2}
               />
             </pattern>
@@ -682,11 +689,11 @@ const StudioCanvas = ({
               height={16}
               patternUnits="userSpaceOnUse"
             >
-              <rect width={40} height={16} fill="#f8fafc" />
+              <rect width={40} height={16} fill={PAPER} />
               <path
                 d="M0 0h40M0 8h40M10 0v8M30 8v8"
                 fill="none"
-                stroke="#cbd5e1"
+                stroke={HAIRLINE}
                 strokeWidth={1.2}
               />
             </pattern>
@@ -716,7 +723,7 @@ const StudioCanvas = ({
                   points={points}
                   fill={roomFill(room)}
                   fillOpacity={0.65}
-                  stroke={selected ? SELECT_COLOR : "#94a3b8"}
+                  stroke={selected ? SELECT_COLOR : MUTED}
                   strokeWidth={selected ? 3 : 1}
                   strokeDasharray={selected ? undefined : "4 4"}
                   className="cursor-pointer"
@@ -728,7 +735,7 @@ const StudioCanvas = ({
                     y={centroid.y}
                     textAnchor="middle"
                     fontSize={22}
-                    fill={selected ? SELECT_COLOR : "#64748b"}
+                    fill={selected ? SELECT_COLOR : MUTED}
                     pointerEvents="none"
                   >
                     {room.label}
@@ -753,7 +760,7 @@ const StudioCanvas = ({
                   width={w}
                   height={h}
                   fill="transparent"
-                  stroke={selected ? SELECT_COLOR : tint || "#334155"}
+                  stroke={selected ? SELECT_COLOR : tint || INK}
                   strokeWidth={2.5}
                   className="cursor-move"
                   onPointerDown={(event) =>
@@ -766,7 +773,7 @@ const StudioCanvas = ({
                     y={y + h / 2}
                     textAnchor="middle"
                     fontSize={13}
-                    fill={selected ? SELECT_COLOR : "#64748b"}
+                    fill={selected ? SELECT_COLOR : MUTED}
                     pointerEvents="none"
                   >
                     {fixture.label}
@@ -785,9 +792,7 @@ const StudioCanvas = ({
                 y1={wall.y1}
                 x2={wall.x2}
                 y2={wall.y2}
-                stroke={
-                  isSelected("wall", index) ? SELECT_COLOR : tint || "#0f172a"
-                }
+                stroke={isSelected("wall", index) ? SELECT_COLOR : tint || INK}
                 strokeWidth={8}
                 strokeLinecap="square"
                 strokeDasharray={
@@ -811,9 +816,9 @@ const StudioCanvas = ({
                 stroke={
                   isSelected("opening", index)
                     ? SELECT_COLOR
-                    : tint || (opening.type === "door" ? "#b45309" : "#2563eb")
+                    : tint || (opening.type === "door" ? MUTED : "#2A3470")
                 }
-                strokeWidth={6}
+                strokeWidth={isSelected("opening", index) ? 9 : 6}
                 opacity={0.9}
                 className="cursor-pointer"
                 onPointerDown={(event) => selectOnly(event, "opening", index)}
@@ -831,7 +836,7 @@ const StudioCanvas = ({
                 transform={`rotate(${asset.rotation || 0} ${asset.x} ${asset.y}) translate(${
                   asset.x - w / 2
                 } ${asset.y - h / 2})`}
-                style={{ color: selected ? SELECT_COLOR : "#0f172a" }}
+                style={{ color: selected ? SELECT_COLOR : INK }}
                 className="cursor-move"
                 onPointerDown={(event) => startMoveDrag(event, "asset", index)}
               >
@@ -872,12 +877,12 @@ const StudioCanvas = ({
                 r={9}
                 fill={
                   drag?.type === "endpoint" && drag.end === end
-                    ? "#fbbf24"
-                    : "white"
+                    ? SELECT_COLOR
+                    : PAPER
                 }
-                stroke="#0f172a"
+                stroke={INK}
                 strokeWidth={2.5}
-                className="cursor-move hover:fill-amber-400"
+                className="cursor-move hover:fill-[var(--viz-line)]"
                 onPointerDown={(event) =>
                   startEndpointDrag(event, selection.kind, selection.index, end)
                 }
@@ -903,7 +908,7 @@ const StudioCanvas = ({
                   if (Number.isFinite(next) && next > 0)
                     onCommitWallLength(selection.index, next);
                 }}
-                className="rounded border border-gray-300 bg-white/90 text-black"
+                className="rounded-md border border-[var(--viz-line)] bg-[var(--viz-paper)]/95 text-[var(--viz-ink)]"
                 style={{
                   width: "100%",
                   height: "100%",
@@ -916,14 +921,14 @@ const StudioCanvas = ({
 
           {tool === "wall" && wallStart && (
             <g pointerEvents="none">
-              <circle cx={wallStart.x} cy={wallStart.y} r={7} fill="#0f172a" />
+              <circle cx={wallStart.x} cy={wallStart.y} r={7} fill={INK} />
               {wallCursor && (
                 <line
                   x1={wallStart.x}
                   y1={wallStart.y}
                   x2={wallCursor.x}
                   y2={wallCursor.y}
-                  stroke="#0f172a"
+                  stroke={INK}
                   strokeWidth={4}
                   strokeDasharray="10 6"
                   opacity={0.6}
@@ -938,7 +943,7 @@ const StudioCanvas = ({
                 cx={calibration.a.x}
                 cy={calibration.a.y}
                 r={7}
-                fill="#2563eb"
+                fill={SELECT_COLOR}
               />
               {calibration.b && (
                 <>
@@ -947,7 +952,7 @@ const StudioCanvas = ({
                     y1={calibration.a.y}
                     x2={calibration.b.x}
                     y2={calibration.b.y}
-                    stroke="#2563eb"
+                    stroke={SELECT_COLOR}
                     strokeWidth={3}
                     strokeDasharray="8 5"
                   />
@@ -955,7 +960,7 @@ const StudioCanvas = ({
                     cx={calibration.b.x}
                     cy={calibration.b.y}
                     r={7}
-                    fill="#2563eb"
+                    fill={SELECT_COLOR}
                   />
                 </>
               )}
@@ -978,22 +983,22 @@ const StudioCanvas = ({
           <button
             type="button"
             onClick={() => setShowUnderlay(!showUnderlay)}
-            className="absolute top-3 right-3 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 shadow-sm cursor-pointer hover:bg-gray-50"
+            className="viz-mono absolute top-3 right-3 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)]/95 px-3 py-1 text-xs cursor-pointer hover:bg-[var(--viz-paper)]"
           >
             {showUnderlay ? "Hide underlay" : "Show underlay"}
           </button>
         )}
 
         {calibration && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-lg">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)] px-3 py-1.5 shadow-lg">
             {!calibration.b
-              ? <span className="text-xs text-gray-600">
+              ? <span className="text-xs text-[var(--viz-muted)]">
                   {calibration.a
                     ? "Click the second point"
                     : "Click the first point of a known distance"}
                 </span>
               : <>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
+                  <label className="flex items-center gap-1 text-xs text-[var(--viz-muted)]">
                     Real distance (mm)
                     <input
                       type="number"
@@ -1008,13 +1013,13 @@ const StudioCanvas = ({
                       onKeyDown={(event) => {
                         if (event.key === "Enter") applyCalibration();
                       }}
-                      className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-black"
+                      className="w-24 px-2 py-1 border border-[var(--viz-line)] bg-white rounded-md text-sm text-[var(--viz-ink)]"
                     />
                   </label>
                   <button
                     type="button"
                     onClick={applyCalibration}
-                    className="rounded-full bg-black px-3 py-1 text-xs text-white cursor-pointer hover:bg-gray-800"
+                    className="rounded-full bg-[var(--viz-ink)] px-3 py-1 text-xs text-[var(--viz-paper)] cursor-pointer hover:bg-black"
                   >
                     Apply
                   </button>
@@ -1022,7 +1027,7 @@ const StudioCanvas = ({
             <button
               type="button"
               onClick={() => setCalibration(null)}
-              className="rounded-full px-2 py-1 text-xs text-gray-500 cursor-pointer hover:bg-gray-100"
+              className="rounded-full px-2 py-1 text-xs text-[var(--viz-muted)] cursor-pointer hover:bg-[var(--viz-ground)]"
             >
               Cancel
             </button>
@@ -1030,14 +1035,14 @@ const StudioCanvas = ({
         )}
 
         <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2">
-          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="flex items-center gap-1 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)] p-1 shadow-sm">
             <button
               type="button"
               onClick={onUndo}
               disabled={!canUndo}
               title="Undo (Ctrl/Cmd+Z)"
               aria-label="Undo"
-              className="rounded-full px-2 py-0.5 text-sm text-gray-700 cursor-pointer hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-full px-2 py-0.5 text-sm text-[var(--viz-ink)] cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
             >
               ↺
             </button>
@@ -1047,7 +1052,7 @@ const StudioCanvas = ({
               disabled={!canRedo}
               title="Redo (Shift+Ctrl/Cmd+Z)"
               aria-label="Redo"
-              className="rounded-full px-2 py-0.5 text-sm text-gray-700 cursor-pointer hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-full px-2 py-0.5 text-sm text-[var(--viz-ink)] cursor-pointer hover:bg-[var(--viz-ground)] disabled:bg-[var(--viz-line)] disabled:text-[var(--viz-muted)] disabled:cursor-not-allowed"
             >
               ↻
             </button>
@@ -1058,10 +1063,10 @@ const StudioCanvas = ({
                 setWallStart(null);
               }}
               title="Add wall (W) — Esc or V to exit"
-              className={`rounded-full px-2.5 py-0.5 text-xs cursor-pointer ${
+              className={`viz-mono rounded-full px-2.5 py-0.5 text-xs cursor-pointer ${
                 tool === "wall"
-                  ? "bg-black text-white"
-                  : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                  : "text-[var(--viz-ink)] hover:bg-[var(--viz-ground)]"
               }`}
             >
               Wall
@@ -1074,35 +1079,41 @@ const StudioCanvas = ({
                 )
               }
               title="Set the scale from a known distance"
-              className={`rounded-full px-2.5 py-0.5 text-xs cursor-pointer ${
+              className={`viz-mono rounded-full px-2.5 py-0.5 text-xs cursor-pointer ${
                 calibration
-                  ? "bg-black text-white"
-                  : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-[var(--viz-ink)] text-[var(--viz-paper)]"
+                  : "text-[var(--viz-ink)] hover:bg-[var(--viz-ground)]"
               }`}
             >
               Calibrate
             </button>
           </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] shadow-sm">
+          <div className="viz-mono flex items-center gap-1.5 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)] px-3 py-1 text-[11px] shadow-sm">
             <span
               className={
-                mods.bypass ? "text-gray-300 line-through" : "text-gray-600"
+                mods.bypass
+                  ? "text-[var(--viz-line)] line-through"
+                  : "text-[var(--viz-muted)]"
               }
             >
               Snap: {GRID}
             </span>
-            <span className="text-gray-300">·</span>
+            <span className="text-[var(--viz-line)]">·</span>
             <span
               className={
-                mods.bypass ? "font-semibold text-black" : "text-gray-400"
+                mods.bypass
+                  ? "font-semibold text-[var(--viz-ink)]"
+                  : "text-[var(--viz-muted)]"
               }
             >
               ⌃ off
             </span>
-            <span className="text-gray-300">·</span>
+            <span className="text-[var(--viz-line)]">·</span>
             <span
               className={
-                mods.ortho ? "font-semibold text-black" : "text-gray-400"
+                mods.ortho
+                  ? "font-semibold text-[var(--viz-ink)]"
+                  : "text-[var(--viz-muted)]"
               }
             >
               ⇧ ortho
@@ -1111,18 +1122,18 @@ const StudioCanvas = ({
         </div>
 
         {dirty && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-gray-200 bg-white p-1.5 shadow-lg">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[var(--viz-line)] bg-[var(--viz-paper)] p-1.5 shadow-lg">
             <button
               type="button"
               onClick={onDiscard}
-              className="rounded-full px-3 py-1.5 text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+              className="rounded-full px-3 py-1.5 text-sm text-[var(--viz-muted)] cursor-pointer hover:bg-[var(--viz-ground)]"
             >
               Discard changes
             </button>
             <button
               type="button"
               onClick={onRerender}
-              className="rounded-full bg-black px-4 py-1.5 text-sm text-white cursor-pointer hover:bg-gray-800"
+              className="viz-btn rounded-full bg-[var(--viz-ink)] px-4 py-1.5 text-[var(--viz-paper)] cursor-pointer hover:bg-black"
             >
               Re-render drawing
             </button>
@@ -1135,11 +1146,11 @@ const StudioCanvas = ({
   const render2dView = () => (
     <div className="p-4 flex flex-col min-h-[70vh]">
       <div
-        className="flex-1 min-h-[52vh] rounded-2xl border border-gray-200 bg-white overflow-hidden [&_svg]:w-full [&_svg]:h-full"
+        className="flex-1 min-h-[52vh] rounded-2xl border border-[var(--viz-line)] bg-white overflow-hidden [&_svg]:w-full [&_svg]:h-full"
         // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG is generated server-side from validated numeric geometry with XML-escaped labels
         dangerouslySetInnerHTML={{ __html: result.svg }}
       />
-      <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+      <div className="mt-3 rounded-xl border border-[var(--viz-line)] bg-[var(--viz-paper)] p-3">
         <p className="text-xs text-amber-800">
           <span className="font-semibold">
             AI-generated draft — verify all dimensions before use.
@@ -1162,7 +1173,7 @@ const StudioCanvas = ({
         )}
         {reconcileInfo && (
           <>
-            <p className="mt-1 text-xs text-green-700">
+            <p className="mt-1 text-xs text-[var(--viz-blue)]">
               {reconcileInfo.summary}
             </p>
             {reconcileInfo.conflicting.length > 0 && (
@@ -1187,7 +1198,7 @@ const StudioCanvas = ({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {result.planSizeMm && result.scale && (
             <>
-              <label className="flex items-center gap-2 text-xs text-gray-600">
+              <label className="viz-mono flex items-center gap-2 text-xs text-[var(--viz-muted)]">
                 Plan width
                 <input
                   key={result.planSizeMm.width}
@@ -1196,7 +1207,7 @@ const StudioCanvas = ({
                   min={500}
                   max={200000}
                   defaultValue={Math.round(result.planSizeMm.width)}
-                  className="w-28 px-2 py-1 border border-gray-300 rounded text-sm text-black"
+                  className="w-28 px-2 py-1 border border-[var(--viz-line)] bg-white rounded-md text-sm text-[var(--viz-ink)]"
                 />
                 mm
               </label>
@@ -1205,7 +1216,7 @@ const StudioCanvas = ({
                 onClick={() =>
                   onApplyScale(Number(scaleInputRef.current?.value))
                 }
-                className="rounded-full border border-black bg-white px-3 py-1 text-sm cursor-pointer hover:bg-gray-50"
+                className="rounded-full border border-[var(--viz-ink)] bg-[var(--viz-paper)] px-3 py-1 text-sm cursor-pointer hover:bg-[var(--viz-ground)]"
               >
                 Apply
               </button>
@@ -1218,7 +1229,7 @@ const StudioCanvas = ({
             <button
               type="button"
               onClick={onReconcile}
-              className="rounded-full border border-black bg-white px-3 py-1 text-sm cursor-pointer hover:bg-gray-50"
+              className="rounded-full border border-[var(--viz-ink)] bg-[var(--viz-paper)] px-3 py-1 text-sm cursor-pointer hover:bg-[var(--viz-ground)]"
             >
               Reconcile to dimensions
             </button>
@@ -1227,14 +1238,14 @@ const StudioCanvas = ({
           <button
             type="button"
             onClick={downloadSvg}
-            className="rounded-full border border-black bg-white px-4 py-1.5 text-sm cursor-pointer hover:bg-gray-50"
+            className="rounded-full border border-[var(--viz-ink)] bg-[var(--viz-paper)] px-4 py-1.5 text-sm cursor-pointer hover:bg-[var(--viz-ground)]"
           >
             Download SVG
           </button>
           <button
             type="button"
             onClick={downloadDxf}
-            className="rounded-full bg-black px-4 py-1.5 text-sm text-white cursor-pointer hover:bg-gray-800"
+            className="viz-btn rounded-full bg-[var(--viz-ink)] px-4 py-1.5 text-[var(--viz-paper)] cursor-pointer hover:bg-black"
           >
             Download DXF
           </button>
@@ -1242,7 +1253,7 @@ const StudioCanvas = ({
             <button
               type="button"
               onClick={downloadDwg}
-              className="rounded-full bg-black px-4 py-1.5 text-sm text-white cursor-pointer hover:bg-gray-800"
+              className="rounded-full border border-[var(--viz-ink)] bg-[var(--viz-paper)] px-4 py-1.5 text-sm cursor-pointer hover:bg-[var(--viz-ground)]"
             >
               Download DWG
             </button>
@@ -1254,7 +1265,7 @@ const StudioCanvas = ({
 
   return (
     <div
-      className="flex-1 min-w-0 rounded-2xl border border-gray-200 bg-[#fafafa] overflow-hidden"
+      className="flex-1 min-w-0 rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] overflow-hidden"
       style={DOT_GRID_STYLE}
     >
       {!result || !draftGeometry
