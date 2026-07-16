@@ -22,10 +22,10 @@ const CSP = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  // Vendored Caslon TTFs are read via fs at runtime by the spec-sheet PDF
-  // route — trace them into standalone/serverless output.
+  // Vendored Caslon TTFs + the brand mark are read via fs at runtime by the
+  // spec-sheet PDF route — trace them into standalone/serverless output.
   outputFileTracingIncludes: {
-    "/api/spec-pdf": ["./src/assets/fonts/*.ttf"],
+    "/api/spec-pdf": ["./src/assets/fonts/*.ttf", "./src/assets/brand/*.png"],
   },
   async headers() {
     return [

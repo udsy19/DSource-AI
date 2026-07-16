@@ -29,6 +29,13 @@ const GROUND = rgb(0xee / 255, 0xeb / 255, 0xe2 / 255); // --viz-ground
 const INDIGO = rgb(0x35 / 255, 0x41 / 255, 0x8c / 255); // --viz-blue
 
 const FONT_DIR = path.join(process.cwd(), "src", "assets", "fonts");
+const BRAND_LOGO = path.join(
+  process.cwd(),
+  "src",
+  "assets",
+  "brand",
+  "logo-ink.png",
+);
 
 // Catalog prices are INR. "Rs" instead of the ₹ glyph — the mono standard
 // fonts (WinAnsi encoding) cannot encode U+20B9.
@@ -63,10 +70,12 @@ export const buildSpecPdf = async ({ projectName, products }) => {
   doc.registerFontkit(fontkit);
 
   // The promise voice — real Libre Caslon Text (vendored, OFL).
-  const [caslonBoldBytes, caslonItalicBytes] = await Promise.all([
+  const [caslonBoldBytes, caslonItalicBytes, logoBytes] = await Promise.all([
     readFile(path.join(FONT_DIR, "LibreCaslonText-Bold.ttf")),
     readFile(path.join(FONT_DIR, "LibreCaslonText-Italic.ttf")),
+    readFile(BRAND_LOGO),
   ]);
+  const brandMark = await doc.embedPng(logoBytes);
   const caslonBold = await doc.embedFont(caslonBoldBytes, { subset: true });
   const caslonItalic = await doc.embedFont(caslonItalicBytes, {
     subset: true,
@@ -175,8 +184,16 @@ export const buildSpecPdf = async ({ projectName, products }) => {
     y = PAGE_H - MARGIN;
 
     if (pages.length === 1) {
-      // --- Masthead folio: label pair over the ink rule ---
-      label(page, "DSource Studio", MARGIN, y);
+      // --- Masthead folio: brand mark + label pair over the ink rule ---
+      const markH = 16;
+      const markW = markH * (brandMark.width / brandMark.height);
+      page.drawImage(brandMark, {
+        x: MARGIN,
+        y: y - 4,
+        width: markW,
+        height: markH,
+      });
+      label(page, "DSource Studio", MARGIN + markW + 7, y);
       const right = "Specification sheet";
       label(
         page,

@@ -1,5 +1,8 @@
 "use client";
 
+import Image from "next/image";
+import logo from "../../../public/brand/logo-ink.png";
+
 /**
  * Shared shell for the auth pages: a centered paper plate on the grain
  * ground — form on the left; on the right, a dark vignette with an engraved
@@ -19,6 +22,13 @@ export default function AuthShell({
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-[var(--viz-line)] bg-[var(--viz-paper)] shadow-xl lg:grid-cols-2">
         {/* The form side */}
         <div className="px-6 py-10 sm:px-10 sm:py-12">
+          <Image
+            src={logo}
+            alt="DSource.AI"
+            width={36}
+            height={40}
+            className="mb-6 h-9 w-auto"
+          />
           <p className="viz-label">{eyebrow}</p>
           <h1 className="viz-serif mt-3 text-3xl sm:text-4xl">{title}</h1>
           <p className="mt-3 text-sm text-[var(--viz-muted)]">{lede}</p>

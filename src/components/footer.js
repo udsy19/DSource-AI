@@ -1,3 +1,5 @@
+import Image from "next/image";
+import logoPaper from "../../public/brand/logo-paper.png";
 import Reveal from "./Reveal";
 
 const Footer = () => {
@@ -11,9 +13,18 @@ const Footer = () => {
         />
         <Reveal className="relative flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
           <div className="max-w-xl">
-            <p className="viz-mono text-[11px] uppercase tracking-widest text-stone-400">
-              DSource.AI
-            </p>
+            <div className="flex items-center gap-2.5">
+              <Image
+                src={logoPaper}
+                alt=""
+                width={20}
+                height={22}
+                className="h-5 w-auto opacity-90"
+              />
+              <p className="viz-mono text-[11px] uppercase tracking-widest text-stone-400">
+                DSource.AI
+              </p>
+            </div>
             <h2 className="viz-serif mt-2 text-3xl text-stone-100 sm:text-4xl">
               Seven days on us.
               <span className="italic text-stone-300"> Bring a room.</span>

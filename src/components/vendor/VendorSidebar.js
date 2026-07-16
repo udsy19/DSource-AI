@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import logo from "../../../public/brand/logo-ink.png";
 import { useAuth } from "../../contexts/AuthContext";
 
 // Only routes that exist. Orders / AI Visualizer / Settings had no pages
@@ -39,8 +41,15 @@ export default function VendorSidebar() {
     <div className="viz-panel flex h-full w-64 flex-col overflow-hidden">
       {/* Wordmark */}
       <div className="border-b border-[var(--viz-line)] px-6 py-6">
-        <Link href="/vendor" className="viz-serif block text-xl">
-          DSource.AI
+        <Link href="/vendor" className="flex items-center gap-2.5">
+          <Image
+            src={logo}
+            alt=""
+            width={24}
+            height={27}
+            className="h-6 w-auto"
+          />
+          <span className="viz-serif text-xl">DSource.AI</span>
         </Link>
         <p className="viz-label mt-1">The workshop office</p>
       </div>

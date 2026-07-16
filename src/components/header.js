@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import logo from "../../public/logo-dsource.png";
+import logo from "../../public/brand/logo-ink.png";
 import specSheetIcon from "../../public/spec-sheet-icon.png";
 import { useAuth } from "../contexts/AuthContext";
 import { useSpec } from "../contexts/SpecContext";
@@ -74,8 +74,8 @@ const Header = ({ currentPath = "" }) => {
                   src={logo}
                   alt="DSource.AI logo"
                   width={28}
-                  height={28}
-                  className="h-7 w-7 rounded-lg border border-[var(--viz-line)]"
+                  height={31}
+                  className="h-7 w-auto"
                 />
                 <span className="viz-serif text-xl">DSource.AI</span>
               </Link>
