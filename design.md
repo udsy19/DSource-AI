@@ -368,14 +368,24 @@ pinned for seven viewports, played frame-by-frame on a DPR-scaled canvas:
    holds on the fully designed home, then unpins directly into The
    Workflow. The film's argument IS the product's.
 
-Production recipe (all Higgsfield MCP, ~60 credits total): villa still via
-nano_banana_pro → clip chain via kling3_0_turbo where each clip's last
-frame (ffmpeg `-sseof`) is uploaded as the next clip's `start_image` —
-that's what keeps one continuous world across cuts. Frames:
-`ffmpeg -vf "select='not(mod(n,3))',scale=1280:-2" -q:v 4`. Lenis smooth
-scroll while mounted (homepage only); frames land by 90% of the pin; ink
-headline carries a paper text-glow for legibility over the film. Small
-screens / reduced-motion: first frame + promise, static.
+Production recipe (all Higgsfield MCP, ~200 credits): villa still via
+nano_banana_pro → three kling3_0_turbo clips chained by uploading each
+clip's last frame (ffmpeg `-sseof`) as the next clip's `start_image`. The
+act 1→2 seam is a single kling3_0 `mode:'4k'` clip pinned at BOTH ends
+(start_image = orbit's last frame, end_image = empty room) so both cuts
+lock — this is what fixed the "abrupt" transition. Every clip upscaled to
+2K via `upscale_video` (bytedance, preset 'aigc') before frame extraction.
+Frames: `ffmpeg -vf "select='not(mod(n,3))',scale=2560:1440:...crop" -c:v
+libwebp -quality 82` → 243 × 2560×1440 webp (~40MB). Mobile: the three
+clips stitched with ffmpeg concat to `public/hero-film.mp4` (720p, ~9MB),
+autoplayed muted/looping/playsInline. Canvas sizes to the section's
+`getBoundingClientRect`, NOT window.innerWidth (which includes the
+scrollbar and leaves a grey gutter). Title sequence: white serif over a
+soft radial ink scrim, staggered mask-reveal on load (`.hero-copy-line`
+clipped by `overflow-hidden` parents), lifting away with the scrim across
+the first 18% so interior beats play undistracted. Lenis smooth scroll
+while mounted (homepage only); frames land by 90% of the pin. Reduced
+motion: static first frame + title.
 
 **Sections** — every one opens with the folio header (mono meta pair over
 a 2px ink rule):

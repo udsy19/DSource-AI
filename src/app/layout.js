@@ -7,6 +7,7 @@ import "./globals.css";
 
 import ConditionalFooter from "../components/ConditionalFooter";
 import Header from "../components/header";
+import SmoothScroll from "../components/SmoothScroll";
 import { AuthProvider } from "../contexts/AuthContext";
 import { PathnameProvider } from "../contexts/PathnameContext";
 import { SpecProvider } from "../contexts/SpecContext";
@@ -49,6 +50,7 @@ export default function RootLayout({ children }) {
             <SpecProvider>
               {/* No global gutter: sections bleed to the viewport edge and
                   every page owns its horizontal padding. */}
+              <SmoothScroll />
               <Header />
               <main className="relative z-0">{children}</main>
               <ConditionalFooter />

@@ -2,36 +2,58 @@
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import Lenis from "lenis";
 import { useEffect, useRef } from "react";
 
-// 243 frames from three chained Higgsfield clips: a golden-hour orbit
-// toward the villa, the glide through the teak door into the empty house,
-// and the room furnishing itself piece by piece (see design.md §12).
+// 243 frames (4K webp) from three chained Higgsfield clips: a golden-hour
+// orbit toward the villa, one continuous glide through the teak door into
+// the empty house, and the room furnishing itself piece by piece.
+// `hero-film.mp4` is the same three clips stitched for mobile. (design.md §12)
 const FRAME_COUNT = 243;
-const framePath = (i) => `/frames/frame_${String(i + 1).padStart(4, "0")}.jpg`;
+const framePath = (i) => `/frames/frame_${String(i + 1).padStart(4, "0")}.webp`;
 
 /**
- * Scroll-scrubbed film hero in three acts, pinned for ~7 screens:
- * the camera orbits the villa at golden hour (the promise rides this act,
- * receding at the threshold), glides through the teak door into the empty
- * house, and then the room designs itself — furniture materializing piece
- * by piece until the film ends on the finished home and unpins into The
- * Workflow. The global nav bows out over the first 10% and returns on
- * unpin. Lenis smooth-scrolls the page while mounted (homepage only).
- *
- * Small screens and reduced-motion get the first frame and the promise,
- * statically.
+ * Scroll-scrubbed film hero in three acts, pinned for ~6 screens. On load
+ * the title sequence reveals over a soft scrim (staggered, cinematic); the
+ * camera orbits the villa (title recedes at the threshold), glides through
+ * the door into the empty house, and the room designs itself until the film
+ * unpins into The Workflow. Desktop plays the frame sequence on a canvas
+ * with a lerped frame index (smooth even as scroll eases to a stop); phones
+ * autoplay the stitched film. The global nav bows out over the first 10%.
+ * Site-wide smooth scroll comes from the shared Lenis in the layout.
  */
 export default function VideoScrollHero() {
   const rootRef = useRef(null);
   const canvasRef = useRef(null);
-  const headerRef = useRef(null);
+  const copyRef = useRef(null);
+  const scrimRef = useRef(null);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
     const mm = gsap.matchMedia();
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
+    // --- Title sequence: staggered mask-reveal on load, every viewport ---
+    if (!reduce) {
+      const lines = rootRef.current.querySelectorAll(".hero-copy-line");
+      gsap.set(lines, { yPercent: 118 });
+      gsap.set(scrimRef.current, { autoAlpha: 0 });
+      gsap
+        .timeline({ delay: 0.3 })
+        .to(
+          scrimRef.current,
+          { autoAlpha: 1, duration: 1.1, ease: "power2.out" },
+          0,
+        )
+        .to(
+          lines,
+          { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.13 },
+          0.1,
+        );
+    }
+
+    // --- Desktop: canvas frame theatre with lerped playback ---
     mm.add(
       "(min-width: 1024px) and (prefers-reduced-motion: no-preference)",
       () => {
@@ -39,34 +61,33 @@ export default function VideoScrollHero() {
         const context = canvas.getContext("2d");
         const nav = document.querySelector("div.viz-scope.fixed");
 
-        // Smooth scroll, wired into ScrollTrigger per the Lenis docs.
-        const lenis = new Lenis();
-        lenis.on("scroll", ScrollTrigger.update);
-        const raf = (time) => lenis.raf(time * 1000);
-        gsap.ticker.add(raf);
-        gsap.ticker.lagSmoothing(0);
-
+        const stageSize = { w: 0, h: 0 };
         const setCanvasSize = () => {
+          const rect = rootRef.current.getBoundingClientRect();
+          stageSize.w = rect.width;
+          stageSize.h = rect.height;
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          canvas.width = window.innerWidth * dpr;
-          canvas.height = window.innerHeight * dpr;
-          canvas.style.width = `${window.innerWidth}px`;
-          canvas.style.height = `${window.innerHeight}px`;
+          canvas.width = Math.round(rect.width * dpr);
+          canvas.height = Math.round(rect.height * dpr);
+          canvas.style.width = `${rect.width}px`;
+          canvas.style.height = `${rect.height}px`;
           context.setTransform(dpr, 0, 0, dpr, 0, 0);
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = "high";
         };
         setCanvasSize();
 
         const images = [];
-        const frame = { index: 0 };
+        const frame = { current: 0, target: 0, drawn: -1 };
         let toLoad = FRAME_COUNT;
 
-        const render = () => {
-          const w = window.innerWidth;
-          const h = window.innerHeight;
-          context.clearRect(0, 0, w, h);
-          const img = images[frame.index];
+        const draw = (index) => {
+          const w = stageSize.w;
+          const h = stageSize.h;
+          const img = images[index];
           if (!img || !img.complete || img.naturalWidth === 0) return;
-          // cover-fit: fill the viewport, preserve aspect, center overflow
+          context.clearRect(0, 0, w, h);
+          // cover-fit: fill the stage, preserve aspect, center overflow
           const imgRatio = img.naturalWidth / img.naturalHeight;
           const canvasRatio = w / h;
           let dw = w;
@@ -85,7 +106,7 @@ export default function VideoScrollHero() {
 
         const onImageSettled = () => {
           toLoad -= 1;
-          if (toLoad === 0) render();
+          if (toLoad === 0) draw(0);
         };
         for (let i = 0; i < FRAME_COUNT; i++) {
           const img = new window.Image();
@@ -95,26 +116,29 @@ export default function VideoScrollHero() {
           images.push(img);
         }
 
+        // Continuously ease the drawn frame toward the scroll target — this
+        // is what removes the stepping when the scroll decelerates.
+        const tick = () => {
+          frame.current += (frame.target - frame.current) * 0.18;
+          const idx = Math.round(frame.current);
+          if (idx !== frame.drawn) {
+            frame.drawn = idx;
+            draw(idx);
+          }
+        };
+        gsap.ticker.add(tick);
+
         const st = ScrollTrigger.create({
           trigger: rootRef.current,
           start: "top top",
-          end: `+=${window.innerHeight * 7}`,
+          end: `+=${window.innerHeight * 6}`,
           pin: true,
           pinSpacing: true,
-          scrub: 1,
           anticipatePin: 1,
           onUpdate: (self) => {
             const p = self.progress;
+            frame.target = Math.min(p / 0.92, 1) * (FRAME_COUNT - 1);
 
-            // film: all frames land by 90% so the unpin never mid-frames
-            const filmP = Math.min(p / 0.9, 1);
-            const nextIndex = Math.round(filmP * (FRAME_COUNT - 1));
-            if (nextIndex !== frame.index) {
-              frame.index = nextIndex;
-              render();
-            }
-
-            // global nav bows out across the first 10%
             if (nav) {
               gsap.set(nav, {
                 opacity: p < 0.1 ? 1 - p / 0.1 : 0,
@@ -122,12 +146,13 @@ export default function VideoScrollHero() {
               });
             }
 
-            // the promise rides the orbit, then recedes at the threshold
-            const hp = Math.min(p / 0.28, 1);
-            gsap.set(headerRef.current, {
-              z: -900 * hp,
-              opacity: p < 0.22 ? 1 : Math.max(0, 1 - (p - 0.22) / 0.06),
+            // Title + scrim lift away together across the first act.
+            const out = Math.min(p / 0.16, 1);
+            gsap.set(copyRef.current, {
+              autoAlpha: 1 - out,
+              yPercent: -10 * out,
             });
+            gsap.set(scrimRef.current, { autoAlpha: 1 - out });
           },
           onLeave: () =>
             nav &&
@@ -136,20 +161,38 @@ export default function VideoScrollHero() {
 
         const onResize = () => {
           setCanvasSize();
-          render();
+          draw(frame.drawn < 0 ? 0 : frame.drawn);
           ScrollTrigger.refresh();
         };
         window.addEventListener("resize", onResize);
 
         return () => {
           window.removeEventListener("resize", onResize);
+          gsap.ticker.remove(tick);
           st.kill();
-          gsap.ticker.remove(raf);
-          lenis.destroy();
           if (nav) gsap.set(nav, { opacity: 1, pointerEvents: "auto" });
         };
       },
     );
+
+    // --- Mobile: title lifts away as you scroll past the film ---
+    mm.add("(max-width: 1023px)", () => {
+      const st = ScrollTrigger.create({
+        trigger: rootRef.current,
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+        onUpdate: (self) => {
+          const out = Math.min(self.progress / 0.5, 1);
+          gsap.set(copyRef.current, {
+            autoAlpha: 1 - out,
+            yPercent: -10 * out,
+          });
+          gsap.set(scrimRef.current, { autoAlpha: 1 - out });
+        },
+      });
+      return () => st.kill();
+    });
 
     return () => mm.revert();
   }, []);
@@ -157,45 +200,72 @@ export default function VideoScrollHero() {
   return (
     <section
       ref={rootRef}
-      className="viz-scope relative h-svh w-full overflow-hidden bg-[var(--viz-ground)]"
+      className="viz-scope relative h-svh w-full overflow-hidden bg-[var(--viz-well)]"
     >
-      {/* The film */}
+      {/* The film — canvas on desktop, autoplay video on mobile */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 hidden lg:block"
         aria-hidden="true"
       />
-      {/* Small screens: first frame, still */}
+      {/* biome-ignore lint/a11y/useMediaCaption: ambient background film, no dialogue */}
+      <video
+        className="absolute inset-0 h-full w-full object-cover lg:hidden"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        poster={framePath(0)}
+        aria-hidden="true"
+      >
+        <source src="/hero-film.mp4" type="video/mp4" />
+      </video>
+
+      {/* Legibility scrim: a soft dark wash behind the title, fading with it. */}
       <div
-        className="absolute inset-0 bg-cover bg-center lg:hidden"
-        style={{ backgroundImage: `url('${framePath(0)}')` }}
+        ref={scrimRef}
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(125% 90% at 50% 40%, rgba(26,22,16,0.64) 0%, rgba(26,22,16,0.34) 44%, transparent 74%)",
+        }}
         aria-hidden="true"
       />
 
-      {/* The promise, receding into the room */}
+      {/* Title sequence. Each clip container carries bottom padding pulled
+          back by negative margin, so mask-reveal never crops descenders. */}
       <div
-        className="absolute inset-0 flex items-start justify-center pt-[22vh]"
-        style={{ perspective: "1000px" }}
+        ref={copyRef}
+        className="absolute inset-x-0 top-[25%] flex flex-col items-center px-6 text-center"
       >
-        <div ref={headerRef} className="px-6 text-center">
-          <p className="viz-mono text-xs tracking-widest text-[var(--viz-ink)]/70 uppercase">
+        <div className="-mb-[0.2em] overflow-hidden pb-[0.2em]">
+          <p className="hero-copy-line viz-mono text-[11px] tracking-[0.32em] text-white/80 uppercase sm:text-xs">
             Your materials guide
           </p>
-          <h1 className="viz-serif mx-auto mt-5 max-w-3xl text-5xl leading-tight text-[var(--viz-ink)] [text-shadow:0_0_18px_rgba(251,249,244,0.95),0_0_60px_rgba(251,249,244,0.75)] md:text-6xl">
-            Materials matched.
-            <br />
-            Projects simplified.
-            <br />
-            <span className="italic">Designs elevated.</span>
-          </h1>
-          <p className="viz-mono mt-8 text-[11px] tracking-[0.2em] text-[var(--viz-ink)]/60 uppercase">
+        </div>
+        <h1 className="viz-serif mt-4 max-w-3xl text-4xl leading-[1.12] text-white sm:text-5xl md:text-6xl lg:text-7xl">
+          <span className="block -mb-[0.16em] overflow-hidden pb-[0.16em]">
+            <span className="hero-copy-line block">Materials matched.</span>
+          </span>
+          <span className="block -mb-[0.16em] overflow-hidden pb-[0.16em]">
+            <span className="hero-copy-line block">Projects simplified.</span>
+          </span>
+          <span className="block -mb-[0.16em] overflow-hidden pb-[0.16em]">
+            <span className="hero-copy-line block italic">
+              Designs elevated.
+            </span>
+          </span>
+        </h1>
+        <div className="mt-8 -mb-[0.2em] overflow-hidden pb-[0.2em]">
+          <p className="hero-copy-line viz-mono text-[10px] tracking-[0.3em] text-white/75 uppercase sm:text-[11px]">
             Upload · Match · Render · Spec
           </p>
         </div>
       </div>
 
       {/* Scroll cue */}
-      <p className="viz-mono absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] tracking-[0.2em] text-[var(--viz-ink)]/50 uppercase lg:bottom-8">
+      <p className="viz-mono absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] tracking-[0.3em] text-white/60 uppercase lg:bottom-8">
         Scroll
       </p>
     </section>
