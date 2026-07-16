@@ -23,6 +23,18 @@ export async function getAuthenticatedUser() {
     return { user: null, error: error || new Error("Not authenticated") };
   }
 
+  // Reject suspended accounts immediately. Supabase ban_duration revokes refresh
+  // tokens but leaves an already-issued access token valid until it expires; this
+  // indexed PK lookup on the user's own profile closes that window.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("banned")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.banned) {
+    return { user: null, error: new Error("Account suspended") };
+  }
+
   return { user, error: null };
 }
 
