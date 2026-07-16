@@ -7,8 +7,11 @@
  * inside client code.
  */
 
-const requireEnv = (name) => {
-  const value = process.env[name];
+// The value must come from a STATIC `process.env.NEXT_PUBLIC_*` reference.
+// Next.js inlines NEXT_PUBLIC_* vars into the browser bundle only for literal
+// member access — a dynamic `process.env[name]` is NOT inlined and reads as
+// undefined in the browser, which would throw here on every page.
+const requireEnv = (name, value) => {
   if (!value) {
     throw new Error(
       `Missing required environment variable: ${name}. ` +
@@ -19,11 +22,15 @@ const requireEnv = (name) => {
 };
 
 /** @returns {string} Public Supabase project URL. */
-export const getSupabaseUrl = () => requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+export const getSupabaseUrl = () =>
+  requireEnv("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 /** @returns {string} Public Supabase anon key. */
 export const getSupabaseAnonKey = () =>
-  requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  requireEnv(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
 
 /**
  * @returns {string} Server-only Google GenAI API key.
@@ -35,5 +42,5 @@ export const getGoogleGenAIKey = () => {
       "GOOGLE_GENAI_API_KEY is server-only and must not be read in the browser.",
     );
   }
-  return requireEnv("GOOGLE_GENAI_API_KEY");
+  return requireEnv("GOOGLE_GENAI_API_KEY", process.env.GOOGLE_GENAI_API_KEY);
 };
