@@ -45,7 +45,7 @@ const CHAPTERS = [
     eyebrow: "AI Material Finder",
     title: "Every piece, sourced.",
     line: "Point at anything in the room and we identify the real product.",
-    href: "/ai-material-finder",
+    href: "/material-finder",
     pin: {
       x: 52,
       y: 52,

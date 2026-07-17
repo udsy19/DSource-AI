@@ -64,7 +64,7 @@ const VisualizerBoard = () => {
             <div className="flex items-baseline justify-between gap-4 pb-2">
               <p className="viz-label">DSource Studio</p>
               <Link
-                href="/ai-material-finder/tutorial"
+                href="/material-finder/tutorial"
                 className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
               >
                 View tutorial →
