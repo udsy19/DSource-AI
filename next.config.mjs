@@ -73,6 +73,12 @@ const nextConfig = {
     ];
   },
   images: {
+    // Vercel Services (beta) routes every request to the service function and
+    // does not wire up the platform image optimizer, so /_next/image 404s and
+    // every <Image> renders broken (first seen: the header logo). Serve
+    // sources directly — they're pre-compressed, and this also sidesteps
+    // optimizer billing. Revisit if Services gains optimizer support.
+    unoptimized: true,
     remotePatterns: ALLOWED_IMAGE_HOSTS.map((hostname) => ({
       protocol: "https",
       hostname,
