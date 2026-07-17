@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef } from "react";
 import Dossier from "@/components/material-finder/Dossier";
 import InputPlate from "@/components/material-finder/InputPlate";
 import SearchProgress from "@/components/material-finder/SearchProgress";
@@ -18,6 +20,19 @@ import { useSpec } from "@/contexts/SpecContext";
 const MaterialFinderTool = () => {
   const { addProductToSpec } = useSpec();
   const { status, stage, result, error, search, reset } = useMaterialFinder();
+  const searchParams = useSearchParams();
+  const autoRan = useRef(false);
+
+  // ?url= arrives from the dsource.ai/<product-url> prefix route. Run it once,
+  // on arrival — the user already expressed intent by typing our domain in
+  // front of theirs; making them press a button again would be theatre.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run exactly once per arrival; search is recreated each render
+  useEffect(() => {
+    const url = searchParams.get("url");
+    if (!url || autoRan.current) return;
+    autoRan.current = true;
+    search({ url });
+  }, [searchParams]);
 
   const searching = status === "searching";
   const showPlate = status === "idle" || status === "error";
@@ -105,4 +120,14 @@ const MaterialFinderTool = () => {
   );
 };
 
-export default MaterialFinderTool;
+/**
+ * useSearchParams() opts the tree into client-side bailout, so the page needs
+ * a Suspense boundary to stay statically prerenderable.
+ */
+const MaterialFinderPage = () => (
+  <Suspense fallback={null}>
+    <MaterialFinderTool />
+  </Suspense>
+);
+
+export default MaterialFinderPage;

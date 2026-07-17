@@ -3,19 +3,19 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/utils/api-auth";
 import { hostQueryImage, unhostQueryImage } from "@/utils/finder/host-image";
-import {
-  enrichIdentity,
-  identifyFromImage,
-  identifyFromUrl,
-  offerFromSource,
-  searchKeyFor,
-} from "@/utils/finder/identity";
+import { identifyFromImage, identifyFromUrl } from "@/utils/finder/identity";
 import {
   providersFor,
   unconfiguredProviders,
 } from "@/utils/finder/provider-registry";
 import { identityFromCatalog } from "@/utils/finder/providers/catalog";
-import { scoreAndRank, summarizeEvidence } from "@/utils/finder/score";
+import {
+  enrichIdentity,
+  offerFromSource,
+  scoreAndRank,
+  searchKeyFor,
+  summarizeEvidence,
+} from "@/utils/finder/score";
 import { verifyOffers } from "@/utils/finder/verify";
 import { checkRateLimit } from "@/utils/rate-limit";
 import { createClient } from "@/utils/supabase/server";
