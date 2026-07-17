@@ -7,7 +7,7 @@ import Reveal from "../Reveal";
 
 // Community renders, hung as five columns that drift at alternating speeds.
 const COLUMNS = [
-  [{ id: "gw-1", image: "/material-finder-images/DS 001.png", tall: true }],
+  [{ id: "gw-1", image: "/material-finder-images/DS 001.webp", tall: true }],
   [
     { id: "gw-2", image: "/material-finder-images/DS 006.png" },
     { id: "gw-3", image: "/material-finder-images/Frame 99.png" },
