@@ -175,7 +175,7 @@ export default function WorkflowPlates() {
         </Link>
 
         {/* 02 — Discover */}
-        <Link href="/ai-material-finder" className="workflow-plate group block">
+        <Link href="/material-finder" className="workflow-plate group block">
           <p className="viz-label">Step 02 — Discover</p>
           <div className="relative mt-3 h-[300px] overflow-hidden rounded-2xl border border-[var(--viz-line)] sm:h-[380px] lg:h-[420px]">
             <div
