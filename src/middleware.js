@@ -118,6 +118,10 @@ export async function middleware(request) {
 }
 
 export const config = {
+  // Vercel Services can't ship Edge Function output ("Edge Runtime is not
+  // supported in services"), and Node middleware is stable since Next 15.5 —
+  // run the auth gating on the Node runtime instead.
+  runtime: "nodejs",
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
