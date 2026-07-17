@@ -201,7 +201,7 @@ python3 -m venv .venv
 
 ## 9. Post-deploy smoke tests
 
-1. **Auth:** sign up, log in, log out; `/spec-builder`, `/ai-material-finder`,
+1. **Auth:** sign up, log in, log out; `/spec-builder`, `/material-finder`,
    `/ai-visualizer` redirect to `/` when logged out.
 2. **Marketplace:** product list and detail pages render with images.
 3. **AI Material Finder:** upload a room photo → elements detected → product

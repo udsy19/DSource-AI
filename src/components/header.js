@@ -21,6 +21,7 @@ const PUBLIC_NAV_LINKS = [
 const AUTHED_NAV_LINKS = [
   { href: "/studio", label: "Studio" },
   { href: "/ai-visualizer", label: "Product" },
+  { href: "/material-finder/find", label: "Material Finder" },
   { href: "/get-inspired", label: "Get inspired" },
   { href: "/marketplace/products", label: "Digital Library" },
 ];

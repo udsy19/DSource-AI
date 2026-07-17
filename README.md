@@ -5,7 +5,7 @@ DSource is an AI-powered interior materials marketplace built with [Next.js 15](
 ## Features
 
 - **Marketplace** (`/marketplace`) — browse and view products backed by a Supabase database.
-- **AI Material Finder** (`/ai-material-finder`) — upload a room photo; Gemini vision detects elements (sofa, floor, walls, ...) and matches them to catalog products. *Requires login.*
+- **Material Finder** (`/material-finder`) — paste a product link or drop a photo of one product; resolves what it is (JSON-LD identifiers, or Gemini vision reading the label), then fans out across the DSource catalog, Shopify's catalog, ShopSavvy and Google Lens to find everyone selling it. Every seller is shown, ranked by tier (GTIN agreement → probable → unverified) with the evidence behind each match, and grey-market/dropshipper signals flagged. The tool at `/material-finder/find` *requires login* and is rate-limited — each search spends real money across paid providers. The landing page and tutorial are public.
 - **AI Visualizer** (`/ai-visualizer`) — three modes, all image-edit-first (they start from your uploaded room photo). *Requires login.*
   - **AI Render** — restyle the room from structured parameters (style, lighting, palette, flooring, ...) plus a free-text brief. After generation, vision AI verifies the result against the brief and retries once with strengthened directives if a parameter was ignored; when every check passes the title block reads **PROOF: VERIFIED**.
   - **Mood Board** — fuse selected catalog products into a composed board.
@@ -95,7 +95,7 @@ dsource-client/
 ├── supabase/migrations/     # Render history, embeddings, layer graph
 └── src/
     ├── app/
-    │   ├── marketplace/ · [ai-material-finder]/ · ai-visualizer/
+    │   ├── marketplace/ · material-finder/ · ai-visualizer/
     │   ├── spec-builder/ · vendor/ · login/ · signup/ · static pages
     │   └── api/
     │       ├── analyze-image/       # Gemini: detect elements in a room photo
@@ -123,7 +123,8 @@ Internal modules are imported through the `@/*` alias (e.g. `@/utils/supabase/se
 
 `middleware.js` runs on every non-static page request:
 
-- `/spec-builder`, `/ai-material-finder`, `/ai-visualizer` → redirect to `/` when not logged in.
+- `/spec-builder`, `/material-finder/find`, `/ai-visualizer` → redirect to `/` when not logged in.
+  (`/material-finder` itself and its tutorial stay public — only the tool is gated.)
 - `/vendor/*` (beyond the `/vendor` landing page) → redirect unless the user has the `vendor` role.
 
 API routes are skipped by the middleware and enforce auth themselves (`src/utils/api-auth.js`); the expensive AI routes are additionally rate-limited per user (`src/utils/rate-limit.js`).

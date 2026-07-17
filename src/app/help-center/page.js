@@ -175,7 +175,7 @@ export default function HelpCenterPage() {
             New to the studio? Start with how it works.
           </p>
           <Link
-            href="/ai-material-finder/tutorial"
+            href="/material-finder/tutorial"
             className="viz-mono mt-3 inline-block text-xs tracking-[0.08em] uppercase underline decoration-[var(--viz-line)] underline-offset-4 transition-colors hover:text-[var(--viz-blue)] hover:decoration-[var(--viz-blue)]"
           >
             How the studio works →

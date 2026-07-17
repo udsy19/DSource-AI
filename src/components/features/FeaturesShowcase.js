@@ -343,7 +343,7 @@ export const FEATURES = [
     blurb:
       "The AI reads a finished scene and matches each item — sofa, lamp, rug, tile — to a real, live-priced product from the material bank.",
     cta: "Try the finder",
-    href: "/ai-material-finder",
+    href: "/material-finder",
   },
   {
     n: "03",

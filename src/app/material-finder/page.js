@@ -36,7 +36,7 @@ const AiMaterialFinder = () => {
             <div className="flex items-baseline justify-between gap-4 pb-2">
               <p className="viz-label">DSource Studio</p>
               <Link
-                href="/ai-material-finder/tutorial"
+                href="/material-finder/tutorial"
                 className="viz-label shrink-0 hover:text-[var(--viz-ink)]"
               >
                 View tutorial →
@@ -71,7 +71,7 @@ const AiMaterialFinder = () => {
               the endless search.
             </p>
             <Link
-              href="/ai-material-finder/find"
+              href="/material-finder/find"
               className="viz-btn mt-8 inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3.5 text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
             >
               Open the material finder
@@ -160,7 +160,7 @@ const AiMaterialFinder = () => {
                 See a room you love? Bring it in.
               </p>
               <Link
-                href="/ai-material-finder/find"
+                href="/material-finder/find"
                 className="viz-btn inline-block rounded-full bg-[var(--viz-ink)] px-7 py-3.5 text-[var(--viz-paper)] transition-colors duration-200 hover:bg-[var(--viz-well)]"
               >
                 Try it yourself

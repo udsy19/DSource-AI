@@ -1,13 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
-// Routes that require authentication
-// /ai-material-finder (the Features page) is deliberately public — it only
-// explains what the product offers; the AI tools it links to gate themselves.
+// Routes that require authentication.
+// /material-finder itself (the Features page) and its tutorial stay public —
+// they only explain what the product offers. /material-finder/find is gated
+// because every search spends real money across several paid providers, so it
+// must be attributable to a user and rate-limited.
 const protectedRoutes = [
   "/studio",
   "/spec-builder",
   "/ai-visualizer",
+  "/material-finder/find",
   "/account",
   "/folios",
   "/get-inspired",
@@ -118,6 +121,10 @@ export async function middleware(request) {
 }
 
 export const config = {
+  // Vercel Services can't ship Edge Function output ("Edge Runtime is not
+  // supported in services"), and Node middleware is stable since Next 15.5 —
+  // run the auth gating on the Node runtime instead.
+  runtime: "nodejs",
   matcher: [
     /*
      * Match all request paths except for the ones starting with:

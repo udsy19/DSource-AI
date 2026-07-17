@@ -37,6 +37,25 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/spec-pdf": ["./src/assets/fonts/*.ttf", "./src/assets/brand/*.png"],
   },
+  async redirects() {
+    return [
+      // The finder used to live at /ai-material-finder (in a directory named
+      // with literal brackets, so Next served it as a dynamic segment and
+      // every unmatched single-segment path rendered it too). Both the page
+      // and that bug are gone; keep the old URLs working for anything already
+      // indexed or linked.
+      {
+        source: "/ai-material-finder",
+        destination: "/material-finder",
+        permanent: true,
+      },
+      {
+        source: "/ai-material-finder/:path*",
+        destination: "/material-finder/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
