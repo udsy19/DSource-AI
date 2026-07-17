@@ -19,15 +19,13 @@ export async function GET() {
       .from("scraped_product_list")
       .select("*")
       .eq("created_by", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (error) {
-      console.error("Supabase error:", error);
+      console.error("products-list: fetch failed", error);
       return NextResponse.json(
-        {
-          error: "Failed to fetch products from database",
-          details: error.message,
-        },
+        { error: "Failed to fetch products from database" },
         { status: 500 },
       );
     }
@@ -41,9 +39,9 @@ export async function GET() {
       { status: 200 },
     );
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error("products-list: request failed", error);
     return NextResponse.json(
-      { error: "Failed to get products", details: error.message },
+      { error: "Failed to get products" },
       { status: 500 },
     );
   }

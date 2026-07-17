@@ -93,7 +93,7 @@ export async function POST(request) {
     .single();
 
   if (error) {
-    console.error("Supabase insert error:", error);
+    console.error("products: insert failed", error);
     if (error.code === "23505") {
       return NextResponse.json(
         { error: "A product with this product_id already exists" },
@@ -101,15 +101,16 @@ export async function POST(request) {
       );
     }
     return NextResponse.json(
-      { error: error.message ?? "Failed to create product" },
+      { error: "Failed to create product" },
       { status: 500 },
     );
   }
 
-  // Best-effort: embed the product image for reverse search. Failures are
-  // logged only — the backfill script picks up any rows left un-embedded.
+  // Best-effort: embed the product image for reverse search. Failures —
+  // including a missing REPLICATE_API_TOKEN, which throws via utils/env —
+  // are logged only; the backfill script picks up any rows left un-embedded.
   // (CSV bulk uploads skip this; run scripts/backfill-embeddings.mjs after.)
-  if (data?.image_url && process.env.REPLICATE_API_TOKEN) {
+  if (data?.image_url) {
     try {
       const { embedImage } = await import("@/utils/visualizer/embeddings");
       const embedding = await embedImage(data.image_url);

@@ -21,7 +21,7 @@ Names verified against actual `process.env.*` usages in the codebase.
 | `GOOGLE_GENAI_API_KEY` | `/api/analyze-image`, `/api/detect-components`, `/api/generate-image` (topic guard + adherence verification), `/api/reverse-search` (crop description + re-rank) | AI Material Finder; visualizer component detection, prompt guard, PROOF verification, reverse-search quality | **Yes** — server-side only |
 | `REPLICATE_API_TOKEN` | `/api/generate-image` (all image generation), `/api/reverse-search` + `src/utils/visualizer/embeddings.js` (CLIP query embedding), `/api/depth` + `src/utils/visualizer/depth.js` (depth maps), `/api/products` (single-product embed on create), `scripts/backfill-embeddings.mjs` | All visualizer generation, reverse material search, 3D view | **Yes** — server-side only |
 | `MATERIAL_BANK_API_URL` | `src/utils/visualizer/material-bank.js` (used from `/api/reverse-search` and `/api/generate-image` swap path) | Optional. When set, reverse search matches the live material-bank catalog and product **swap-into-render** becomes available. When unset, reverse search falls back to the per-user Supabase catalog (`match_products` RPC) and swap returns "Product swap requires the material bank connection." | Not a credential, but keep it server-side (no `NEXT_PUBLIC_` prefix) |
-| `SUPABASE_SERVICE_ROLE_KEY` | `scripts/backfill-embeddings.mjs` **only** | Embeddings backfill script | **Yes — server scripts only.** Bypasses RLS entirely. It is not referenced anywhere in the app runtime; do **not** add it to Vercel/app env. Keep it in the shell environment of whoever runs the backfill. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `src/utils/supabase/admin.js` (used by `/api/admin/grant-role`), `scripts/backfill-embeddings.mjs` | Admin role grants; embeddings backfill script | **Yes** — server-side only. Bypasses RLS entirely; never expose to the client. Required in app env only if the admin grant-role endpoint is used. |
 | `DEV_AUTH_BYPASS` | `middleware.js` and every visualizer API route | Dev-only auth escape hatch | Must be **absent or `false` in production**. It is additionally `NODE_ENV`-gated (`NODE_ENV !== "production"`), so a production build ignores it — but do not set it anyway. |
 | `PACE_MS` | `scripts/backfill-embeddings.mjs` | Optional; delay between Replicate calls (default `11000` ms) | No |
 | `CAD_EXPORT_URL` *(CAD-IMAGE)* | `/api/cad-convert` | Optional. When set, professional DXF/DWG export via the cad-export microservice; unset or unreachable falls back to the baseline JS DXF renderer. | No, but keep server-side |
@@ -29,7 +29,7 @@ Names verified against actual `process.env.*` usages in the codebase.
 
 `.env.example` documents the app-level variables. Routes with **no** external
 env (`/api/get-products`, `/api/products-list`, `/api/renders`,
-`/api/spec-pdf`, `/api/vendor/upload`, `/api/images/[...path]`) still need
+`/api/spec-pdf`, `/api/vendor/upload`) still need
 the two Supabase publics for auth.
 
 ## 2. Build and run

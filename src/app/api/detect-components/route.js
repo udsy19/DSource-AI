@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/utils/api-auth";
 import {
+  AiResponseError,
+  assertNotBlocked,
   callWithRetry,
   extractJsonResponse,
   getResponseText,
@@ -136,6 +138,11 @@ export async function POST(request) {
       { label: "Component detection", timeoutMs: 30_000 },
     );
 
+    assertNotBlocked(
+      response,
+      "This image couldn't be processed. Please try another photo.",
+    );
+
     const parsed = extractJsonResponse(await getResponseText(response));
     const components = (
       Array.isArray(parsed?.components) ? parsed.components : []
@@ -159,6 +166,12 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, components });
   } catch (error) {
+    if (error instanceof AiResponseError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Component detection failed:", error);
     return NextResponse.json(
       {

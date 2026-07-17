@@ -2,9 +2,10 @@
  * Fail-fast environment variable validation.
  *
  * `NEXT_PUBLIC_*` vars are inlined at build time and safe to read in the
- * browser bundle. `GOOGLE_GENAI_API_KEY` is server-only and is validated
- * lazily — only when running on the server — so it never throws (or leaks)
- * inside client code.
+ * browser bundle. The remaining vars are server-only secrets validated
+ * lazily — only when running on the server, at first use — so they never
+ * throw (or leak) inside client code, and never fail a build that runs
+ * with placeholder env (CI).
  */
 
 const assertEnv = (name, value) => {
@@ -15,6 +16,14 @@ const assertEnv = (name, value) => {
     );
   }
   return value;
+};
+
+const assertServerOnly = (name) => {
+  if (typeof window !== "undefined") {
+    throw new Error(
+      `${name} is server-only and must not be read in the browser.`,
+    );
+  }
 };
 
 // NEXT_PUBLIC_* vars must be referenced STATICALLY (process.env.FOO) so the
@@ -37,10 +46,43 @@ export const getSupabaseAnonKey = () =>
  * @throws If called in a browser context, or if the var is unset on the server.
  */
 export const getGoogleGenAIKey = () => {
-  if (typeof window !== "undefined") {
-    throw new Error(
-      "GOOGLE_GENAI_API_KEY is server-only and must not be read in the browser.",
-    );
-  }
+  assertServerOnly("GOOGLE_GENAI_API_KEY");
   return assertEnv("GOOGLE_GENAI_API_KEY", process.env.GOOGLE_GENAI_API_KEY);
+};
+
+/**
+ * @returns {string} Server-only Supabase service-role key. Bypasses RLS —
+ * never expose it to client code.
+ * @throws If called in a browser context, or if the var is unset on the server.
+ */
+export const getSupabaseServiceRoleKey = () => {
+  assertServerOnly("SUPABASE_SERVICE_ROLE_KEY");
+  return assertEnv(
+    "SUPABASE_SERVICE_ROLE_KEY",
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+};
+
+/**
+ * @returns {string} Server-only Replicate API token.
+ * @throws If called in a browser context, or if the var is unset on the server.
+ */
+export const getReplicateToken = () => {
+  assertServerOnly("REPLICATE_API_TOKEN");
+  return assertEnv("REPLICATE_API_TOKEN", process.env.REPLICATE_API_TOKEN);
+};
+
+/**
+ * Admin emails allowed to perform privileged actions (e.g. granting roles).
+ * Configured via the ADMIN_EMAILS env var (comma-separated).
+ *
+ * @returns {string[]} Lowercased, trimmed admin email allowlist.
+ * @throws If called in a browser context, or if the var is unset on the server.
+ */
+export const getAdminEmails = () => {
+  assertServerOnly("ADMIN_EMAILS");
+  return assertEnv("ADMIN_EMAILS", process.env.ADMIN_EMAILS)
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 };

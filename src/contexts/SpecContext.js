@@ -130,7 +130,7 @@ export const SpecProvider = ({ children }) => {
         quantity: product.quantity || 1,
         timeline: product.timeline || "2-4 weeks",
         inStock: product.inStock !== undefined ? product.inStock : true,
-        image: product.image || "/api/images/placeholder.png",
+        image: product.image || "/placeholder.png",
         link: product.link || "/marketplace",
         category: category || "Uncategorized",
       };

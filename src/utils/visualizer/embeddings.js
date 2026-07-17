@@ -1,5 +1,5 @@
-import Replicate from "replicate";
 import { callWithRetry } from "@/utils/gemini";
+import { getReplicateClient } from "@/utils/replicate";
 
 /**
  * Image embeddings for reverse material search.
@@ -18,15 +18,11 @@ export const EMBEDDING_MODEL =
   "andreasjansson/clip-features:75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a";
 export const EMBEDDING_DIM = 768;
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-  useFileOutput: false,
-});
-
 /**
  * Embeds one image (https URL or data URI) → 768-dim vector.
  */
 export const embedImage = async (imageUrlOrDataUri) => {
+  const replicate = getReplicateClient();
   const output = await callWithRetry(
     () =>
       replicate.run(EMBEDDING_MODEL, { input: { inputs: imageUrlOrDataUri } }),

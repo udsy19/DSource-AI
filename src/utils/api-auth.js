@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getUserRole } from "./authorization";
+import { getAdminEmails } from "./env";
 import { ROLES } from "./roles";
 
 // Single source of truth for role derivation lives in ./authorization. Re-export
@@ -34,18 +35,8 @@ export function isVendorUser(user) {
 }
 
 /**
- * Admin emails allowed to perform privileged actions (e.g. granting roles).
- * Configured via the ADMIN_EMAILS env var (comma-separated).
- */
-export function getAdminEmails() {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-/**
  * Check if a user is an admin (by email allowlist).
+ * Throws (via utils/env) if ADMIN_EMAILS is not configured on the server.
  */
 export function isAdminUser(user) {
   const email = user?.email?.toLowerCase();

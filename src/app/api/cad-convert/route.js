@@ -10,7 +10,10 @@ import {
 } from "@/utils/cad-geometry";
 import { reconcileToDimensions } from "@/utils/cad-reconcile";
 import {
+  AiResponseError,
+  assertNotBlocked,
   extractJsonResponse,
+  generateContentWithResilience,
   getResponseText,
   parseImageData,
 } from "@/utils/gemini";
@@ -39,25 +42,41 @@ const EXTRACTION_MODELS = ["gemini-3.5-flash", "gemini-pro-latest"];
 
 // One JSON-mode Gemini call with the model-fallback loop shared by the
 // extraction, AI-edit, and suggest paths. Throws the last error if every
-// model fails.
+// model fails. Each model attempt is individually time-limited so the
+// fallback still fits the route's maxDuration=60 budget (classification +
+// two 20s extraction attempts leave headroom); 429/5xx get one backoff
+// retry inside the helper, timeouts fall through to the next model.
 const generateJsonWithFallback = async (contents) => {
   let lastError = null;
   for (const model of EXTRACTION_MODELS) {
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          responseMimeType: "application/json",
-          maxOutputTokens: 65536,
-          temperature: 0.2,
+      const response = await generateContentWithResilience(
+        ai,
+        {
+          model,
+          contents,
+          config: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 65536,
+            temperature: 0.2,
+          },
         },
-      });
+        { timeoutMs: 20_000, maxRetries: 1 },
+      );
+      assertNotBlocked(
+        response,
+        "This request was blocked by the content safety filter. Please try a different image or instruction.",
+      );
       return {
         result: extractJsonResponse(await getResponseText(response)),
         model,
       };
     } catch (error) {
+      // A safety block is a verdict on the input, not a model failure —
+      // falling back to another model would just get blocked again.
+      if (error instanceof AiResponseError) {
+        throw error;
+      }
       console.error(`CAD Gemini call failed with ${model}:`, error.message);
       lastError = error;
     }
@@ -305,7 +324,9 @@ const planSizeFromBounds = (bounds) => {
 // renderer consumes. Unset CAD_EXPORT_URL or any failure returns null so the
 // baseline JS renderer always keeps the conversion response working.
 const renderProfessionalExport = async (processed) => {
-  const baseUrl = process.env.CAD_EXPORT_URL;
+  // Tolerate a trailing slash — Vercel's service binding injects the URL as a
+  // base and a double slash would 404 into the silent JS-renderer fallback.
+  const baseUrl = process.env.CAD_EXPORT_URL?.replace(/\/$/, "");
   if (!baseUrl) return null;
   try {
     const response = await fetch(`${baseUrl}/render`, {
@@ -699,10 +720,18 @@ export async function POST(request) {
     };
 
     // Step 1: Gate — only proceed on images that are actually floor plans
-    const classificationResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [imagePart, { text: CLASSIFICATION_PROMPT }],
-    });
+    const classificationResponse = await generateContentWithResilience(
+      ai,
+      {
+        model: "gemini-2.5-flash",
+        contents: [imagePart, { text: CLASSIFICATION_PROMPT }],
+      },
+      { timeoutMs: 15_000, maxRetries: 1 },
+    );
+    assertNotBlocked(
+      classificationResponse,
+      "This image couldn't be processed. Please try another photo.",
+    );
     const classification = extractJsonResponse(
       await getResponseText(classificationResponse),
     );
@@ -802,12 +831,17 @@ export async function POST(request) {
       }),
     );
   } catch (error) {
+    if (error instanceof AiResponseError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Error in cad-convert endpoint:", error);
     return NextResponse.json(
       {
         success: false,
         error: "Failed to convert the image. Please try again.",
-        details: error.message,
       },
       { status: 500 },
     );

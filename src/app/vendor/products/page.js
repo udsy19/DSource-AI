@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -917,11 +916,10 @@ export default function ProductsPage() {
                         <td className="px-4 py-4">
                           {product.image_url && !imageErrors.has(product.id)
                             ? <div className="h-12 w-12 overflow-hidden rounded-md border border-[var(--viz-line)] bg-[var(--viz-ground)]">
-                                <Image
+                                {/* biome-ignore lint/performance/noImgElement: vendor CSV image URLs come from arbitrary supplier hosts next/image is not configured for */}
+                                <img
                                   src={product.image_url}
                                   alt={product.product_name || "Product"}
-                                  width={48}
-                                  height={48}
                                   className="h-full w-full object-cover"
                                   onError={() => {
                                     setImageErrors(

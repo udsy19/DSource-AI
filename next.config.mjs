@@ -28,6 +28,10 @@ const CSP = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // A sibling checkout one directory up has its own package-lock.json, which
+  // makes Next infer the wrong workspace root (breaks serverless file
+  // tracing). Pin the root to this app explicitly.
+  outputFileTracingRoot: import.meta.dirname,
   // Vendored Caslon TTFs + the brand mark are read via fs at runtime by the
   // spec-sheet PDF route — trace them into standalone/serverless output.
   outputFileTracingIncludes: {

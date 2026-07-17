@@ -52,12 +52,9 @@ export async function GET(_request, { params }) {
     const { data: products, error } = await query;
 
     if (error) {
-      console.error("Supabase error:", error);
+      console.error("products/[id]: fetch failed", error);
       return NextResponse.json(
-        {
-          error: "Failed to fetch product from database",
-          details: error.message,
-        },
+        { error: "Failed to fetch product from database" },
         { status: 500 },
       );
     }
@@ -91,9 +88,9 @@ export async function GET(_request, { params }) {
       { status: 200 },
     );
   } catch (error) {
-    console.error("Error fetching product:", error);
+    console.error("products/[id]: request failed", error);
     return NextResponse.json(
-      { error: "Failed to get product", details: error.message },
+      { error: "Failed to get product" },
       { status: 500 },
     );
   }
@@ -199,9 +196,9 @@ export async function PATCH(request, { params }) {
     .single();
 
   if (error) {
-    console.error("Supabase update error:", error);
+    console.error("products/[id]: update failed", error);
     return NextResponse.json(
-      { error: error.message ?? "Failed to update product" },
+      { error: "Failed to update product" },
       { status: 500 },
     );
   }
@@ -256,9 +253,9 @@ export async function DELETE(_request, { params }) {
     .single();
 
   if (error) {
-    console.error("Supabase delete error:", error);
+    console.error("products/[id]: delete failed", error);
     return NextResponse.json(
-      { error: error.message ?? "Failed to delete product" },
+      { error: "Failed to delete product" },
       { status: 500 },
     );
   }
